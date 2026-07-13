@@ -134,6 +134,18 @@ and avoid mixing generated artifacts with source changes. Pull requests target `
 effects, list affected variants, link related issues, and include screenshots for UI changes. Report the exact local
 checks and variant builds performed.
 
+## 人言需求文档
+
+`docs/renyan/` 是人言需求基线、需求原文、证据映射与验证结论的权威目录。需求编号采用稳定的
+`RY-F-NNN` 与 `RY-NF-NNN` 格式；已有编号不得复用或静默改写，需求变更必须保留来源、变更原因和
+对应基线。
+
+需求证据状态限定为“充分静态证据”“部分静态证据”“未发现直接证据”“待动态验证”“待外部材料”和
+“存在冲突风险”。状态只描述当前基线的证据强度，不等同于采购验收、生产验证或合规结论。
+
+需求源、源码证据或状态发生变化时，必须同步维护目录索引、基线说明、需求追踪表和验证报告。所有相关
+修改、提交与推送均遵循 `qsh` 分支规则，不得借由需求文档工作修改或推送 `master`。
+
 ## Agent-Specific Behavioral Guidelines
 
 The following block is intentionally preserved verbatim. Do not edit, reformat, translate, or reorder it.
