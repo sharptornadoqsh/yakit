@@ -1,4 +1,8 @@
-const { app, BrowserWindow, dialog, nativeImage, globalShortcut, ipcMain, protocol, Menu } = require('electron')
+const { app, BrowserWindow, dialog, nativeImage, globalShortcut, ipcMain, protocol, Menu, shell } = require('electron')
+const { configureApplicationIdentity, productConfig } = require('./product')
+
+configureApplicationIdentity(app)
+
 const isDev = require('electron-is-dev')
 const path = require('path')
 const os = require('os')
@@ -13,10 +17,12 @@ const {
   setLocalCache,
 } = require('./localCache')
 const { asyncKillDynamicControl } = require('./handlers/dynamicControlFun')
-const { getWindowStatePath, getConfig } = require('./filePath')
+const { getWindowStatePath, getConfig, getYakitHome } = require('./filePath')
 const Screenshots = require('./screenshots')
 const windowStateKeeper = require('electron-window-state')
-const { MenuTemplate } = require('./menu')
+const { createMenuTemplate } = require('./menu')
+const { showAboutWindow } = require('./about')
+const { createProductTray, destroyProductTray } = require('./tray')
 const {
   renderLogOutputFile,
   getAllLogHandles,
@@ -79,7 +85,7 @@ if (shouldAbortStartupForDebugFlags) {
 
   app.once('ready', () => {
     try {
-      dialog.showErrorBox('Unsupported startup parameters', 'Yakit rejected forbidden debug startup flags.')
+      dialog.showErrorBox('不支持的启动参数', `${productConfig.displayName} 已拒绝调试启动参数。`)
     } catch (error) {}
     app.exit(1)
   })
@@ -91,6 +97,7 @@ const UICloseFlag = 'windows-close-flag'
 /** 窗口对象 */
 let win = null
 let engineLinkWin = null
+let applicationQuitting = false
 
 process.on('uncaughtException', (error) => {
   try {
@@ -137,6 +144,8 @@ function createEngineLinkWindow() {
     skipTaskbar: false,
     fullscreenable: false,
     maximizable: false,
+    title: productConfig.displayName,
+    icon: path.join(__dirname, '../assets/renyan-icon.png'),
   })
 
   if (!hasPos) engineLinkWin.center()
@@ -218,7 +227,7 @@ function createWindow() {
     defaultWidth: minWidth,
     defaultHeight: minHeight,
     path: getWindowStatePath(),
-    file: 'yakit-window-state.json',
+    file: 'renyan-window-state.json',
   })
   const width = Math.max(state.width ?? minWidth, minWidth)
   const height = Math.max(state.height ?? minHeight, minHeight)
@@ -242,6 +251,8 @@ function createWindow() {
     titleBarStyle: 'hidden',
     show: false,
     skipTaskbar: true,
+    title: productConfig.displayName,
+    icon: path.join(__dirname, '../assets/renyan-icon.png'),
   })
 
   if (isDev) win.loadURL('http://127.0.0.1:3000')
@@ -354,6 +365,7 @@ function markRenderOk(curWin) {
 }
 // 关闭、reload清理渲染map
 function clearRenderMap(targetWin) {
+  if (!targetWin) return
   renderMap.delete(targetWin.id)
   messageQueue.delete(targetWin.id)
 }
@@ -398,6 +410,22 @@ function winClose(targetWin, removeEvent) {
     removeEvent && targetWin.removeAllListeners('close')
     targetWin.close()
     targetWin = null
+  }
+}
+
+async function quitApplication() {
+  if (applicationQuitting) return
+  applicationQuitting = true
+  try {
+    await asyncKillDynamicControl()
+  } finally {
+    clearRenderMap(engineLinkWin)
+    clearRenderMap(win)
+    winClose(engineLinkWin, true)
+    winClose(win, true)
+    destroyProductTray()
+    closeAllLogHandles()
+    app.exit()
   }
 }
 // 获取当前窗口
@@ -559,6 +587,7 @@ function registerGlobalIPC() {
     clearRenderMap(win)
     winClose(engineLinkWin, true)
     winClose(win, true)
+    destroyProductTray()
     closeAllLogHandles()
     app.relaunch()
     app.exit(0)
@@ -566,27 +595,13 @@ function registerGlobalIPC() {
 
   // ------------------- 软件退出逻辑 -------------------
   ipcMain.handle('app-exit', async (e, params) => {
-    const { showCloseMessageBox, isIRify, isMemfit } = params
+    const { showCloseMessageBox } = params || {}
     const parentWindow = getActiveWindow()
 
-    const exitCleanupOperation = () => {
-      clearRenderMap(engineLinkWin)
-      clearRenderMap(win)
-      winClose(engineLinkWin, false)
-      winClose(win, false)
-      closeAllLogHandles()
-      app.exit()
-    }
     if (getExtraLocalCacheValue(UICloseFlag) !== false && showCloseMessageBox && parentWindow) {
-      const showIcon = isIRify
-        ? '../assets/irify-close.png'
-        : isMemfit
-          ? '../assets/memfit-close.png'
-          : '../assets/yakit-close.png'
-
       dialog
         .showMessageBox(parentWindow, {
-          icon: nativeImage.createFromPath(path.join(__dirname, showIcon)),
+          icon: nativeImage.createFromPath(path.join(__dirname, '../assets/renyan-close.png')),
           type: 'none',
           title: '提示',
           defaultId: 0,
@@ -599,20 +614,19 @@ function registerGlobalIPC() {
         })
         .then(async (res) => {
           await setCloeseExtraLocalCache(UICloseFlag, !res.checkboxChecked)
-          await asyncKillDynamicControl()
           if (res.response === 0) {
+            await asyncKillDynamicControl()
             e.preventDefault()
             engineLinkWin?.minimize()
             win?.minimize()
           } else if (res.response === 1) {
-            exitCleanupOperation()
+            await quitApplication()
           } else {
             e.preventDefault()
           }
         })
     } else {
-      await asyncKillDynamicControl()
-      exitCleanupOperation()
+      await quitApplication()
     }
   })
 
@@ -636,7 +650,7 @@ function registerGlobalIPC() {
 /**
  * set software menu
  */
-const menu = Menu.buildFromTemplate(MenuTemplate)
+const menu = Menu.buildFromTemplate(createMenuTemplate({ showAbout: () => showAboutWindow(getActiveWindow()) }))
 Menu.setApplicationMenu(menu)
 
 /**
@@ -718,6 +732,19 @@ if (!shouldAbortStartupForDebugFlags) {
 
     createEngineLinkWindow()
     createWindow()
+    createProductTray({
+      showMainWindow: () => winShow(win, readyWinShow),
+      hideWindows: () => {
+        winHide(engineLinkWin)
+        winHide(win)
+      },
+      openLogDirectory: async () => {
+        const errorMessage = await shell.openPath(getYakitHome())
+        if (errorMessage) dialog.showErrorBox('无法打开日志目录', errorMessage)
+      },
+      showAbout: () => showAboutWindow(getActiveWindow()),
+      quitApplication: () => void quitApplication(),
+    })
 
     app.on('activate', function () {
       if (BrowserWindow.getAllWindows().length === 0) {

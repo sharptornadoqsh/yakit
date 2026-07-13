@@ -6,7 +6,7 @@ import { YakitMenuItemDividerProps, YakitMenuItemProps, YakitMenuItemType } from
 import { UserInfoProps } from '@/store'
 import { UserPlatformType } from '@/pages/globalVariable'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
-import yakitImg from '@/assets/yakit.jpg'
+import productIcon from '@/assets/renyan-icon.svg'
 import { useMemoizedFn } from 'ahooks'
 import { API } from '@/services/swagger/resposeType'
 import { getTokenLimit, getTokenPercent, getTokenUsed } from './CeUsageStatisticsModal'
@@ -85,9 +85,9 @@ export const CeUserInfo: React.FC<CeUserInfoProps> = (props) => {
   const avatarSrc = useMemo(() => {
     if (platformType) {
       const imgKey = platformType.img as keyof UserInfoProps
-      return (userInfo[imgKey] as string) || yakitImg
+      return (userInfo[imgKey] as string) || productIcon
     }
-    return yakitImg
+    return productIcon
   }, [userInfo, platformType])
 
   const handleClick = useMemoizedFn((e: React.MouseEvent) => {

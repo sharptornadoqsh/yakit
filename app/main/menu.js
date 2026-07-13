@@ -1,87 +1,59 @@
-const { app, shell } = require('electron')
+const electron = require('electron')
 const process = require('process')
+const { productConfig } = require('./product')
 
 const isMac = process.platform === 'darwin'
 
-/**
- * @name mac系统专属应用上下文菜单项
- * @type {Electron.MenuItemConstructorOptions}
- */
-const macAppMenu = {
-  label: app.name,
-  submenu: [
-    { role: 'about' },
-    { type: 'separator' },
-    { role: 'services' },
-    { type: 'separator' },
-    { role: 'hide' },
-    { role: 'hideOthers' },
-    { role: 'unhide' },
-    { type: 'separator' },
-    { role: 'quit' },
-  ],
+const createMenuTemplate = ({ showAbout, openExternal = (target) => electron.shell.openExternal(target) }) => {
+  const macAppMenu = {
+    label: productConfig.displayName,
+    submenu: [
+      { label: `关于 ${productConfig.displayName}`, click: showAbout },
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide', label: `隐藏 ${productConfig.displayName}` },
+      { role: 'hideOthers', label: '隐藏其他窗口' },
+      { role: 'unhide', label: '全部显示' },
+      { type: 'separator' },
+      { role: 'quit', label: `退出 ${productConfig.displayName}` },
+    ],
+  }
+
+  const viewMenu = {
+    label: '视图',
+    submenu: [
+      { role: 'reload', label: '重新载入', accelerator: '' },
+      { role: 'forceReload', label: '强制重新载入', accelerator: '' },
+      { role: 'toggleDevTools', label: '开发者工具' },
+      { type: 'separator' },
+      { role: 'resetZoom', label: '重置缩放' },
+      { role: 'zoomIn', label: '放大' },
+      { role: 'zoomOut', label: '缩小' },
+      { type: 'separator' },
+      { role: 'togglefullscreen', label: '切换全屏' },
+    ],
+  }
+
+  const helpMenu = {
+    role: 'help',
+    label: '帮助',
+    submenu: [
+      { label: `关于 ${productConfig.displayName}`, click: showAbout },
+      { type: 'separator' },
+      { label: '项目主页', click: () => openExternal(productConfig.repositoryUrl) },
+      { label: '问题反馈', click: () => openExternal(productConfig.issuesUrl) },
+      { label: '上游开源文档', click: () => openExternal(productConfig.upstreamDocumentationUrl) },
+    ],
+  }
+
+  return [
+    ...(isMac ? [macAppMenu] : []),
+    { role: 'editMenu', label: '编辑' },
+    viewMenu,
+    { role: 'windowMenu', label: '窗口' },
+    helpMenu,
+  ]
 }
 
-/**
- * @name 开发者工具菜单项
- * @type {Electron.MenuItemConstructorOptions}
- */
-const devToolMenu = {
-  label: 'View',
-  submenu: [
-    { role: 'reload', accelerator: '' },
-    { role: 'forceReload', accelerator: '' },
-    { role: 'toggleDevTools' },
-    { type: 'separator' },
-    { role: 'resetZoom' },
-    { role: 'zoomIn' },
-    { role: 'zoomOut' },
-    { type: 'separator' },
-    { role: 'togglefullscreen' },
-  ],
-}
-
-/**
- * @name 帮助菜单项
- * @type {Electron.MenuItemConstructorOptions}
- */
-const helpMenu = {
-  role: 'help',
-  submenu: [
-    {
-      label: 'Learn More',
-      click: async () => {
-        await shell.openExternal('https://www.yaklang.com')
-      },
-    },
-    {
-      label: 'Yakit IDE',
-      click: async () => {
-        await shell.openExternal(`https://www.yaklang.com/products/intro`)
-      },
-    },
-    {
-      label: 'Yaklang Documentation',
-      click: async () => {
-        await shell.openExternal('https://www.yaklang.com/docs/intro')
-      },
-    },
-    {
-      label: 'Search Issues',
-      click: async () => {
-        await shell.openExternal('https://github.com/yaklang/yakit/issues')
-      },
-    },
-  ],
-}
-
-/** @name 软件顶部菜单 */
-const MenuTemplate = [
-  ...(isMac ? [macAppMenu] : []),
-  { role: 'editMenu' },
-  devToolMenu,
-  { role: 'windowMenu' },
-  helpMenu,
-]
-
-module.exports = { MenuTemplate }
+module.exports = { createMenuTemplate }

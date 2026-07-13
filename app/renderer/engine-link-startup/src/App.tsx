@@ -2,11 +2,12 @@ import { memo, useEffect, useState } from 'react'
 import { StartupPage } from './pages/StartupPage'
 import './theme/ThemeClass.scss'
 import './theme/yakit.scss'
-import { GetMainColor, getReleaseEditionName, isCommunityEdition, isIRify, isMemfit } from './utils/envfile'
+import { GetMainColor, isCommunityEdition, isIRify, isMemfit } from './utils/envfile'
 import { useTheme } from './hooks/useTheme'
 import { applyYakitThemeColors } from './utils/applyYakitThemeColors'
 import { yakitApp } from './utils/electronBridge'
 import styles from './App.module.scss'
+import { productConfig } from './config/product'
 
 const App: React.FC = memo(() => {
   const { theme } = useTheme()
@@ -16,7 +17,7 @@ const App: React.FC = memo(() => {
     yakitApp.markRendererReady()
     const titleElement = document.getElementById('app-html-title')
     if (titleElement) {
-      titleElement.textContent = getReleaseEditionName()
+      titleElement.textContent = productConfig.displayName
     }
 
     // 解压命令执行引擎脚本压缩包

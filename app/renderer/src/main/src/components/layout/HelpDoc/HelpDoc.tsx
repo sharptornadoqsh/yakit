@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
 import { YakitSystem } from '@/yakitGVDefine'
 import { YakitMenu } from '@/components/yakitUI/YakitMenu/YakitMenu'
-import { ReportBug, FeatureRequest, LocalInfoProps } from '@/utils/template/issues'
 import { useMemoizedFn } from 'ahooks'
 import { OutlineQuestionmarkcircleIcon } from '@/assets/icon/outline'
 import { grpcFetchLocalYakitVersion, grpcFetchLocalYakVersion } from '@/apiUtils/grpc'
-import { WebsiteGV } from '@/enums/website'
-import { SystemInfo } from '@/constants/hardware'
 import { yakitShell } from '@/services/electronBridge'
+import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
+import { productBuild, productConfig } from '@/config/product'
+import renyanLogo from '@/assets/renyan-logo-light.svg'
 
 import classNames from 'classnames'
 import styles from './HelpDoc.module.scss'
@@ -24,6 +25,25 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
   const { t } = useI18nNamespaces(['layout'])
 
   const [show, setShow] = useState<boolean>(false)
+  const [aboutVisible, setAboutVisible] = useState<boolean>(false)
+  const [clientVersion, setClientVersion] = useState<string>('读取中')
+  const [engineVersion, setEngineVersion] = useState<string>('读取中')
+
+  useEffect(() => {
+    if (!aboutVisible) return
+
+    let active = true
+    Promise.allSettled([grpcFetchLocalYakitVersion(true), grpcFetchLocalYakVersion(true)]).then(([client, engine]) => {
+      if (!active) return
+      setClientVersion(client.status === 'fulfilled' ? client.value || '未知' : '不可用')
+      setEngineVersion(engine.status === 'fulfilled' ? engine.value || '未知' : '不可用')
+    })
+
+    return () => {
+      active = false
+    }
+  }, [aboutVisible])
+
   const menu = (
     <YakitMenu
       data={[
@@ -41,7 +61,7 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
         },
         {
           key: 'aboutUs',
-          label: t('HelpDoc.aboutUs'),
+          label: `${t('HelpDoc.aboutUs')} · ${productConfig.shortName}`,
         },
       ]}
       onClick={({ key }) => menuSelect(key)}
@@ -51,16 +71,16 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
     if (show) setShow(false)
     switch (type) {
       case 'report_bug':
-        yakitShell.openExternal(`https://github.com/yaklang/yakit/issues/new?template=bug_report.yml`)
+        yakitShell.openExternal(`${productConfig.issuesUrl}/new?template=bug_report.yml`)
         return
       case 'feature_request':
-        yakitShell.openExternal(`https://github.com/yaklang/yakit/issues/new?template=feature_request.yml`)
+        yakitShell.openExternal(`${productConfig.issuesUrl}/new?template=feature_request.yml`)
         return
       case 'official_website':
-        yakitShell.openExternal(WebsiteGV.YakHelpDocAddress)
+        yakitShell.openExternal(productConfig.repositoryUrl)
         return
       case 'aboutUs':
-        yakitShell.openExternal(WebsiteGV.AboutUsWebsite)
+        setAboutVisible(true)
         return
       default:
         return
@@ -68,23 +88,69 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
   })
 
   return (
-    <YakitPopover
-      overlayClassName={classNames(styles['ui-op-dropdown'], styles['ui-op-setting-dropdown'])}
-      trigger={'click'}
-      placement={system === 'Darwin' ? 'bottomRight' : 'bottom'}
-      content={menu}
-      visible={show}
-      onVisibleChange={(visible) => setShow(visible)}
-    >
-      <div className={styles['ui-op-btn-wrapper']}>
-        <div
-          className={classNames(styles['op-btn-body'], {
-            [styles['op-btn-body-hover']]: show,
-          })}
-        >
-          <OutlineQuestionmarkcircleIcon className={styles['icon-style']} />
+    <>
+      <YakitPopover
+        overlayClassName={classNames(styles['ui-op-dropdown'], styles['ui-op-setting-dropdown'])}
+        trigger={'click'}
+        placement={system === 'Darwin' ? 'bottomRight' : 'bottom'}
+        content={menu}
+        visible={show}
+        onVisibleChange={(visible) => setShow(visible)}
+      >
+        <div className={styles['ui-op-btn-wrapper']}>
+          <div
+            className={classNames(styles['op-btn-body'], {
+              [styles['op-btn-body-hover']]: show,
+            })}
+          >
+            <OutlineQuestionmarkcircleIcon className={styles['icon-style']} />
+          </div>
         </div>
-      </div>
-    </YakitPopover>
+      </YakitPopover>
+      <YakitModal
+        visible={aboutVisible}
+        width={560}
+        type="white"
+        title={`关于 ${productConfig.displayName}`}
+        onCancel={() => setAboutVisible(false)}
+        footer={
+          <div className={styles['about-footer']}>
+            <div className={styles['about-legal-links']}>
+              <YakitButton type="text" onClick={() => yakitShell.openExternal(productConfig.licenseUrl)}>
+                开源许可证
+              </YakitButton>
+              <YakitButton type="text" onClick={() => yakitShell.openExternal(productConfig.thirdPartyNoticesUrl)}>
+                第三方通知
+              </YakitButton>
+            </div>
+            <YakitButton type="primary" onClick={() => setAboutVisible(false)}>
+              关闭
+            </YakitButton>
+          </div>
+        }
+      >
+        <div className={styles['about-product']}>
+          <div className={styles['about-brand']}>
+            <img src={renyanLogo} alt={productConfig.displayName} />
+            <div>
+              <div className={styles['about-name']}>{productConfig.displayName}</div>
+              <div className={styles['about-tagline']}>{productConfig.tagline}</div>
+            </div>
+          </div>
+          <dl className={styles['about-metadata']}>
+            <dt>客户端版本</dt>
+            <dd>{clientVersion}</dd>
+            <dt>引擎版本</dt>
+            <dd>{engineVersion}</dd>
+            <dt>构建版本</dt>
+            <dd>{productBuild.buildSha}</dd>
+            <dt>版本类别</dt>
+            <dd>{productBuild.edition}</dd>
+          </dl>
+          <div className={styles['about-support']}>支持方：{productConfig.supportName}</div>
+          <div className={styles['about-copyright']}>{productConfig.copyright}</div>
+        </div>
+      </YakitModal>
+    </>
   )
 })

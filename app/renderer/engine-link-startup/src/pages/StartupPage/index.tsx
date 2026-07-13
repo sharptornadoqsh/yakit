@@ -46,7 +46,6 @@ import {
   isEnpriTrace,
   isEnpriTraceAgent,
   isEnpriTraceIRify,
-  isIRify,
   isMemfit,
 } from '@/utils/envfile'
 import { RemoteEngine } from './components/RemoteEngine/RemoteEngine'
@@ -57,20 +56,16 @@ import { LocalEngineLinkFuncProps, LocalLinkParams } from './components/LocalEng
 import { EngineLog } from './components/EngineLog'
 import emiter from '@/utils/eventBus/eventBus'
 import { YaklangEngineWatchDog } from './components/YaklangEngineWatchDog'
-import yakitEELogo from '@/assets/yakitEELogo.png'
-import yakitEEDarkLogo from '@/assets/yakitEEDarkLogo.png'
-import yakitSELogo from '@/assets/yakitSELogo.png'
-import yakitSEDarkLogo from '@/assets/yakitSEDarkLogo.png'
-import irifyRight from '@/assets/irify-right.png'
-import yakitRight from '@/assets/yakit-right.png'
-import memfitRight from '@/assets/memfit-right.webm'
-import memfitRightDark from '@/assets/memfit-right-dark.webm'
-import { SolidIrifyFontLogoIcon, SolidMemfitFontLogoIcon, SolidYakitFontLogoIcon } from '@/assets/colors'
+import renyanLogoLight from '@/assets/renyan-logo-light.svg'
+import renyanLogoDark from '@/assets/renyan-logo-dark.svg'
+import renyanPanelLight from '@/assets/renyan-startup-panel-light.svg'
+import renyanPanelDark from '@/assets/renyan-startup-panel-dark.svg'
 import { useTheme } from '@/hooks/useTheme'
 import { SoftwareBasics } from './components/SoftwareBasics'
 import { yakitApp, yakitEngine } from '@/utils/electronBridge'
 import { useYakitStatus } from '@/hooks/useYakitStatus'
 import styles from './index.module.scss'
+import { productConfig } from '@/config/product'
 
 const DefaultCredential: YaklangEngineWatchDogCredential = {
   Host: '127.0.0.1',
@@ -1140,47 +1135,8 @@ export const StartupPage: React.FC = () => {
     }
   })
 
-  const startupLogo = useMemo(() => {
-    // ce
-    if (isCommunityEdition()) {
-      if (isCommunityIRify()) {
-        return { type: 'svg', component: SolidIrifyFontLogoIcon, width: 112, height: 41 }
-      } else if (isCommunityMemfit()) {
-        return { type: 'svg', component: SolidMemfitFontLogoIcon, width: 112, height: 41 }
-      } else {
-        return { type: 'svg', component: SolidYakitFontLogoIcon, width: 112, height: 41 }
-      }
-    }
-
-    // ee
-    if (isEnpriTrace()) {
-      if (isEnpriTraceIRify()) {
-        return { type: 'svg', component: SolidIrifyFontLogoIcon, width: 112, height: 41 }
-      } else if (isMemfit()) {
-        return { type: 'svg', component: SolidMemfitFontLogoIcon, width: 112, height: 41 }
-      } else {
-        return { type: 'img', src: theme === 'light' ? yakitEELogo : yakitEEDarkLogo, width: 137, height: 40 }
-      }
-    }
-
-    // se
-    if (isEnpriTraceAgent()) {
-      return { type: 'img', src: theme === 'light' ? yakitSELogo : yakitSEDarkLogo, width: 190, height: 40 }
-    }
-
-    return { type: 'svg', component: SolidYakitFontLogoIcon, width: 112, height: 41 }
-  }, [theme])
-
-  const startupRightImg = useMemo(() => {
-    if (isIRify()) {
-      return <img src={irifyRight} alt="暂无图片" />
-    }
-    if (isCommunityMemfit() || isMemfit())
-      return (
-        <video src={theme === 'light' ? memfitRight : memfitRightDark} autoPlay loop muted playsInline preload="auto" />
-      )
-    return <img src={yakitRight} alt="暂无图片" />
-  }, [theme])
+  const startupLogo = theme === 'light' ? renyanLogoLight : renyanLogoDark
+  const startupRightImg = theme === 'light' ? renyanPanelLight : renyanPanelDark
 
   return (
     <div className={styles['startup-wrapper']}>
@@ -1188,13 +1144,9 @@ export const StartupPage: React.FC = () => {
       <div className={styles['startup-wrapper-left']}>
         <div className={styles['startup-title']}>
           <div className={styles['startup-logo']}>
-            {startupLogo.type === 'img' ? (
-              <img src={startupLogo.src} alt="暂无图片" width={startupLogo.width} height={startupLogo.height} />
-            ) : (
-              <startupLogo.component style={{ height: startupLogo.height, width: startupLogo.width }} />
-            )}
+            <img src={startupLogo} alt={productConfig.displayName} width={300} height={72} />
           </div>
-          <div className={styles['startup-desc']}>为网络安全而生</div>
+          <div className={styles['startup-desc']}>{productConfig.tagline}</div>
         </div>
         <YaklangEngineWatchDog
           credential={credential}
@@ -1280,7 +1232,9 @@ export const StartupPage: React.FC = () => {
           </>
         )}
       </div>
-      <div className={styles['startup-wrapper-right']}>{startupRightImg}</div>
+      <div className={styles['startup-wrapper-right']}>
+        <img src={startupRightImg} alt={`${productConfig.displayName} 启动页`} />
+      </div>
     </div>
   )
 }

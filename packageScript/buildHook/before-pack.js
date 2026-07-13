@@ -1,4 +1,5 @@
 const packageJson = require('../../package.json')
+const productConfig = require('../../product/renyan.json')
 
 module.exports = async function (context) {
   const isLegacy = process.env.THE_LEGACY == 'true'
@@ -19,9 +20,7 @@ module.exports = async function (context) {
     productVersion = productVersion.replace('-ee', '')
   }
 
-  const productName = baseInfo.productName
-
-  const artifactName = productName === 'Memfit AI' ? 'MemfitAI' : productName
+  const artifactName = productConfig.artifactPrefix
 
   /** win32 */
   const win32Config = context.electronPlatformName === 'win32' ? context.packager.config.win : null

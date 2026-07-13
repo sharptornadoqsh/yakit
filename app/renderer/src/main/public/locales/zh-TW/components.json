@@ -350,7 +350,7 @@
       "knowledgeBase": "知識庫"
     },
     "KnowledgeBaseGraphDemo": {
-      "techDocs": "yakit 技術文件"
+      "techDocs": "睿眼自動化滲透系統技術文件"
     },
     "RagEntryTable": {
       "fetchFailed": "獲取向量儲存條目失敗：{{error}}",

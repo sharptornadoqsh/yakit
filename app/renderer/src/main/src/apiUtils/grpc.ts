@@ -1,6 +1,6 @@
 import { yakitNotify } from '@/utils/notification'
 import { APIFunc, APINoRequestFunc, APIOptionalFunc } from './type'
-import { fetchEnv, getReleaseEditionName } from '@/utils/envfile'
+import { fetchEnv, getReleaseEditionCompatibilityName } from '@/utils/envfile'
 import { NetWorkApi } from '@/services/fetch'
 import { API } from '@/services/swagger/resposeType'
 import { yakitEngine } from '@/services/electronBridge'
@@ -39,7 +39,7 @@ export const grpcFetchLatestYakitVersion: APIOptionalFunc<GrpcToHTTPRequestProps
     yakitEngine
       .fetchLatestYakitVersion({
         config: config,
-        releaseEditionName: getReleaseEditionName(),
+        releaseEditionName: getReleaseEditionCompatibilityName(),
       })
       .then(resolve)
       .catch((e) => {

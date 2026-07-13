@@ -56,7 +56,7 @@ import { YakitHint } from '@/components/yakitUI/YakitHint/YakitHint'
 import { PluginUpload } from '@/pages/plugins/local/PluginLocalUpload'
 import { setClipboardText } from '@/utils/clipboard'
 
-import YakitLogo from '@/assets/yakitLogo.png'
+import YakitLogo from '@/assets/renyan-icon.svg'
 import UnLogin from '@/assets/unLogin.png'
 import classNames from 'classnames'
 import '../../plugins/plugins.scss'

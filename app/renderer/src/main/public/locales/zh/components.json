@@ -350,7 +350,7 @@
       "knowledgeBase": "知识库"
     },
     "KnowledgeBaseGraphDemo": {
-      "techDocs": "yakit 技术文档"
+      "techDocs": "睿眼自动化渗透系统技术文档"
     },
     "RagEntryTable": {
       "fetchFailed": "获取向量存储条目失败：{{error}}",

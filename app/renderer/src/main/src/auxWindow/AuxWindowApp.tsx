@@ -4,6 +4,7 @@ import EngineConsole from '@/auxWindow/pages/EngineConsole/EngineConsole'
 import AiChatLog from '@/auxWindow/pages/AiChatLog/AiChatLog'
 import AIConcurrentStream from '@/auxWindow/pages/AIConcurrentStream/AIConcurrentStream'
 import { AuxWindowRoute } from '@/auxWindow/routes/routes'
+import { productConfig } from '@/config/product'
 
 const getQueryParam = (param: string) => new URLSearchParams(window.location.search).get(param)
 
@@ -24,7 +25,7 @@ const isAuxWindowRoute = (route: string): route is AuxWindowRoute => {
 const AuxWindowApp: React.FC = () => {
   const windowId = getQueryParam('windowId') || ''
   const route = getQueryParam('route') || ''
-  const title = getQueryParam('title') || 'Yakit'
+  const title = getQueryParam('title') || productConfig.displayName
 
   useEffect(() => {
     document.title = title

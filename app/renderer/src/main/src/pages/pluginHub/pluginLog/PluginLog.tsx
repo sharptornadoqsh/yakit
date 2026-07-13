@@ -20,7 +20,7 @@ import { failed } from '@/utils/notification'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { OutlineRefreshIcon } from '@/assets/icon/outline'
 
-import yakitImg from '@/assets/yakit.jpg'
+import productIcon from '@/assets/renyan-icon.svg'
 import classNames from 'classnames'
 import styles from './PluginLog.module.scss'
 
@@ -271,7 +271,7 @@ export const PluginLog: React.FC<PluginLogProps> = memo(
           <div className={styles['reply-body']}>
             <div className={styles['reply-user']}>
               {userInfo.isLogin ? (
-                <img src={userInfo[UserPlatformType[userInfo.platform || ''].img] || yakitImg} />
+                <img src={userInfo[UserPlatformType[userInfo.platform || ''].img] || productIcon} />
               ) : (
                 <UnLoginSvgIcon />
               )}

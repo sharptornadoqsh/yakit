@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+<defs>
+  <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#07122E" /><stop offset="1" stop-color="#173A7A" /></linearGradient>
+  <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#7899DB" stroke-width="1" opacity=".16" /></pattern>
+</defs>
+<rect width="1600" height="1000" fill="url(#background)" /><rect width="1600" height="1000" fill="url(#grid)" />
+<path d="M0 760H300L430 630H720L900 810H1260L1400 670H1600" fill="none" stroke="#16B89A" stroke-width="8" opacity=".65" />
+<path d="M0 210H280L410 340H680L860 160H1190L1360 330H1600" fill="none" stroke="#315EFB" stroke-width="8" opacity=".75" />
+<g transform="translate(1030 245) scale(.42)" opacity=".2"><defs>
+  <linearGradient id="background-mark-background" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#0A1538" />
+    <stop offset="1" stop-color="#244A98" />
+  </linearGradient>
+</defs>
+<rect width="1024" height="1024" rx="218" fill="url(#background-mark-background)" />
+<path d="M168 512 Q512 188 856 512" fill="none" stroke="#F4F8FF" stroke-width="54" stroke-linecap="round" />
+<path d="M168 512 Q512 836 856 512" fill="none" stroke="#F4F8FF" stroke-width="54" stroke-linecap="round" />
+<path d="M512 364 640 438 640 586 512 660 384 586 384 438Z" fill="#16B89A" />
+<circle cx="512" cy="512" r="68" fill="#0A1538" />
+<circle cx="512" cy="512" r="24" fill="#FFFFFF" />
+<path d="M304 204H178V330 M720 204H846V330 M304 820H178V694 M720 820H846V694" fill="none" stroke="#315EFB" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" />
+<g fill="#16B89A">
+  <circle cx="168" cy="512" r="14" /><circle cx="856" cy="512" r="14" />
+  <circle cx="512" cy="188" r="14" /><circle cx="512" cy="836" r="14" />
+</g></g>
+</svg>

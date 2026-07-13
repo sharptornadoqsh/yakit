@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Modal, Tooltip, Avatar, Form, Divider } from 'antd'
-import {
-  RiskStateSvgIcon,
-  UISettingSvgIcon,
-  UnLoginSvgIcon,
-  UpdateSvgIcon,
-  VersionUpdateSvgIcon,
-  YakitWhiteSvgIcon,
-} from './icons'
+import { RiskStateSvgIcon, UISettingSvgIcon, UnLoginSvgIcon, UpdateSvgIcon, VersionUpdateSvgIcon } from './icons'
 import { YakitEllipsis } from '../basics/YakitEllipsis'
 import { useCreation, useDebounceEffect, useDebounceFn, useMemoizedFn, useUpdateEffect } from 'ahooks'
 import { showModal } from '@/utils/showModal'
@@ -31,6 +24,7 @@ import { YakitMenu, YakitMenuItemProps, YakitMenuItemType } from '../yakitUI/Yak
 import {
   getCurrentVersionSource,
   VersionSource,
+  getReleaseEditionCompatibilityName,
   getReleaseEditionName,
   getRemoteI18nGV,
   isCommunityEdition,
@@ -117,8 +111,8 @@ import {
 } from '@/apiUtils/grpc'
 import { WebsiteGV } from '@/enums/website'
 
-import YakitLogo from '@/assets/yakitLogo.png'
-import yakitImg from '../../assets/yakit.jpg'
+import renyanIcon from '@/assets/renyan-icon.svg'
+import { productConfig } from '@/config/product'
 import classNames from 'classnames'
 import styles from './funcDomain.module.scss'
 import {
@@ -1068,7 +1062,7 @@ export const FuncDomain: React.FC<FuncDomainProp> = React.memo((props) => {
                       >
                         <UserAvatarIMBadge badge={imControlBadge} onBadgeClick={() => setRobotControlModal(true)}>
                           <img
-                            src={userInfo[UserPlatformType[userInfo.platform || ''].img] || yakitImg}
+                            src={userInfo[UserPlatformType[userInfo.platform || ''].img] || renyanIcon}
                             style={{ width: 24, height: 24, borderRadius: '50%' }}
                           />
                         </UserAvatarIMBadge>
@@ -1987,7 +1981,7 @@ const UIOpUpdateYakit: React.FC<UIOpUpdateProps> = React.memo((props) => {
   })
 
   const handleOpenPath = useMemoizedFn(async () => {
-    const EditionName = getReleaseEditionName().replace(/\s+/g, '')
+    const EditionName = getReleaseEditionCompatibilityName().replace(/\s+/g, '')
     const Version = lastVersion || version
     const cleanVersion = Version.startsWith('v') ? Version.substring(1) : Version
     const filename = `${EditionName}-${cleanVersion}`
@@ -2012,7 +2006,7 @@ const UIOpUpdateYakit: React.FC<UIOpUpdateProps> = React.memo((props) => {
       <div className={styles['update-header-wrapper']}>
         <div className={styles['header-info']}>
           <div className={styles['update-icon']}>
-            <YakitWhiteSvgIcon />
+            <img src={renyanIcon} width={30} alt={productConfig.displayName} />
           </div>
           <div>
             <div className={styles['update-title']}>
@@ -2141,7 +2135,7 @@ const UIOpUpdateYaklang: React.FC<UIOpUpdateProps> = React.memo((props) => {
       <div className={styles['update-header-wrapper']}>
         <div className={styles['header-info']}>
           <div className={styles['update-icon']}>
-            <img src={YakitLogo} width={30} />
+            <img src={renyanIcon} width={30} alt={productConfig.displayName} />
           </div>
           <div
             style={{

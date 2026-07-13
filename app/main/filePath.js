@@ -4,8 +4,9 @@ const os = require('os')
 const path = require('path')
 const process = require('process')
 const fs = require('fs')
+const { productConfig } = require('./product')
 
-const DEFAULT_PROJECT_NAME = 'yakit-projects'
+const DEFAULT_PROJECT_NAME = 'projects'
 
 const DEFAULT_CONFIG = {
   YAKIT_HOME: '',
@@ -16,18 +17,13 @@ const DEFAULT_CONFIG = {
 // --- config.json 相关 ---
 
 /**
- * 获取应用配置目录（只存放 config.json）
- * - Windows 打包: exe 所在目录
- * - macOS / Linux / 开发模式: app.getPath('userData')
+ * 获取产品专属配置目录，只存放当前产品数据，不探测或迁移旧产品目录。
  */
 const getAppConfigDir = () => {
   try {
-    if (process.platform === 'win32' && app.isPackaged) {
-      return path.dirname(app.getPath('exe'))
-    }
     return app.getPath('userData')
   } catch (e) {
-    return path.join(os.homedir(), '.yakit')
+    return path.join(os.homedir(), productConfig.defaultDataDirectory)
   }
 }
 
@@ -110,27 +106,17 @@ const getYakitHome = () => {
     return resolved
   } catch (e) {
     console.log(`getYakitHome failed, using fallback: ${e}`)
-    return path.join(os.homedir(), DEFAULT_PROJECT_NAME)
+    return path.join(os.homedir(), productConfig.defaultDataDirectory, DEFAULT_PROJECT_NAME)
   }
 }
 
 /**
- * 兼容旧逻辑的默认路径解析
- * - Windows 打包: exe目录/yakit-projects
- * - 其他: ~/yakit-projects
+ * 默认项目数据位于产品专属 userData 下，旧目录只能由显式 YAKIT_HOME 配置引用。
  */
 const _resolveDefaultProjectPath = () => {
-  try {
-    if (process.platform === 'win32' && app.isPackaged) {
-      const appDir = path.dirname(app.getPath('exe'))
-      const winPath = path.join(appDir, DEFAULT_PROJECT_NAME)
-      _ensureDir(winPath)
-      return winPath
-    }
-  } catch (e) {}
-  const fallback = path.join(os.homedir(), DEFAULT_PROJECT_NAME)
-  _ensureDir(fallback)
-  return fallback
+  const productPath = path.join(getAppConfigDir(), DEFAULT_PROJECT_NAME)
+  _ensureDir(productPath)
+  return productPath
 }
 
 const _ensureDir = (dir) => {

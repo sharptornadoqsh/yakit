@@ -40,7 +40,7 @@
     "cVEManagement": "CVE 管理",
     "searchAndQueryCVEData": "搜尋查詢CVE資料",
     "pluginHub": "外掛倉庫",
-    "massiveYakitPluginsOne-ClickDownload": "海量Yakit外掛一鍵下載",
+    "massiveYakitPluginsOne-ClickDownload": "海量外掛一鍵下載",
     "portListener": "埠監聽器",
     "reverseShellTool": "反彈 Shell 接收工具，可以在伺服器上開啟一個埠，進行監聽，並進行互動",
     "subdomainCollection": "子域名收集",

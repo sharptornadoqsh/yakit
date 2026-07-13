@@ -23,6 +23,12 @@
     .startup-title {
       .startup-logo {
         margin-bottom: 8px;
+        img {
+          display: block;
+          max-width: 100%;
+          object-fit: contain;
+          object-position: left center;
+        }
         svg {
           height: 100%;
         }

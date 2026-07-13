@@ -8,7 +8,7 @@ import { API } from './services/swagger/resposeType'
 import { useGoogleChromePluginPath, useStore, yakitDynamicStatus } from './store'
 import { refreshToken } from './utils/login'
 import UILayout from './components/layout/UILayout'
-import { getReleaseEditionName, getRemoteHttpSettingGV, isCommunityEdition, isIRify, isMemfit } from '@/utils/envfile'
+import { getRemoteHttpSettingGV, isCommunityEdition, isIRify, isMemfit } from '@/utils/envfile'
 import { RemoteGV } from './yakitGV'
 import { coordinate, setChartsColorList } from './pages/globalVariable'
 import { remoteOperation } from './pages/dynamicControl/DynamicControl'
@@ -24,6 +24,7 @@ import { JSONParseLog } from './utils/tool'
 import { debugToPrintLogs } from './utils/logCollection'
 import { yakitApp, yakitProfile, yakitSocket } from './services/electronBridge'
 import { useI18nNamespaces } from './i18n/useI18nNamespaces'
+import { productConfig } from './config/product'
 
 /** 部分页面懒加载 */
 const Main = lazy(() => import('./pages/MainOperator'))
@@ -304,7 +305,7 @@ function NewApp() {
   useEffect(() => {
     const titleElement = document.getElementById('app-html-title')
     if (titleElement) {
-      titleElement.textContent = getReleaseEditionName()
+      titleElement.textContent = productConfig.displayName
     }
   }, [])
 

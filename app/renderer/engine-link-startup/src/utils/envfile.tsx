@@ -1,5 +1,6 @@
 import { LocalGVS } from '@/enums/yakitGV'
 import { Theme } from '@/hooks/useTheme'
+import { productConfig } from '@/config/product'
 
 export const __PLATFORM__ = import.meta.env.VITE_PLATFORM
 
@@ -17,7 +18,7 @@ export enum PRODUCT_RELEASE_EDITION {
   MEMFIT = 6,
 }
 
-export const getReleaseEditionName = () => {
+export const getReleaseEditionCompatibilityName = () => {
   switch (GetReleaseEdition()) {
     case PRODUCT_RELEASE_EDITION.EnpriTrace:
       return 'EnpriTrace'
@@ -33,6 +34,8 @@ export const getReleaseEditionName = () => {
       return 'Yakit'
   }
 }
+
+export const getReleaseEditionName = () => productConfig.displayName
 
 /** EE */
 export const isEnpriTrace = () => {
@@ -176,7 +179,9 @@ export const GetMainColor = (themeMode: Theme) => {
       return themeMode === 'dark' ? '#5E9DEA' : '#2E63B3'
     case 'enterprise':
     case 'simple-enterprise':
-    case 'yakit':
       return '#F17F30'
+    case 'yakit':
+    default:
+      return productConfig.primaryColor
   }
 }

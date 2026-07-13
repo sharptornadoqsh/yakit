@@ -1,0 +1,23 @@
+{
+  "displayName": "睿眼自动化渗透系统",
+  "shortName": "RenYan Pentest",
+  "appId": "io.github.sharptornadoqsh.renyan",
+  "executableName": "RenYan-Pentest",
+  "linuxExecutableName": "renyan-pentest",
+  "artifactPrefix": "RenYan-Pentest",
+  "defaultDataDirectory": "RenYan-Pentest",
+  "updateChannel": "stable",
+  "supportName": "sharptornadoqsh",
+  "copyright": "Copyright © 2026 sharptornadoqsh. Yakit 项目贡献者保留原权利声明。",
+  "primaryColor": "#315EFB",
+  "successColor": "#16B89A",
+  "warningColor": "#E6A23C",
+  "errorColor": "#E5484D",
+  "edition": "社区版",
+  "tagline": "自动化渗透与验证工作台",
+  "repositoryUrl": "https://github.com/sharptornadoqsh/yakit",
+  "issuesUrl": "https://github.com/sharptornadoqsh/yakit/issues",
+  "licenseUrl": "https://github.com/sharptornadoqsh/yakit/blob/qsh/LICENSE",
+  "thirdPartyNoticesUrl": "https://github.com/sharptornadoqsh/yakit/blob/qsh/product/legal/THIRD_PARTY_NOTICES.md",
+  "upstreamDocumentationUrl": "https://www.yaklang.com/docs/intro"
+}

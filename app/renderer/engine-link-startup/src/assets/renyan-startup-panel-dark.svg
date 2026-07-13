@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 944 1152" role="img" aria-labelledby="title">
+<title id="title">睿眼自动化渗透系统</title>
+<defs>
+  <linearGradient id="panel-dark" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#091128" /><stop offset="1" stop-color="#101E3E" />
+  </linearGradient>
+  <pattern id="grid-dark" width="64" height="64" patternUnits="userSpaceOnUse">
+    <path d="M64 0H0V64" fill="none" stroke="#213967" stroke-width="1" opacity=".55" />
+  </pattern>
+</defs>
+<rect width="944" height="1152" rx="32" fill="url(#panel-dark)" />
+<rect width="944" height="1152" rx="32" fill="url(#grid-dark)" />
+<path d="M96 280H254L330 356H514L618 252H848" fill="none" stroke="#315EFB" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+<path d="M96 844H236L330 750H566L682 866H848" fill="none" stroke="#16B89A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+<g fill="#315EFB"><circle cx="96" cy="280" r="12" /><circle cx="848" cy="252" r="12" /><circle cx="330" cy="356" r="12" /></g>
+<g fill="#16B89A"><circle cx="96" cy="844" r="12" /><circle cx="848" cy="866" r="12" /><circle cx="566" cy="750" r="12" /></g>
+<g transform="translate(300 394) scale(.34)"><defs>
+  <linearGradient id="panel-mark-dark-background" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#0A1538" />
+    <stop offset="1" stop-color="#244A98" />
+  </linearGradient>
+</defs>
+<rect width="1024" height="1024" rx="218" fill="url(#panel-mark-dark-background)" />
+<path d="M168 512 Q512 188 856 512" fill="none" stroke="#F4F8FF" stroke-width="54" stroke-linecap="round" />
+<path d="M168 512 Q512 836 856 512" fill="none" stroke="#F4F8FF" stroke-width="54" stroke-linecap="round" />
+<path d="M512 364 640 438 640 586 512 660 384 586 384 438Z" fill="#16B89A" />
+<circle cx="512" cy="512" r="68" fill="#0A1538" />
+<circle cx="512" cy="512" r="24" fill="#FFFFFF" />
+<path d="M304 204H178V330 M720 204H846V330 M304 820H178V694 M720 820H846V694" fill="none" stroke="#315EFB" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" />
+<g fill="#16B89A">
+  <circle cx="168" cy="512" r="14" /><circle cx="856" cy="512" r="14" />
+  <circle cx="512" cy="188" r="14" /><circle cx="512" cy="836" r="14" />
+</g></g>
+<text x="472" y="820" text-anchor="middle" fill="#F3F7FF" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="54" font-weight="700">睿眼自动化渗透系统</text>
+<text x="472" y="884" text-anchor="middle" fill="#A4B5D3" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="3">RENYAN PENTEST</text>
+<text x="472" y="936" text-anchor="middle" fill="#A4B5D3" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="27">自动化渗透与验证工作台</text>
+</svg>

@@ -12,7 +12,7 @@ import {
 } from './components/LocalEngine/LocalEngineType'
 import { StartLocalEngine } from './types'
 import { randomString } from '@/utils/randomUtil'
-import { getReleaseEditionName, isEnterpriseEdition, isIRify, isMemfit } from '@/utils/envfile'
+import { getReleaseEditionCompatibilityName, isEnterpriseEdition, isIRify, isMemfit } from '@/utils/envfile'
 
 /** @name 插件漏洞信息库自检 */
 export const grpcInitCVEDatabase: APINoRequestFunc<unknown> = (hiddenError) => {
@@ -287,7 +287,7 @@ export const grpcFetchLatestYakitVersion: APIOptionalFunc<GrpcToHTTPRequestProps
     yakitEngine
       .fetchLatestYakitVersion({
         config: config,
-        releaseEditionName: getReleaseEditionName(),
+        releaseEditionName: getReleaseEditionCompatibilityName(),
       })
       .then(resolve)
       .catch((e) => {

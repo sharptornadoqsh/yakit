@@ -17,6 +17,9 @@ const NodePolyfillPlugin = require('node-polyfill-webpack-plugin')
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
+const webpack = require('webpack')
+const productConfig = require('../../../../product/renyan.json')
+const { resolveBuildSha, resolveEdition } = require('../../../../product/build')
 
 const devMode = process.env.NODE_ENV !== 'production'
 const AUX_ENTRY = path.resolve(__dirname, 'src/auxWindow/aux-entry.tsx')
@@ -81,6 +84,12 @@ module.exports = {
         }),
       ),
     addWebpackPlugin(new NodePolyfillPlugin()),
+    addWebpackPlugin(
+      new webpack.DefinePlugin({
+        'process.env.REACT_APP_RENYAN_BUILD_SHA': JSON.stringify(resolveBuildSha()),
+        'process.env.REACT_APP_RENYAN_EDITION': JSON.stringify(resolveEdition(process.env.REACT_APP_PLATFORM)),
+      }),
+    ),
     !devMode &&
       addWebpackPlugin(
         new MiniCssExtractPlugin({
@@ -175,6 +184,8 @@ module.exports = {
         const existingOptions = existingPlugin.userOptions || existingPlugin.options || {}
         config.plugins[htmlPluginIndex] = new HtmlWebpackPlugin({
           ...existingOptions,
+          title: productConfig.displayName,
+          description: productConfig.tagline,
           excludeChunks: ['aux'],
         })
       }
@@ -184,6 +195,8 @@ module.exports = {
           inject: true,
           template: AUX_HTML_TEMPLATE,
           filename: 'yakit-aux.html',
+          title: productConfig.displayName,
+          description: productConfig.tagline,
           // 仅挂载 aux entry；vendor-monaco / vendor-streamdown 等依赖 chunk 由 webpack 图自动注入
           chunks: ['aux'],
           excludeChunks: ['main'],

@@ -1,6 +1,6 @@
 import React, { memo, ReactNode, Suspense, useEffect, useState } from 'react'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
-import { DesktopComputerSvgIcon, YakitLogoSvgIcon } from '@/assets/newIcon'
+import { DesktopComputerSvgIcon } from '@/assets/newIcon'
 import { Typography } from 'antd'
 import { useMemoizedFn } from 'ahooks'
 import { SoftwareRemoteSvgIcon } from './icon'
@@ -9,18 +9,12 @@ import { ProjectManageProp } from './ProjectManage'
 
 import classNames from 'classnames'
 import styles from './SoftwareSettings.module.scss'
-import { isCommunityMemfit, isEnpriTrace, isEnpriTraceAgent, isIRify, isMemfit } from '@/utils/envfile'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
-import yakitEEProject from '@/assets/yakitFontEE.png'
-import yakitSEProject from '@/assets/yakitFontSE.png'
-import yakitEEMiniProject from '@/assets/yakitEE.png'
-import yakitSEMiniProject from '@/assets/yakitSE.png'
-import {
-  SolidIrifyFontLogoIcon,
-  SolidIrifyMiniLogoIcon,
-  SolidMemfitFontLogoIcon,
-  SolidMemfitMiniLogoIcon,
-} from '@/assets/icon/colors'
+import renyanIcon from '@/assets/renyan-icon.svg'
+import renyanLogoLight from '@/assets/renyan-logo-light.svg'
+import renyanLogoDark from '@/assets/renyan-logo-dark.svg'
+import { productConfig } from '@/config/product'
+import { useTheme } from '@/hook/useTheme'
 
 const ProjectManage = React.lazy(() => import('./ProjectManage'))
 
@@ -33,19 +27,13 @@ interface SettingsMenuProp {
   name: string
   icon: ReactNode
 }
-const ProjectLogo = (showMini: boolean) => {
-  if (isIRify()) {
-    return showMini ? <SolidIrifyMiniLogoIcon className={styles['prject-logo-mini']} /> : <SolidIrifyFontLogoIcon />
-  } else if (isEnpriTrace()) {
-    return <img style={{ height: '100%' }} src={showMini ? yakitEEMiniProject : yakitEEProject} alt="暂无图片" />
-  } else if (isEnpriTraceAgent()) {
-    return <img style={{ height: '100%' }} src={showMini ? yakitSEMiniProject : yakitSEProject} alt="暂无图片" />
-  } else if (isMemfit() || isCommunityMemfit()) {
-    return showMini ? <SolidMemfitMiniLogoIcon className={styles['prject-logo-mini']} /> : <SolidMemfitFontLogoIcon />
-  } else {
-    return <YakitLogoSvgIcon />
-  }
-}
+const ProjectLogo = (showMini: boolean, theme: 'light' | 'dark') => (
+  <img
+    className={showMini ? styles['project-logo-mini'] : styles['project-logo']}
+    src={showMini ? renyanIcon : theme === 'light' ? renyanLogoLight : renyanLogoDark}
+    alt={productConfig.displayName}
+  />
+)
 const getSettingsMenu = (t: TFunction): SettingsMenuProp[] => [
   {
     key: 'project',
@@ -78,6 +66,7 @@ export interface SoftwareSettingsProp {
 export const SoftwareSettings: React.FC<SoftwareSettingsProp> = memo((props) => {
   const { onEngineModeChange } = props
   const { t } = useI18nNamespaces(['setting'])
+  const { theme } = useTheme()
 
   const [hostName, setHostName] = useState<string>('')
   const [currentKey, setCurrentKey] = useState<string>('project')
@@ -121,7 +110,7 @@ export const SoftwareSettings: React.FC<SoftwareSettingsProp> = memo((props) => 
             [styles['left-mini-body']]: showMini,
           })}
         >
-          <div className={styles['navbar-logo']}>{ProjectLogo(showMini)}</div>
+          <div className={styles['navbar-logo']}>{ProjectLogo(showMini, theme)}</div>
 
           <div className={styles['navbar-list-wrapper']}>
             <div className={styles['list-body']}>

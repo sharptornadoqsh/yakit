@@ -1,30 +1,16 @@
 import React, { useMemo } from 'react'
 import { YakitStatusType, YaklangEngineMode } from '@/yakitGVDefine'
-import {
-  fetchEnv,
-  getReleaseEditionName,
-  isCommunityEdition,
-  isCommunityMemfit,
-  isEnpriTrace,
-  isEnpriTraceAgent,
-  isIRify,
-  isMemfit,
-} from '@/utils/envfile'
+import { getReleaseEditionName, isCommunityEdition } from '@/utils/envfile'
 import { Tooltip } from 'antd'
 import { OutlineQuestionmarkcircleIcon } from '@/assets/icon/outline'
 import { YakitButton } from '../yakitUI/YakitButton/YakitButton'
 
-import yakitSE from '@/assets/yakitSE.png'
-import yakitEE from '@/assets/yakitEE.png'
-import yakitCE from '@/assets/yakit.jpg'
+import renyanIcon from '@/assets/renyan-icon.svg'
 import styles from './newYakitLoading.module.scss'
 import classNames from 'classnames'
-import { SolidIrifyMiniLogoIcon, SolidMemfitMiniLogoIcon } from '@/assets/icon/colors'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 
-import IRifyPrimaryBg from '../../assets/uiLayout/IRifyPrimaryBg.png'
-import MemfitAIPrimaryBg from '@/assets/uiLayout/MemfitAIPrimaryBg.png'
-import YakitPrimaryBg from '@/assets/uiLayout/YakitPrimaryBg.png'
+import RenYanPrimaryBg from '@/assets/uiLayout/RenYanPrimaryBg.svg'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -122,94 +108,15 @@ export const NewYakitLoading: React.FC<NewYakitLoadingProp> = (props) => {
     [yakitStatus, i18n.language],
   )
 
-  const startLogo = useMemo(() => {
-    /* 社区版 */
-    if (isCommunityEdition()) {
-      if (isIRify()) {
-        return (
-          <div className={styles['yakit-loading-icon-wrapper']}>
-            <div className={styles['white-icon']}>
-              <SolidIrifyMiniLogoIcon />
-            </div>
-          </div>
-        )
-      }
-      if (isCommunityMemfit()) {
-        return (
-          <div className={styles['yakit-loading-icon-wrapper']}>
-            <div className={styles['white-icon']}>
-              <SolidMemfitMiniLogoIcon />
-            </div>
-          </div>
-        )
-      }
-      return (
-        <div className={styles['yakit-loading-icon-wrapper']}>
-          <div className={styles['white-icon']}>
-            <img src={yakitCE} alt={t('YakitEmpty.noImage')} />
-          </div>
-        </div>
-      )
-    }
+  const startLogo = (
+    <div className={styles['yakit-loading-icon-wrapper']}>
+      <div className={styles['white-icon']}>
+        <img src={renyanIcon} alt={getReleaseEditionName()} />
+      </div>
+    </div>
+  )
 
-    /* 企业版 */
-    if (isEnpriTrace()) {
-      if (isIRify()) {
-        return (
-          <div className={styles['yakit-loading-icon-wrapper']}>
-            <div className={styles['white-icon']}>
-              <SolidIrifyMiniLogoIcon />
-            </div>
-          </div>
-        )
-      }
-      if (isMemfit()) {
-        return (
-          <div className={styles['yakit-loading-icon-wrapper']}>
-            <div className={styles['white-icon']}>
-              <SolidMemfitMiniLogoIcon />
-            </div>
-          </div>
-        )
-      }
-      return (
-        <div className={styles['yakit-loading-icon-wrapper']}>
-          <div className={styles['white-icon']}>
-            <img src={yakitEE} alt={t('YakitEmpty.noImage')} />
-          </div>
-        </div>
-      )
-    }
-
-    /* 便携版 */
-    if (isEnpriTraceAgent()) {
-      return (
-        <div className={styles['yakit-loading-icon-wrapper']}>
-          <div className={styles['white-icon']}>
-            <img src={yakitSE} alt={t('YakitEmpty.noImage')} />
-          </div>
-        </div>
-      )
-    }
-
-    return null
-  }, [i18n.language])
-
-  const primaryBg = useMemo(() => {
-    switch (fetchEnv()) {
-      case 'irify':
-      case 'irify-enterprise':
-        return `url(${IRifyPrimaryBg})`
-      case 'memfit':
-        return `url(${MemfitAIPrimaryBg})`
-      case 'enterprise':
-      case 'simple-enterprise':
-      case 'yakit':
-        return `url(${YakitPrimaryBg})`
-      default:
-        break
-    }
-  }, [])
+  const primaryBg = `url(${RenYanPrimaryBg})`
 
   return (
     <div className={styles['yakit-loading-wrapper']}>

@@ -20,8 +20,11 @@ import { applyYakitThemeColors } from './utils/applyYakitThemeColors'
 import { registerAppSyncHandlers } from '@/auxWindow/utils/messaging'
 import { setupConcurrentStreamMainBridge } from '@/pages/ai-agent/components/ConcurrentStreamCard/concurrentStream/concurrentStreamMainBridge'
 import { debugToPrintLogs } from './utils/logCollection'
+import { productConfig } from './config/product'
 
 const MONACO_WORKER_BASE = 'static/js/monaco'
+
+document.title = productConfig.displayName
 
 window.MonacoEnvironment = {
   getWorkerUrl: function (moduleId, label) {

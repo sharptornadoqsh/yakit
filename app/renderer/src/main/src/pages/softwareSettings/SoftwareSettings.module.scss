@@ -19,12 +19,24 @@
       overflow: hidden;
 
       .navbar-logo {
-        width: 101px;
+        width: 180px;
         height: 32px;
         svg {
           // width: 101px;
           height: 32px;
         }
+      }
+      .project-logo {
+        display: block;
+        width: 134px;
+        height: 32px;
+        object-fit: contain;
+        object-position: left center;
+      }
+      .project-logo-mini {
+        display: block;
+        width: 32px;
+        height: 32px;
       }
       .prject-logo-mini svg {
         width: 32px;

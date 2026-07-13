@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>关于</title>
+    <link rel="stylesheet" href="about.css" />
+  </head>
+  <body>
+    <main class="about-card">
+      <img class="product-icon" src="../assets/renyan-icon.png" alt="" />
+      <h1 id="display-name"></h1>
+      <p id="short-name" class="short-name"></p>
+      <dl class="version-grid">
+        <div>
+          <dt>客户端版本</dt>
+          <dd id="client-version">unknown</dd>
+        </div>
+        <div>
+          <dt>引擎版本</dt>
+          <dd id="engine-version">unknown</dd>
+        </div>
+        <div>
+          <dt>构建版本</dt>
+          <dd id="build-sha">unknown</dd>
+        </div>
+        <div>
+          <dt>版本类别</dt>
+          <dd id="edition">社区版</dd>
+        </div>
+      </dl>
+      <nav class="legal-links" aria-label="法律文档">
+        <a href="renyan://license" target="_blank" rel="noreferrer">开源许可证</a>
+        <a href="renyan://third-party" target="_blank" rel="noreferrer">第三方通知</a>
+      </nav>
+      <footer>
+        <p>支持方：<span id="support-name"></span></p>
+        <p id="copyright"></p>
+      </footer>
+    </main>
+    <script src="about-page.js"></script>
+  </body>
+</html>

@@ -420,7 +420,7 @@
   },
   "DownloadYakit": {
     "downloading": "{{edition}} 軟體下載中...",
-    "officialDownloadLink": "Yakit 軟體官網下載連結",
+    "officialDownloadLink": "睿眼自動化滲透系統專案首頁",
     "officialDownloadHint": "如遇網路問題無法下載，可到官網下載安裝：",
     "website": "官網地址"
   },

@@ -1,6 +1,7 @@
 import Icon from '@ant-design/icons'
 import { CustomIconComponentProps } from '@ant-design/icons/lib/components/Icon'
 import React from 'react'
+import renyanIcon from '@/assets/renyan-icon.svg'
 
 interface IconProps extends CustomIconComponentProps {
   onClick: (e: React.MouseEvent) => void
@@ -339,7 +340,14 @@ const YakitLogoSvg = () => (
   </svg>
 )
 
-export const YakitLogoSvgIcon = (props: Partial<IconProps>) => <Icon component={YakitLogoSvg} {...props} />
+const RenYanLogoSvg = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+    <image href={renyanIcon} width="28" height="28" />
+  </svg>
+)
+
+// 旧导出名称属于渲染端兼容标识，实际图形统一引用产品品牌资源。
+export const YakitLogoSvgIcon = (props: Partial<IconProps>) => <Icon component={RenYanLogoSvg} {...props} />
 
 const YakitSpinLogoSvg = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -353,4 +361,10 @@ const YakitSpinLogoSvg = () => (
   </svg>
 )
 
-export const YakitSpinLogoSvgIcon = (props: Partial<IconProps>) => <Icon component={YakitSpinLogoSvg} {...props} />
+const RenYanSpinLogoSvg = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12">
+    <image href={renyanIcon} width="12" height="12" />
+  </svg>
+)
+
+export const YakitSpinLogoSvgIcon = (props: Partial<IconProps>) => <Icon component={RenYanSpinLogoSvg} {...props} />

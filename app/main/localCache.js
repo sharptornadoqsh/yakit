@@ -1,6 +1,9 @@
 const { ipcMain } = require('electron')
 const fs = require('fs')
 const { getLocalCachePath, getExtraLocalCachePath } = require('./filePath')
+const { productConfig } = require('./product')
+
+const cacheDescription = `该文件内缓存数据如需手动修改，请在关闭 ${productConfig.displayName} 之后进行操作`
 
 /** 缓存数据存放变量 */
 const kvCache = new Map()
@@ -102,7 +105,7 @@ const initLocalCache = (callback) => {
   localCacheState.cacheInitialized = true
 
   kvCache.clear()
-  kvCache.set('*description*', '该文件内缓存数据如需手动修改，请在关闭 Yakit 之后进行操作')
+  kvCache.set('*description*', cacheDescription)
 
   try {
     /** 处理文件不存在的情况 */
@@ -132,7 +135,7 @@ const initExtraLocalCache = (callback) => {
   localCacheState.extraCacheInitialized = true
 
   extraKVCache.clear()
-  kvCache.set('*description*', '该文件内缓存数据如需手动修改，请在关闭 Yakit 之后进行操作')
+  kvCache.set('*description*', cacheDescription)
 
   try {
     if (fs.existsSync(getExtraLocalCachePath())) {

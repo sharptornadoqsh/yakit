@@ -72,7 +72,7 @@ import { formatDate } from '@/utils/timeUtil'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { PluginTestErrorIcon, PluginTestWarningIcon, PluginsGridCheckIcon } from './icon'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
-import YakitLogo from '@/assets/yakitLogo.png'
+import YakitLogo from '@/assets/renyan-icon.svg'
 import { PluginFilterParams, PluginSearchParams } from './baseTemplateType'
 import { yakitNotify } from '@/utils/notification'
 import {

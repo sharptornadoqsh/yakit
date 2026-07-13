@@ -6,6 +6,7 @@ import { RemoteI18nGV } from '@/enums/i18n'
 import { Theme } from '@/hook/useTheme'
 import { yakitRelease } from '@/services/electronBridge'
 import i18n from '@/i18n/i18n'
+import { productConfig } from '@/config/product'
 const tOriginal = i18n.getFixedT(null, 'utils')
 
 export enum PRODUCT_RELEASE_EDITION {
@@ -26,7 +27,7 @@ export enum PRODUCT_RELEASE_EDITION {
 
 export type VersionSource = 'yakit' | 'irify' | 'memfit'
 
-export const getReleaseEditionName = () => {
+export const getReleaseEditionCompatibilityName = () => {
   switch (GetReleaseEdition()) {
     case PRODUCT_RELEASE_EDITION.EnpriTrace:
       return 'EnpriTrace'
@@ -44,6 +45,8 @@ export const getReleaseEditionName = () => {
       return 'Yakit'
   }
 }
+
+export const getReleaseEditionName = () => productConfig.displayName
 /**只有yakit 社区版和企业版有WF缓存 */
 export const isWFCacheEdition = () => {
   return (
@@ -291,7 +294,9 @@ export const GetMainColor = (themeMode: Theme) => {
       return themeMode === 'dark' ? '#5E9DEA' : '#2E63B3'
     case 'enterprise':
     case 'simple-enterprise':
-    case 'yakit':
       return '#F17F30'
+    case 'yakit':
+    default:
+      return productConfig.primaryColor
   }
 }
