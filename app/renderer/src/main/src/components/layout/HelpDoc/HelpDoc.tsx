@@ -14,6 +14,8 @@ import renyanLogo from '@/assets/renyan-logo-light.svg'
 import classNames from 'classnames'
 import styles from './HelpDoc.module.scss'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import emiter from '@/utils/eventBus/eventBus'
+import { RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
 
 interface HelpDocProps {
   system: YakitSystem
@@ -28,6 +30,14 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
   const [aboutVisible, setAboutVisible] = useState<boolean>(false)
   const [clientVersion, setClientVersion] = useState<string>('读取中')
   const [engineVersion, setEngineVersion] = useState<string>('读取中')
+
+  useEffect(() => {
+    const openAbout = (command: string) => {
+      if (command === RENYAN_SHELL_EVENTS.openAbout) setAboutVisible(true)
+    }
+    emiter.on('onUIOpSettingMenuSelect', openAbout)
+    return () => emiter.off('onUIOpSettingMenuSelect', openAbout)
+  }, [])
 
   useEffect(() => {
     if (!aboutVisible) return

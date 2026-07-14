@@ -1,0 +1,82 @@
+.state {
+  display: flex;
+  align-items: center;
+  min-height: 112px;
+  padding: 20px;
+  border: 1px dashed var(--Colors-Use-Neutral-Border);
+  background: var(--Colors-Use-Neutral-Bg);
+  color: var(--Colors-Use-Neutral-Text-1-Title);
+  gap: 14px;
+}
+
+.state-compact {
+  min-height: 72px;
+  padding: 12px 14px;
+}
+
+.state-icon {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--Colors-Use-Neutral-Border);
+  background: var(--Colors-Use-Basic-Background);
+  color: var(--Colors-Use-Neutral-Text-3-Secondary);
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.state-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+
+  strong {
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  span {
+    color: var(--Colors-Use-Neutral-Text-3-Secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+}
+
+.state-error .state-icon {
+  border-color: var(--Colors-Use-Error-Border);
+  background: var(--Colors-Use-Error-Bg);
+  color: var(--renyan-error-primary, var(--Colors-Use-Error-Primary));
+}
+
+.state-offline .state-icon,
+.state-noPermission .state-icon {
+  color: var(--renyan-warning-primary, var(--Colors-Use-Warning-Primary));
+}
+
+.loading-indicator {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--Colors-Use-Main-Border);
+  border-top-color: var(--Colors-Use-Main-Primary);
+  border-radius: 50%;
+  animation: renyan-state-loading 0.8s linear infinite;
+}
+
+@keyframes renyan-state-loading {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-indicator {
+    animation-duration: 1.8s;
+  }
+}

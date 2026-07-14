@@ -56,6 +56,8 @@ import emiter from '@/utils/eventBus/eventBus'
 import { grpcQueryNote } from '@/pages/notepadManage/notepadManage/utils'
 import { defaultNoteFilter } from '@/defaultConstants/ModifyNotepad'
 import { genDefaultPagination } from '@/pages/invoker/schema'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
+import { RenyanNavigation } from '../renyanMenu/RenyanNavigation'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -76,7 +78,7 @@ interface PublicMenuProps {
   setRouteToLabel: (data: Map<string, string>) => void
 }
 
-const PublicMenu: React.FC<PublicMenuProps> = React.memo((props) => {
+const LegacyPublicMenu: React.FC<PublicMenuProps> = React.memo((props) => {
   const { onMenuSelect, setRouteToLabel, defaultExpand } = props
   const { t, i18n } = useI18nNamespaces(['layout', 'yakitRoute', 'yakitUi'])
   // 登录用户状态信息
@@ -721,6 +723,14 @@ const PublicMenu: React.FC<PublicMenuProps> = React.memo((props) => {
       </div>
     </div>
   )
+})
+
+const PublicMenu: React.FC<PublicMenuProps> = React.memo((props) => {
+  if (RENYAN_SHELL_ENABLED) {
+    return <RenyanNavigation {...props} />
+  }
+
+  return <LegacyPublicMenu {...props} />
 })
 
 export default PublicMenu

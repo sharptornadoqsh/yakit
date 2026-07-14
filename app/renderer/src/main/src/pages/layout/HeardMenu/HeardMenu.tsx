@@ -68,10 +68,12 @@ import { YakitEditor } from '@/components/yakitUI/YakitEditor/YakitEditor'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { usePluginToId } from '@/store/publicMenu'
 import { JSONParseLog } from '@/utils/tool'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
+import { RenyanNavigation } from '../renyanMenu/RenyanNavigation'
 
 const { ipcRenderer } = window.require('electron')
 
-const HeardMenu: React.FC<HeardMenuProps> = React.memo((props) => {
+const LegacyHeardMenu: React.FC<HeardMenuProps> = React.memo((props) => {
   const { defaultExpand, onRouteMenuSelect, setRouteToLabel } = props
   const { t, i18n } = useI18nNamespaces(['layout', 'yakitRoute', 'yakitUi'])
   const { setNewPluginToId, pluginToId } = usePluginToId()
@@ -916,6 +918,20 @@ const HeardMenu: React.FC<HeardMenuProps> = React.memo((props) => {
       </YakitModal>
     </div>
   )
+})
+
+const HeardMenu: React.FC<HeardMenuProps> = React.memo((props) => {
+  if (RENYAN_SHELL_ENABLED) {
+    return (
+      <RenyanNavigation
+        defaultExpand={props.defaultExpand}
+        onMenuSelect={props.onRouteMenuSelect}
+        setRouteToLabel={props.setRouteToLabel}
+      />
+    )
+  }
+
+  return <LegacyHeardMenu {...props} />
 })
 
 export default HeardMenu

@@ -78,6 +78,7 @@ import { apiSplitUpload, ExportProjectRequest, grpcExportProject, grpcGetProject
 import moment from 'moment'
 import { debugToPrintLog } from '@/utils/logCollection'
 import { usePageInfo } from '@/store/pageInfo'
+import { RenyanStatusBar } from './RenyanStatusBar'
 import { shallow } from 'zustand/shallow'
 import { NewYakitLoading } from '../basics/NewYakitLoading'
 
@@ -1980,6 +1981,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
               onCancel={() => setKillOldEngine(false)}
             />
           </div>
+          <RenyanStatusBar engineLink={engineLink} engineMode={engineMode} />
         </div>
       </div>
       {/* 项目加密导出弹框 */}

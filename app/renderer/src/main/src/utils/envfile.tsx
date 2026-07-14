@@ -3,7 +3,7 @@ import { setRemoteValue } from '@/utils/kv'
 import { RemoteGV } from '@/yakitGV'
 import { RemotePrivateDomainGV } from '@/enums/privateDomain'
 import { RemoteI18nGV } from '@/enums/i18n'
-import { Theme } from '@/hook/useTheme'
+import type { Theme } from '@/hook/useTheme'
 import { yakitRelease } from '@/services/electronBridge'
 import i18n from '@/i18n/i18n'
 import { productConfig } from '@/config/product'
@@ -294,9 +294,9 @@ export const GetMainColor = (themeMode: Theme) => {
       return themeMode === 'dark' ? '#5E9DEA' : '#2E63B3'
     case 'enterprise':
     case 'simple-enterprise':
-      return '#F17F30'
+      return themeMode === 'dark' ? '#7291FF' : productConfig.primaryColor
     case 'yakit':
     default:
-      return productConfig.primaryColor
+      return themeMode === 'dark' ? '#7291FF' : productConfig.primaryColor
   }
 }

@@ -62,6 +62,7 @@ import { YakitRoute } from '@/enums/yakitRoute'
 import { RouteToPageProps } from '@/pages/layout/publicMenu/PublicMenu'
 import { useRunNodeStore } from '@/store/runNode'
 import emiter from '@/utils/eventBus/eventBus'
+import { RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
 import { useTemporaryProjectStore } from '@/store/temporaryProject'
 import { visitorsStatisticsFun } from '@/utils/visitorsStatistics'
 import { serverPushStatus } from '@/utils/duplex/duplex'
@@ -2751,6 +2752,16 @@ const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
       setNoticeType('update')
     }
   }, [userInfo.isLogin])
+
+  useEffect(() => {
+    const openEngineUpdate = (command: string) => {
+      if (command !== RENYAN_SHELL_EVENTS.openEngineUpdate) return
+      setNoticeType('update')
+      setShow(true)
+    }
+    emiter.on('onUIOpSettingMenuSelect', openEngineUpdate)
+    return () => emiter.off('onUIOpSettingMenuSelect', openEngineUpdate)
+  }, [])
 
   const getAllMessage = useMemoizedFn(() => {
     setShow(false)

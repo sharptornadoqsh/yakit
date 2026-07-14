@@ -181,6 +181,9 @@ import { JSONParseLog } from '@/utils/tool'
 import { SoftMode, useSoftMode, YakitModeEnum } from '@/store/softMode'
 import { RemoteSoftModeGV } from '@/enums/softMode'
 import { debugToPrintLogs } from '@/utils/logCollection'
+import { RenyanPageHeader } from '@/components/layout/RenyanPageHeader'
+import { RenyanWorkspaceSidebar } from '../renyanMenu/RenyanNavigation'
+import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 
 const BatchAddNewGroup = React.lazy(() => import('./BatchAddNewGroup'))
 const BatchEditGroup = React.lazy(() => import('./BatchEditGroup/BatchEditGroup'))
@@ -3419,30 +3422,35 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
       emiter.off('onSaveHistoryDataHttpFuzzer', onSaveHTTPFuzzer)
     }
   }, [])
+  const currentWorkspacePage = pageCache.find((item) => item.routeKey === currentTabKey) || pageCache[0]
+
   return (
-    <Content>
-      <YakitSpin spinning={loading}>
-        <TabContent
-          softMode={softMode}
-          pageCache={pageCache}
-          setPageCache={setPageCache}
-          currentTabKey={currentTabKey}
-          setCurrentTabKey={setCurrentTabKey}
-          openMultipleMenuPage={openMultipleMenuPage}
-          onRemove={(tabItem) => {
-            const removeItem: OnlyPageCache = {
-              menuName: tabItem.menuName,
-              route: tabItem.route,
-              pluginId: tabItem.pluginId,
-              pluginName: tabItem.pluginName,
-              routeKey: tabItem.routeKey,
-            }
-            onBeforeRemovePage(removeItem)
-          }}
-          onRestoreHistory={onRestoreHistory}
-          onSaveHistory={onSaveHistory}
-        />
-      </YakitSpin>
+    <Content className={styles['renyan-workspace-shell']}>
+      <RenyanWorkspaceSidebar currentRoute={currentWorkspacePage?.route} onMenuSelect={openMultipleMenuPage} />
+      <div className={styles['renyan-workspace-main']}>
+        <YakitSpin spinning={loading}>
+          <TabContent
+            softMode={softMode}
+            pageCache={pageCache}
+            setPageCache={setPageCache}
+            currentTabKey={currentTabKey}
+            setCurrentTabKey={setCurrentTabKey}
+            openMultipleMenuPage={openMultipleMenuPage}
+            onRemove={(tabItem) => {
+              const removeItem: OnlyPageCache = {
+                menuName: tabItem.menuName,
+                route: tabItem.route,
+                pluginId: tabItem.pluginId,
+                pluginName: tabItem.pluginName,
+                routeKey: tabItem.routeKey,
+              }
+              onBeforeRemovePage(removeItem)
+            }}
+            onRestoreHistory={onRestoreHistory}
+            onSaveHistory={onSaveHistory}
+          />
+        </YakitSpin>
+      </div>
       <YakitModal
         visible={bugTestShow}
         onCancel={() => setBugTestShow(false)}
@@ -3608,34 +3616,47 @@ const TabChildren: React.FC<TabChildrenProps> = React.memo((props) => {
             tabIndex={currentTabKey === pageItem.routeKey ? 1 : -1}
             style={{
               display: currentTabKey === pageItem.routeKey ? '' : 'none',
-              padding: !pageItem.singleNode || NoPaddingRoute.includes(pageItem.route) ? 0 : '8px 16px 13px 16px',
             }}
             className={styles['page-body']}
             id={'main-operator-page-body-' + pageItem.routeKey}
           >
-            {pageItem.singleNode ? (
-              pageRenderList.get(pageItem.routeKey) && (
-                <React.Suspense fallback={<>loading page ...</>}>
-                  <PageItem
-                    routeKey={pageItem.route}
-                    yakScriptId={pageItem.route === YakitRoute.Plugin_OP ? pageItem.pluginId : undefined}
-                    params={pageItem.pageParams}
-                  />
-                </React.Suspense>
-              )
-            ) : (
-              <SubTabList
-                softMode={softMode}
-                pageCache={pageCache}
-                currentTabKey={currentTabKey}
-                openMultipleMenuPage={openMultipleMenuPage}
-                pageItem={pageItem}
-                index={index}
-                onSetPageCache={onSetPageCache}
-                onRestoreHistory={onRestoreHistory}
-                onSaveHistory={onSaveHistory}
+            {currentTabKey === pageItem.routeKey && (
+              <RenyanPageHeader
+                route={pageItem.route}
+                fallbackTitle={pageItem.verbose}
+                onNavigateHome={() => openMultipleMenuPage({ route: YakitRoute.NewHome })}
               />
             )}
+            <div
+              className={classNames(styles['workspace-page-content'], {
+                [styles['workspace-page-content-no-padding']]:
+                  !pageItem.singleNode || NoPaddingRoute.includes(pageItem.route),
+              })}
+            >
+              {pageItem.singleNode ? (
+                pageRenderList.get(pageItem.routeKey) && (
+                  <React.Suspense fallback={<RenyanState type="loading" />}>
+                    <PageItem
+                      routeKey={pageItem.route}
+                      yakScriptId={pageItem.route === YakitRoute.Plugin_OP ? pageItem.pluginId : undefined}
+                      params={pageItem.pageParams}
+                    />
+                  </React.Suspense>
+                )
+              ) : (
+                <SubTabList
+                  softMode={softMode}
+                  pageCache={pageCache}
+                  currentTabKey={currentTabKey}
+                  openMultipleMenuPage={openMultipleMenuPage}
+                  pageItem={pageItem}
+                  index={index}
+                  onSetPageCache={onSetPageCache}
+                  onRestoreHistory={onRestoreHistory}
+                  onSaveHistory={onSaveHistory}
+                />
+              )}
+            </div>
           </div>
         )
       })}
