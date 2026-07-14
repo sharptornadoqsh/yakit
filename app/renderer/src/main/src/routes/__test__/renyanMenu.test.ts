@@ -90,8 +90,12 @@ describe('睿眼菜单模型', () => {
     const labels = buildRenyanRouteLabelMap()
     expect(labels.get(YakitRoute.MITMHacker)).toBe('交互代理')
     expect(labels.get(YakitRoute.HTTPFuzzer)).toBe('报文重放')
+    expect(labels.get(YakitRoute.DB_HTTPHistory)).toBe('历史流量')
+    expect(labels.get(YakitRoute.BatchExecutorPage)).toBe('漏洞检测')
+    expect(labels.get(YakitRoute.Mod_Brute)).toBe('爆破测试')
     expect(labels.get(YakitRoute.DB_Risk)).toBe('风险与漏洞')
     expect(renyanRouteDisplayMap[YakitRoute.Codec]).toBe('编解码工具')
+    expect(renyanRouteDisplayMap[YakitRoute.DataCompare]).toBe('报文差异对比')
   })
 
   it('可靠性序号二十五不建立菜单节点', () => {

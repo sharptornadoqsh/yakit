@@ -28,6 +28,12 @@ export const RenyanPageHeader: React.FC<RenyanPageHeaderProps> = React.memo((pro
 
   const title = getMenuTitle(path.length - 1) || fallbackTitle || routeInfo?.label || String(route)
   const groupTitle = path.length > 1 ? getMenuTitle(0) : t('Layout.RenyanShell.workspace')
+  const descriptionKey = routeInfo?.describeUi
+  const translatedDescription = descriptionKey ? t(descriptionKey) : ''
+  const description =
+    translatedDescription && translatedDescription !== descriptionKey
+      ? translatedDescription
+      : routeInfo?.describe || ''
 
   useEffect(() => {
     document.title = `${title} · ${productConfig.displayName}`
@@ -53,6 +59,7 @@ export const RenyanPageHeader: React.FC<RenyanPageHeaderProps> = React.memo((pro
         <div className={styles['title-row']}>
           <h1>{title}</h1>
         </div>
+        {description && <p className={styles['page-description']}>{description}</p>}
       </div>
       <div className={styles['page-actions']} data-shell-region="page-actions">
         <span className={styles['workspace-state']}>

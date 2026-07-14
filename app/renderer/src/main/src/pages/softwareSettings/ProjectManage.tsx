@@ -1146,7 +1146,10 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
       <div className={styles['project-manage-container']}>
         <div className={styles['project-header']}>
           <div className={styles['header-title']}>
-            <div className={styles['title-style']}>{t('ProjectManage.title')}</div>
+            <div className={styles['title-copy']}>
+              <div className={styles['title-style']}>{t('ProjectManage.title')}</div>
+              <div className={styles['description-style']}>{t('ProjectManage.pageDescription')}</div>
+            </div>
             <div className={styles['total-style']}>
               Total <span className={styles['total-number']}>{__data.ProjectToTal}</span>
             </div>

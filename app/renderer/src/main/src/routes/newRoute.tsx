@@ -23,7 +23,7 @@ import { ChaosMakerPage } from '@/pages/chaosmaker/ChaosMaker'
 import { ScreenRecorderPage } from '@/pages/screenRecorder/ScreenRecorderPage'
 import { CVEViewer } from '@/pages/cve/CVEViewer'
 import { YakJavaDecompiler } from '@/pages/yakJavaDecompiler/YakJavaDecompiler'
-import { PageLoading } from './PageLoading'
+import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 import {
   PrivateOutlineAIAgentIcon,
   PrivateOutlineAuditCodeIcon,
@@ -213,17 +213,17 @@ export const YakitRouteToPageInfo: Record<
 > = {
   'new-home': { label: '首页', labelUi: 'YakitRoute.home' },
   httpHacker: {
-    label: 'MITM 交互式劫持 v1',
+    label: '交互代理',
     labelUi: 'YakitRoute.MITM',
     describeUi: 'YakitRoute.mitmSslHijack',
   },
   'mitm-hijack': {
-    label: 'MITM 交互式劫持',
+    label: '交互代理',
     labelUi: 'YakitRoute.MITM',
     describeUi: 'YakitRoute.mitmSslHijack',
   },
   httpFuzzer: {
-    label: 'Web Fuzzer',
+    label: '报文重放',
     labelUi: 'YakitRoute.WebFuzzer',
     describeUi: 'YakitRoute.fuzzBurpIntegration',
   },
@@ -233,12 +233,12 @@ export const YakitRouteToPageInfo: Record<
     describeUi: 'YakitRoute.fuzzTestingForWebSocketPackets',
   },
   codec: {
-    label: 'Codec',
+    label: '编解码工具',
     labelUi: 'YakitRoute.Codec',
     describeUi: 'YakitRoute.dataProcessingDescription',
   },
   dataCompare: {
-    label: '数据对比',
+    label: '报文差异对比',
     labelUi: 'YakitRoute.dataCompare',
     describeUi: 'YakitRoute.quicklyIdentifyDifferencesInData',
   },
@@ -254,17 +254,17 @@ export const YakitRouteToPageInfo: Record<
   },
   'plugin-op': { label: '插件', labelUi: 'YakitRoute.plugin' },
   brute: {
-    label: '弱口令检测',
+    label: '爆破测试',
     labelUi: 'YakitRoute.weakPasswordCheck',
     describeUi: 'YakitRoute.bruteForceDescription',
   },
   'plugin-hub': {
-    label: '插件仓库',
+    label: '插件中心',
     labelUi: 'YakitRoute.pluginHub',
     describeUi: 'YakitRoute.massiveYakitPluginsOne-ClickDownload',
   },
   'batch-executor-page-ex': {
-    label: '批量执行',
+    label: '漏洞检测',
     labelUi: 'YakitRoute.batchExecute',
     describeUi: 'YakitRoute.batchPOCScan',
   },
@@ -299,7 +299,7 @@ export const YakitRouteToPageInfo: Record<
     describeUi: 'YakitRoute.reverseShellTool',
   },
   'db-http-request': {
-    label: 'History',
+    label: '历史流量',
     labelUi: 'YakitRoute.History',
     describeUi: 'YakitRoute.viewAndManageAllHistoricalTrafficFromMITMPluginsAndFuzzing',
   },
@@ -343,8 +343,12 @@ export const YakitRouteToPageInfo: Record<
     label: '继续任务：批量执行插件',
     labelUi: 'YakitRoute.continueTaskBatchExecutePlugin',
   },
-  'packet-scan-page': { label: '数据包扫描', labelUi: 'YakitRoute.packetScan' },
-  'add-yakit-script': { label: '新建插件', labelUi: 'YakitRoute.createPlugin' },
+  'packet-scan-page': { label: '漏洞检测', labelUi: 'YakitRoute.packetScan' },
+  'add-yakit-script': {
+    label: '插件开发',
+    labelUi: 'YakitRoute.createPlugin',
+    describeUi: 'YakitRoute.pluginDevelopmentDescription',
+  },
   'simple-detect': { label: '安全检测', labelUi: 'YakitRoute.securityCheck' },
   'screen-recorder-page': {
     label: '录屏管理',
@@ -702,85 +706,14 @@ function withRouteToPage(WrappedComponent) {
   return function WithPage(props) {
     return (
       <ErrorBoundary
-        FallbackComponent={({ error, resetErrorBoundary }) => {
-          if (!error) {
-            return <div>未知错误</div>
-          }
-          return (
-            <div style={{ padding: '20px', fontFamily: 'monospace' }}>
-              <h3>页面发生错误</h3>
-              <p>逻辑性崩溃，请关闭重试！</p>
-              <div style={{ marginTop: '16px' }}>
-                <h4>错误信息:</h4>
-                <pre
-                  style={{
-                    background: 'var(--Colors-Use-Neutral-Bg)',
-                    padding: '8px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  {error?.message}
-                </pre>
-              </div>
-              <div style={{ marginTop: '16px' }}>
-                <h4>错误堆栈:</h4>
-                <pre
-                  style={{
-                    background: 'var(--Colors-Use-Neutral-Bg)',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    maxHeight: '300px',
-                    overflow: 'auto',
-                    fontSize: '12px',
-                  }}
-                >
-                  {error?.stack || '无堆栈信息'}
-                </pre>
-              </div>
-              <div style={{ marginTop: '16px' }}>
-                <h4>组件信息:</h4>
-                <pre
-                  style={{
-                    background: 'var(--Colors-Use-Neutral-Bg)',
-                    padding: '8px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  组件名称: {WrappedComponent?.name || WrappedComponent?.displayName || '未知组件'}
-                </pre>
-              </div>
-              <div style={{ marginTop: '16px' }}>
-                <h4>传入参数:</h4>
-                <pre
-                  style={{
-                    background: 'var(--Colors-Use-Neutral-Bg)',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    maxHeight: '200px',
-                    overflow: 'auto',
-                    fontSize: '12px',
-                  }}
-                >
-                  {JSON.stringify(props, null, 2)}
-                </pre>
-              </div>
-              <button
-                onClick={resetErrorBoundary}
-                style={{
-                  marginTop: '16px',
-                  padding: '8px 16px',
-                  background: 'var(--Colors-Use-Blue-Primary)',
-                  color: 'var(--Colors-Use-Blue-On-Primary)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                重试
-              </button>
-            </div>
-          )
-        }}
+        FallbackComponent={({ error, resetErrorBoundary }) => (
+          <RenyanState
+            type="error"
+            description={error?.message || '当前页面暂时无法显示'}
+            actionLabel="重试"
+            onAction={resetErrorBoundary}
+          />
+        )}
       >
         <WrappedComponent {...props} />
       </ErrorBoundary>
@@ -795,19 +728,19 @@ export const RouteToPage: (props: PageItemProps) => ReactNode = (props) => {
       return <>{isIRify() ? <IRifyHome /> : <Home />}</>
     case YakitRoute.HTTPHacker:
       return (
-        <Suspense fallback={<PageLoading />}>
+        <Suspense fallback={<RenyanState type="loading" />}>
           <HTTPHacker />
         </Suspense>
       )
     case YakitRoute.MITMHacker:
       return (
-        <Suspense fallback={<PageLoading />}>
+        <Suspense fallback={<RenyanState type="loading" />}>
           <MITMHacker />
         </Suspense>
       )
     case YakitRoute.HTTPFuzzer:
       return (
-        <Suspense fallback={<PageLoading />}>
+        <Suspense fallback={<RenyanState type="loading" />}>
           <WebFuzzerPage defaultType="config" id={params?.id || ''}>
             <HTTPFuzzerPage system={params?.system} id={params?.id || ''} />
           </WebFuzzerPage>
@@ -830,7 +763,7 @@ export const RouteToPage: (props: PageItemProps) => ReactNode = (props) => {
       return <NewBrute id={params?.id || ''} />
     case YakitRoute.Plugin_Hub:
       return (
-        <Suspense fallback={<PageLoading />}>
+        <Suspense fallback={<RenyanState type="loading" />}>
           <PluginHub />
         </Suspense>
       )

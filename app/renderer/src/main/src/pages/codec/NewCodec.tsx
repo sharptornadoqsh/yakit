@@ -78,6 +78,7 @@ import { useTheme } from '@/hook/useTheme'
 import { handleOpenFileSystemDialog } from '@/utils/fileSystemDialog'
 import { YakitPopconfirm } from '@/components/yakitUI/YakitPopconfirm/YakitPopconfirm'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 const { ipcRenderer } = window.require('electron')
 const { YakitPanel } = YakitCollapse
 
@@ -1764,6 +1765,8 @@ interface NewCodecLeftDragListProps {
   onClickToRunList: (v: CodecMethod) => void
   searchValue?: string
   setSearchValue?: (v: string) => void
+  state: 'loading' | 'ready' | 'error'
+  onRetry: () => void
 }
 
 interface LeftDataProps {
@@ -1786,8 +1789,11 @@ export const NewCodecLeftDragList: React.FC<NewCodecLeftDragListProps> = (props)
     isShowSearchList,
     getCollectData,
     onClickToRunList,
+    state,
+    onRetry,
   } = props
   const [activeKey, setActiveKey] = useState<string[]>([])
+  const hasMethods = leftCollectData.length > 0 || leftData.length > 0
 
   return (
     <div
@@ -1826,19 +1832,34 @@ export const NewCodecLeftDragList: React.FC<NewCodecLeftDragListProps> = (props)
       </div>
       <div className={styles['left-drag-list']}>
         <YakitSpin spinning={false}>
-          {/* 左边列表 */}
-          <>
-            {isShowSearchList ? (
-              <div className={styles['left-drag-list-collapse']}>
-                <NewCodecLeftDragListItem
-                  node={leftSearchData}
-                  collectList={collectList}
-                  getCollectData={getCollectData}
-                  onClickToRunList={onClickToRunList}
-                />
-                <div className={styles['to-end']}>{t('YakitEmpty.end_of_list')}</div>
-              </div>
-            ) : (
+          {state === 'loading' && (
+            <div className={styles['codec-list-state']}>
+              <RenyanState type="loading" compact />
+            </div>
+          )}
+          {state === 'error' && (
+            <div className={styles['codec-list-state']}>
+              <RenyanState type="error" actionLabel={t('YakitButton.retry')} onAction={onRetry} compact />
+            </div>
+          )}
+          {state === 'ready' &&
+            (isShowSearchList ? (
+              leftSearchData.length > 0 ? (
+                <div className={styles['left-drag-list-collapse']}>
+                  <NewCodecLeftDragListItem
+                    node={leftSearchData}
+                    collectList={collectList}
+                    getCollectData={getCollectData}
+                    onClickToRunList={onClickToRunList}
+                  />
+                  <div className={styles['to-end']}>{t('YakitEmpty.end_of_list')}</div>
+                </div>
+              ) : (
+                <div className={styles['codec-list-state']}>
+                  <RenyanState type="empty" compact />
+                </div>
+              )
+            ) : hasMethods ? (
               <YakitCollapse
                 expandIcon={() => <></>}
                 accordion={true}
@@ -1895,8 +1916,11 @@ export const NewCodecLeftDragList: React.FC<NewCodecLeftDragListProps> = (props)
                 })}
                 <div className={styles['to-end']}>{t('YakitEmpty.end_of_list')}</div>
               </YakitCollapse>
-            )}
-          </>
+            ) : (
+              <div className={styles['codec-list-state']}>
+                <RenyanState type="empty" compact />
+              </div>
+            ))}
         </YakitSpin>
       </div>
     </div>
@@ -2066,6 +2090,7 @@ export const NewCodec: React.FC<NewCodecProps> = (props) => {
 
   const [leftSearchData, setLeftSearchData] = useState<CodecMethod[]>([])
   const [searchValue, setSearchValue] = useState<string>()
+  const [codecListState, setCodecListState] = useState<'loading' | 'ready' | 'error'>('loading')
   // 是否显示搜索列表
   const [isShowSearchList, setShowSearchList] = useState<boolean>(false)
   const cacheCodecRef = useRef<CodecMethod[]>([])
@@ -2258,12 +2283,17 @@ export const NewCodec: React.FC<NewCodecProps> = (props) => {
 
   // 获取codec列表
   const getLeftData = useMemoizedFn(() => {
-    ipcRenderer.invoke('GetAllCodecMethods').then((res: CodecMethods) => {
-      const { Methods } = res
-      cacheCodecRef.current = Methods
-      getCollectData()
-      initLeftData(Methods)
-    })
+    setCodecListState('loading')
+    ipcRenderer
+      .invoke('GetAllCodecMethods')
+      .then((res: CodecMethods) => {
+        const { Methods } = res
+        cacheCodecRef.current = Methods
+        getCollectData()
+        initLeftData(Methods)
+        setCodecListState('ready')
+      })
+      .catch(() => setCodecListState('error'))
   })
 
   useDebounceEffect(
@@ -2458,6 +2488,8 @@ export const NewCodec: React.FC<NewCodecProps> = (props) => {
             setSearchValue={setSearchValue}
             getCollectData={getCollectData}
             onClickToRunList={onClickToRunList}
+            state={codecListState}
+            onRetry={getLeftData}
           />
           <NewCodecMiddleRunList
             ref={newCodecMiddleRunListRef}

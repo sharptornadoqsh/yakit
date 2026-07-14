@@ -1,5 +1,5 @@
 .page-header {
-  min-height: 62px;
+  min-height: 76px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -11,6 +11,8 @@
 }
 
 .page-heading {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
@@ -54,6 +56,17 @@
   }
 }
 
+.page-description {
+  max-width: min(880px, 68vw);
+  margin: 1px 0 0;
+  overflow: hidden;
+  color: var(--Colors-Use-Neutral-Text-3-Secondary);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .page-actions {
   flex-shrink: 0;
   display: flex;
@@ -80,5 +93,9 @@
 @media (max-width: 920px) {
   .workspace-state {
     display: none;
+  }
+
+  .page-description {
+    max-width: 62vw;
   }
 }

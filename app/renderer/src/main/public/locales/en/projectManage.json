@@ -32,6 +32,7 @@
     "openProject": "Open Project",
     "copyPath": "Copy Path",
     "title": "Project Management",
+    "pageDescription": "管理本地项目、加密存储，以及明文或加密格式的导入导出",
     "inputProjectName": "Please input project name",
     "recentOperation": "Recent Operation",
     "temporaryProject": "Temporary Project",

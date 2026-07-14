@@ -130,7 +130,7 @@ export const RENYAN_MENU_MODEL: readonly RenyanMenuItem[] = [
       {
         key: 'packet-diff',
         route: YakitRoute.DataCompare,
-        title: '报文差异分析',
+        title: '报文差异对比',
         titleKey: 'Layout.RenyanShell.menu.packetDiff',
         group: 'traffic-analysis',
         order: 40,
@@ -155,7 +155,7 @@ export const RENYAN_MENU_MODEL: readonly RenyanMenuItem[] = [
       {
         key: 'general-vulnerability',
         route: YakitRoute.BatchExecutorPage,
-        title: '通用漏洞检测',
+        title: '漏洞检测',
         titleKey: 'Layout.RenyanShell.menu.generalVulnerability',
         group: 'security-testing',
         order: 10,

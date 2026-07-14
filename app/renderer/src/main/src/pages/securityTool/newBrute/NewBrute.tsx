@@ -34,6 +34,7 @@ import { shallow } from 'zustand/shallow'
 import { YakitRoute } from '@/enums/yakitRoute'
 import { defaultBruteExecuteExtraFormValue, defaultBrutePageInfo } from '@/defaultConstants/NewBrute'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 
 const BruteExecuteParamsDrawer = React.lazy(() => import('./BruteExecuteParamsDrawer'))
 
@@ -57,9 +58,10 @@ export const NewBrute: React.FC<NewBruteProps> = React.memo((props) => {
 })
 
 const BruteTypeTreeList: React.FC<BruteTypeTreeListProps> = React.memo((props) => {
-  const { t } = useI18nNamespaces(['brute'])
+  const { t } = useI18nNamespaces(['brute', 'yakitUi'])
   const { hidden } = props
   const [tree, setTree] = useState<DataNode[]>([])
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading')
 
   const [checkedKeys, setCheckedKeys] = useControllableValue<React.Key[]>(props, {
     defaultValue: [],
@@ -71,7 +73,13 @@ const BruteTypeTreeList: React.FC<BruteTypeTreeListProps> = React.memo((props) =
     getAvailableBruteTypes()
   }, [])
   const getAvailableBruteTypes = useMemoizedFn(() => {
-    apiGetAvailableBruteTypes().then(setTree)
+    setListState('loading')
+    apiGetAvailableBruteTypes()
+      .then((data) => {
+        setTree(data)
+        setListState('ready')
+      })
+      .catch(() => setListState('error'))
   })
   const onCheck = useMemoizedFn((checkedKeysValue: Key[]) => {
     const checkedKeys = checkedKeysValue.filter((item) => !(item as string).includes('temporary-id-'))
@@ -114,17 +122,34 @@ const BruteTypeTreeList: React.FC<BruteTypeTreeListProps> = React.memo((props) =
       <div className={styles['tree-heard']}>
         <span className={styles['tree-heard-title']}>{t('BruteTypeTreeList.availableBruteTypes')}</span>
       </div>
-      <YakitTree
-        checkable
-        selectedKeys={[]}
-        checkedKeys={checkedKeys}
-        onCheck={(keys) => onCheck(keys as Key[])}
-        showLine={false}
-        treeData={tree}
-        onSelect={onSelect}
-        classNameWrapper={styles['tree-list']}
-        rootClassName={styles['tree-root']}
-      />
+      {listState === 'loading' && (
+        <div className={styles['tree-list-state']}>
+          <RenyanState type="loading" compact />
+        </div>
+      )}
+      {listState === 'error' && (
+        <div className={styles['tree-list-state']}>
+          <RenyanState type="error" actionLabel={t('YakitButton.retry')} onAction={getAvailableBruteTypes} compact />
+        </div>
+      )}
+      {listState === 'ready' && tree.length === 0 && (
+        <div className={styles['tree-list-state']}>
+          <RenyanState type="empty" compact />
+        </div>
+      )}
+      {listState === 'ready' && tree.length > 0 && (
+        <YakitTree
+          checkable
+          selectedKeys={[]}
+          checkedKeys={checkedKeys}
+          onCheck={(keys) => onCheck(keys as Key[])}
+          showLine={false}
+          treeData={tree}
+          onSelect={onSelect}
+          classNameWrapper={styles['tree-list']}
+          rootClassName={styles['tree-root']}
+        />
+      )}
     </div>
   )
 })

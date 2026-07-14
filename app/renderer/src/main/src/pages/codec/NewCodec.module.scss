@@ -87,6 +87,14 @@
     .left-drag-list {
       width: 301px;
       overflow: auto;
+
+      .codec-list-state {
+        display: flex;
+        align-items: center;
+        min-height: 180px;
+        padding: 12px;
+      }
+
       .left-drag-list-collapse {
         .panel-active-title {
           color: var(--Colors-Use-Main-Primary);
