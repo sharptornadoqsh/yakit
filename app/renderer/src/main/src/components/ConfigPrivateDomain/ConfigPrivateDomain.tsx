@@ -40,12 +40,14 @@ interface ConfigPrivateDomainProps {
   onSuccee?: () => void
   // 是否为企业登录
   enterpriseLogin?: boolean | undefined
+  // 是否使用企业登录页专用布局
+  pageMode?: boolean
   // 是否展示跳过
   skipShow?: boolean
 }
 
 export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.memo((props) => {
-  const { onClose, onSuccee, enterpriseLogin = false, skipShow = false } = props
+  const { onClose, onSuccee, enterpriseLogin = false, pageMode = false, skipShow = false } = props
   const { t } = useI18nNamespaces(['components', 'yakitUi'])
   const [form] = Form.useForm()
   const [loading, setLoading] = useState<boolean>(false)
@@ -271,16 +273,22 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
     },
   ]
   return (
-    <div className="private-domain">
-      {enterpriseLogin && (
+    <div className={`private-domain${pageMode ? ' private-domain-enterprise-page' : ''}`}>
+      {enterpriseLogin && !pageMode && (
         <div className="login-title-show">
           <div className="icon-box">
-            <img src={productIcon} className="type-icon-img" />
+            <img src={productIcon} className="type-icon-img" alt="" />
           </div>
           <div className="title-box">{t('ConfigPrivateDomain.enterpriseLogin')}</div>
         </div>
       )}
-      <Form {...layout} form={form} name="control-hooks" onFinish={(v) => onFinish(v)} size="small">
+      <Form
+        {...(pageMode ? { layout: 'vertical' as const } : layout)}
+        form={form}
+        name="control-hooks"
+        onFinish={(v) => onFinish(v)}
+        size={pageMode ? 'middle' : 'small'}
+      >
         <Form.Item
           name="BaseUrl"
           label={t('ConfigPrivateDomain.privateDomainAddress')}
@@ -319,7 +327,11 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
             label={t('ConfigPrivateDomain.username')}
             rules={[{ required: true, message: t('YakitForm.requiredField') }]}
           >
-            <YakitInput placeholder={t('ConfigPrivateDomain.enterUsername')} allowClear />
+            <YakitInput
+              placeholder={t('ConfigPrivateDomain.enterUsername')}
+              allowClear={!pageMode}
+              autoComplete="username"
+            />
           </Form.Item>
         )}
         {enterpriseLogin && (
@@ -328,31 +340,63 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
             label={t('ConfigPrivateDomain.password')}
             rules={[{ required: true, message: t('YakitForm.requiredField') }, ...judgePass()]}
           >
-            <YakitInput.Password placeholder={t('ConfigPrivateDomain.enterPassword')} allowClear />
+            <YakitInput.Password
+              placeholder={t('ConfigPrivateDomain.enterPassword')}
+              allowClear={!pageMode}
+              autoComplete="current-password"
+            />
           </Form.Item>
         )}
         {enterpriseLogin ? (
-          <Form.Item label={' '} colon={false} className="form-item-submit">
-            {isShowSkip && (
-              <YakitButton
-                style={{ width: 165, marginRight: 12 }}
-                onClick={() => {
-                  onSuccee && onSuccee()
-                }}
-                size="large"
-              >
-                {t('YakitButton.skip')}
-              </YakitButton>
+          <Form.Item label={pageMode ? undefined : ' '} colon={false} className="form-item-submit">
+            {pageMode ? (
+              <div className="enterprise-login-actions">
+                <YakitButton
+                  className="enterprise-login-submit"
+                  size="large"
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                >
+                  {t('YakitButton.login')}
+                </YakitButton>
+                {isShowSkip && (
+                  <YakitButton
+                    className="enterprise-login-skip"
+                    type="text"
+                    onClick={() => {
+                      onSuccee && onSuccee()
+                    }}
+                    size="large"
+                  >
+                    {t('ConfigPrivateDomain.enterLocalWorkspace')}
+                  </YakitButton>
+                )}
+              </div>
+            ) : (
+              <>
+                {isShowSkip && (
+                  <YakitButton
+                    style={{ width: 165, marginRight: 12 }}
+                    onClick={() => {
+                      onSuccee && onSuccee()
+                    }}
+                    size="large"
+                  >
+                    {t('YakitButton.skip')}
+                  </YakitButton>
+                )}
+                <YakitButton
+                  size="large"
+                  type="primary"
+                  htmlType="submit"
+                  style={{ width: 165, marginLeft: isShowSkip ? 0 : 43 }}
+                  loading={loading}
+                >
+                  {t('YakitButton.login')}
+                </YakitButton>
+              </>
             )}
-            <YakitButton
-              size="large"
-              type="primary"
-              htmlType="submit"
-              style={{ width: 165, marginLeft: isShowSkip ? 0 : 43 }}
-              loading={loading}
-            >
-              {t('YakitButton.login')}
-            </YakitButton>
           </Form.Item>
         ) : (
           <div className="form-btns">

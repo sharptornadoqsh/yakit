@@ -149,7 +149,8 @@
     "username": "用户名",
     "enterUsername": "请输入你的用户名",
     "password": "密码",
-    "enterPassword": "请输入你的密码"
+    "enterPassword": "请输入你的密码",
+    "enterLocalWorkspace": "进入本地工作区"
   },
   "MessageCenter": {
     "applyModify": "申请修改",

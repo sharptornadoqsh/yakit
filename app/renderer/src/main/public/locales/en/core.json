@@ -9,7 +9,23 @@
   },
   "EnterpriseJudgeLogin": {
     "reActivateNotice": "Please re-activate License",
-    "verifyingLicense": "Verifying License"
+    "verifyingLicense": "Verifying License",
+    "verifyingDescription": "Confirming the license status for this device",
+    "enterpriseEdition": "Enterprise Security Workspace",
+    "brandEyebrow": "Unified secure access",
+    "brandHeadline": "Access your enterprise workspace with a trusted identity",
+    "brandDescription": "A private-deployment workspace for traffic analysis, security testing, projects, and findings.",
+    "capabilityLabel": "Enterprise access capabilities",
+    "privateDeployment": "Private deployment access",
+    "identityAccess": "Enterprise identity verification",
+    "localDataBoundary": "Local data boundary",
+    "controlledAccess": "Controlled access channel",
+    "accessPortal": "Enterprise Access Portal",
+    "privateEnvironment": "Private environment",
+    "formEyebrow": "Identity verification",
+    "formTitle": "Sign in to the enterprise workspace",
+    "formDescription": "Enter the private domain and your enterprise account credentials",
+    "connectionNotice": "Connect to an authorized enterprise service endpoint"
   },
   "LicensePage": {
     "getLicenseFailed": "Failed to get License: {{error}}",

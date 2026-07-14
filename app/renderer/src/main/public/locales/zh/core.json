@@ -9,7 +9,23 @@
   },
   "EnterpriseJudgeLogin": {
     "reActivateNotice": "请重新激活License",
-    "verifyingLicense": "验证License中"
+    "verifyingLicense": "验证License中",
+    "verifyingDescription": "正在确认本机授权状态，请稍候",
+    "enterpriseEdition": "企业安全工作台",
+    "brandEyebrow": "统一安全验证入口",
+    "brandHeadline": "以可信身份进入企业工作区",
+    "brandDescription": "面向私有部署环境，统一组织流量分析、安全测试、项目与结果数据。",
+    "capabilityLabel": "企业入口能力",
+    "privateDeployment": "私有部署接入",
+    "identityAccess": "企业身份认证",
+    "localDataBoundary": "本地数据边界",
+    "controlledAccess": "受控访问通道",
+    "accessPortal": "企业访问门户",
+    "privateEnvironment": "私有环境",
+    "formEyebrow": "身份验证",
+    "formTitle": "登录企业工作区",
+    "formDescription": "请输入私有域地址与企业账号信息",
+    "connectionNotice": "请连接已授权的企业服务地址"
   },
   "LicensePage": {
     "getLicenseFailed": "获取License失败: {{error}}",

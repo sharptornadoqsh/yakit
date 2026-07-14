@@ -9,7 +9,23 @@
   },
   "EnterpriseJudgeLogin": {
     "reActivateNotice": "請重新啟用License",
-    "verifyingLicense": "驗證License中"
+    "verifyingLicense": "驗證License中",
+    "verifyingDescription": "正在確認本機授權狀態，請稍候",
+    "enterpriseEdition": "企業安全工作臺",
+    "brandEyebrow": "統一安全驗證入口",
+    "brandHeadline": "以可信身分進入企業工作區",
+    "brandDescription": "面向私有部署環境，統一組織流量分析、安全測試、專案與結果資料。",
+    "capabilityLabel": "企業入口能力",
+    "privateDeployment": "私有部署存取",
+    "identityAccess": "企業身分驗證",
+    "localDataBoundary": "本機資料邊界",
+    "controlledAccess": "受控存取通道",
+    "accessPortal": "企業存取入口",
+    "privateEnvironment": "私有環境",
+    "formEyebrow": "身分驗證",
+    "formTitle": "登入企業工作區",
+    "formDescription": "請輸入私有域位址與企業帳號資訊",
+    "connectionNotice": "請連線至已授權的企業服務位址"
   },
   "LicensePage": {
     "getLicenseFailed": "獲取License失敗: {{error}}",

@@ -1,5 +1,5 @@
-import React, { ReactNode, useEffect, useRef, useState } from 'react'
-import { failed, info, success } from '@/utils/notification'
+import React, { useEffect, useState } from 'react'
+import { info } from '@/utils/notification'
 import { Spin } from 'antd'
 import LicensePage from './LicensePage'
 import { ConfigPrivateDomain } from '@/components/ConfigPrivateDomain/ConfigPrivateDomain'
@@ -9,6 +9,9 @@ import { useUploadInfoByEnpriTrace } from '@/components/layout/utils'
 import { JSONParseLog } from '@/utils/tool'
 import { SystemInfo } from '@/constants/hardware'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { productConfig } from '@/config/product'
+import productIcon from '@/assets/renyan-icon.svg'
+import styles from './EnterpriseJudgeLogin.module.scss'
 const { ipcRenderer } = window.require('electron')
 
 /** 构建期配置：默认需要 License 验证；CI 可设为 false 跳过校验流程 */
@@ -94,32 +97,104 @@ const EnterpriseJudgeLogin: React.FC<EnterpriseJudgeLoginProps> = (props) => {
         }
       })
   }
-  return (
-    <>
-      {loading ? (
-        <div style={{ paddingTop: 10, textAlign: 'center' }}>
-          <Spin tip={t('EnterpriseJudgeLogin.verifyingLicense')}></Spin>
+  if (loading) {
+    return (
+      <main className={styles['enterprise-login-page']}>
+        <div className={styles['ambient-grid']} aria-hidden="true" />
+        <div className={styles['license-loading']} role="status">
+          <img src={productIcon} alt={productConfig.displayName} />
+          <Spin tip={t('EnterpriseJudgeLogin.verifyingLicense')} />
+          <p>{t('EnterpriseJudgeLogin.verifyingDescription')}</p>
         </div>
-      ) : (
-        <>
-          {activateLicense ? (
-            <div style={{ width: 480, margin: '0 auto', paddingTop: 200, height: '100%' }}>
-              <ConfigPrivateDomain
-                enterpriseLogin={true}
-                onSuccee={() => setJudgeLicense(false)}
-                skipShow={isEnpriTrace() || isEnpriTraceAgent()}
-              />
+      </main>
+    )
+  }
+
+  if (!activateLicense) {
+    return (
+      <LicensePage
+        judgeLicense={judgeLicense}
+        licensePageLoading={licensePageLoading}
+        setLicensePageLoading={setLicensePageLoading}
+      />
+    )
+  }
+
+  return (
+    <main className={styles['enterprise-login-page']} data-testid="enterprise-login-page">
+      <div className={styles['ambient-grid']} aria-hidden="true" />
+      <div className={styles['ambient-glow']} aria-hidden="true" />
+
+      <section className={styles['login-shell']} aria-labelledby="enterprise-login-title">
+        <aside className={styles['brand-panel']}>
+          <div className={styles['brand-grid']} aria-hidden="true" />
+          <div className={styles['brand-orbit']} aria-hidden="true">
+            <span />
+          </div>
+
+          <div className={styles['brand-identity']}>
+            <div className={styles['brand-mark']}>
+              <img src={productIcon} alt="" />
             </div>
-          ) : (
-            <LicensePage
-              judgeLicense={judgeLicense}
-              licensePageLoading={licensePageLoading}
-              setLicensePageLoading={setLicensePageLoading}
-            />
-          )}
-        </>
-      )}
-    </>
+            <div>
+              <strong>{productConfig.displayName}</strong>
+              <span>{t('EnterpriseJudgeLogin.enterpriseEdition')}</span>
+            </div>
+          </div>
+
+          <div className={styles['brand-copy']}>
+            <span className={styles['brand-eyebrow']}>{t('EnterpriseJudgeLogin.brandEyebrow')}</span>
+            <h1>{t('EnterpriseJudgeLogin.brandHeadline')}</h1>
+            <p>{t('EnterpriseJudgeLogin.brandDescription')}</p>
+          </div>
+
+          <ul className={styles['capability-list']} aria-label={t('EnterpriseJudgeLogin.capabilityLabel')}>
+            <li>
+              <span>01</span>
+              <strong>{t('EnterpriseJudgeLogin.privateDeployment')}</strong>
+            </li>
+            <li>
+              <span>02</span>
+              <strong>{t('EnterpriseJudgeLogin.identityAccess')}</strong>
+            </li>
+            <li>
+              <span>03</span>
+              <strong>{t('EnterpriseJudgeLogin.localDataBoundary')}</strong>
+            </li>
+          </ul>
+
+          <div className={styles['brand-footer']}>
+            <span className={styles['pulse-dot']} />
+            {t('EnterpriseJudgeLogin.controlledAccess')}
+          </div>
+        </aside>
+
+        <section className={styles['form-panel']}>
+          <div className={styles['form-topline']}>
+            <span>{t('EnterpriseJudgeLogin.accessPortal')}</span>
+            <span className={styles['environment-chip']}>{t('EnterpriseJudgeLogin.privateEnvironment')}</span>
+          </div>
+
+          <div className={styles['form-heading']}>
+            <span>{t('EnterpriseJudgeLogin.formEyebrow')}</span>
+            <h2 id="enterprise-login-title">{t('EnterpriseJudgeLogin.formTitle')}</h2>
+            <p>{t('EnterpriseJudgeLogin.formDescription')}</p>
+          </div>
+
+          <ConfigPrivateDomain
+            enterpriseLogin={true}
+            pageMode={true}
+            onSuccee={() => setJudgeLicense(false)}
+            skipShow={isEnpriTrace() || isEnpriTraceAgent()}
+          />
+
+          <div className={styles['form-footer']}>
+            <span />
+            {t('EnterpriseJudgeLogin.connectionNotice')}
+          </div>
+        </section>
+      </section>
+    </main>
   )
 }
 export default EnterpriseJudgeLogin

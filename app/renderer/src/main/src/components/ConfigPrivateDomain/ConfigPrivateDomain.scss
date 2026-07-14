@@ -47,3 +47,111 @@
     }
   }
 }
+
+.private-domain-enterprise-page {
+  width: 100%;
+  padding: 0;
+
+  .ant-form-item {
+    margin-bottom: 22px;
+  }
+
+  .ant-form-item-label {
+    padding-bottom: 8px;
+
+    > label {
+      height: auto;
+      color: var(--Colors-Use-Neutral-Text-2-Primary);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+  }
+
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-select-selector {
+    color: var(--Colors-Use-Neutral-Text-1-Title);
+    border-color: color-mix(in srgb, var(--Colors-Use-Main-Primary) 14%, var(--Colors-Use-Neutral-Border));
+    border-radius: 9px !important;
+    background: color-mix(in srgb, var(--Colors-Use-Neutral-Bg) 64%, var(--Colors-Use-Basic-Background));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      background-color 160ms ease;
+  }
+
+  .ant-input {
+    min-height: 46px;
+    padding: 10px 13px;
+  }
+
+  .ant-input-affix-wrapper {
+    min-height: 46px;
+    padding: 0 13px;
+
+    .ant-input {
+      min-height: 42px;
+      padding: 8px 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+  }
+
+  .ant-select-single:not(.ant-select-customize-input) .ant-select-selector {
+    height: 46px;
+    padding: 0 13px;
+
+    .ant-select-selection-search-input {
+      height: 44px;
+    }
+  }
+
+  .ant-input:focus,
+  .ant-input-focused,
+  .ant-input-affix-wrapper:focus,
+  .ant-input-affix-wrapper-focused,
+  .ant-select-focused .ant-select-selector {
+    border-color: var(--Colors-Use-Main-Primary) !important;
+    background: var(--Colors-Use-Basic-Background);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--Colors-Use-Main-Primary) 13%, transparent) !important;
+  }
+
+  .form-item-submit {
+    margin-top: 8px;
+    margin-bottom: 0;
+
+    .ant-form-item-control,
+    .ant-form-item-control-input,
+    .ant-form-item-control-input-content {
+      width: 100%;
+    }
+  }
+
+  .enterprise-login-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .enterprise-login-submit {
+    width: 100%;
+    height: 48px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--Colors-Use-Main-Primary) 24%, transparent);
+  }
+
+  .enterprise-login-skip {
+    align-self: center;
+    height: 32px;
+    padding: 0 10px;
+    color: var(--Colors-Use-Neutral-Text-3-Secondary);
+    font-size: 12px;
+  }
+}

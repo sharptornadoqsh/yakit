@@ -149,7 +149,8 @@
     "username": "Username",
     "enterUsername": "Please enter your username",
     "password": "Password",
-    "enterPassword": "Please enter your password"
+    "enterPassword": "Please enter your password",
+    "enterLocalWorkspace": "Enter local workspace"
   },
   "MessageCenter": {
     "applyModify": "Apply Modify",
