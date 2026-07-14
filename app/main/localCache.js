@@ -1,7 +1,8 @@
-const { ipcMain } = require('electron')
+const { ipcMain, safeStorage } = require('electron')
 const fs = require('fs')
 const { getLocalCachePath, getExtraLocalCachePath } = require('./filePath')
 const { productConfig } = require('./product')
+const { protectLocalCacheValue, revealLocalCacheValue } = require('./securityCredentials')
 
 const cacheDescription = `该文件内缓存数据如需手动修改，请在关闭 ${productConfig.displayName} 之后进行操作`
 
@@ -34,16 +35,22 @@ const localCacheState = {
   writingFile: false,
 }
 function getLocalCacheValue(key) {
-  return kvCache.get(key)
+  const result = revealLocalCacheValue(key, kvCache.get(key), safeStorage)
+  if (Object.prototype.hasOwnProperty.call(result, 'migratedValue')) {
+    kvCache.set(key, result.migratedValue)
+    localCacheState.cacheChanged = true
+  }
+  return result.value
 }
 function getExtraLocalCacheValue(key) {
   return extraKVCache.get(key)
 }
 function setLocalCache(key, value) {
-  if (value === kvCache.get(key)) {
+  const protectedValue = protectLocalCacheValue(key, value, safeStorage)
+  if (protectedValue === kvCache.get(key)) {
     return
   }
-  kvCache.set(key, value)
+  kvCache.set(key, protectedValue)
   localCacheState.cacheChanged = true
 }
 function setExtraLocalCache(key, value) {

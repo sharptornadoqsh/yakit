@@ -1,7 +1,7 @@
 const axios = require('axios')
 const https = require('https')
 const { ipcMain } = require('electron')
-const { USER_INFO, resetUserInfo, HttpSetting } = require('./state')
+const { USER_INFO, expireUserInfo, resetUserInfo, HttpSetting } = require('./state')
 const url = require('url')
 const { HttpsProxyAgent } = require('hpagent')
 const { printLogOutputFile } = require('./logFile')
@@ -67,10 +67,10 @@ const add_proxy = process.env.https_proxy || process.env.HTTPS_PROXY
 const agent = !!add_proxy
   ? new HttpsProxyAgent({
       proxy: add_proxy,
-      rejectUnauthorized: false, // 忽略 HTTPS 错误
+      rejectUnauthorized: true,
     })
   : new https.Agent({
-      rejectUnauthorized: false, // 忽略 HTTPS 错误
+      rejectUnauthorized: true,
     })
 
 const service = axios.create({
@@ -112,7 +112,7 @@ service.interceptors.response.use(
       return {
         ...responseData,
         code: responseCode,
-        ...(responseCode === 401 ? { userInfo: USER_INFO } : {}),
+        ...(responseCode === 401 ? { userInfo: expireUserInfo() } : {}),
       }
     }
     const res = {
@@ -129,7 +129,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data.message,
-        userInfo: USER_INFO,
+        userInfo: expireUserInfo(),
       }
       return Promise.resolve(res)
     }
@@ -137,7 +137,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data?.message || error.response.data.reason,
-        userInfo: USER_INFO,
+        userInfo: expireUserInfo(),
       }
       return Promise.resolve(res)
     }
@@ -145,7 +145,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data.message,
-        userInfo: USER_INFO,
+        userInfo: expireUserInfo(),
       }
       return Promise.resolve(res)
     }

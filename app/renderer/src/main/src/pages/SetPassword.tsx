@@ -10,6 +10,7 @@ import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { yakitNetwork, yakitUILayout } from '@/services/electronBridge'
+import { isStrongPassword } from '@/utils/passwordPolicy'
 
 export interface SetPasswordProps {
   userInfo: UserInfoProps
@@ -65,9 +66,7 @@ const SetPassword: React.FC<SetPasswordProps> = (props) => {
   const judgePass = () => [
     {
       validator: (_, value) => {
-        let re =
-          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[.<>?;:\[\]{}~!@#$%^&*()_+-="])[A-Za-z\d.<>?;:\[\]{}~!@#$%^&*()_+-="]{8,20}/
-        if (re.test(value)) {
+        if (isStrongPassword(value)) {
           return Promise.resolve()
         } else {
           return Promise.reject(t('SetPassword.passwordRule'))

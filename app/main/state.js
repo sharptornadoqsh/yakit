@@ -19,6 +19,11 @@ const createUserInfo = () => ({
 })
 const USER_INFO = createUserInfo()
 const resetUserInfo = () => Object.assign(USER_INFO, createUserInfo())
+const expireUserInfo = () => {
+  const expiredUserInfo = { ...USER_INFO, token: null }
+  resetUserInfo()
+  return expiredUserInfo
+}
 const HttpSetting = {
   httpBaseURL: 'https://www.yaklang.com',
   wsBaseURL: 'wss://www.yaklang.com',
@@ -41,6 +46,7 @@ const GLOBAL_YAK_SETTING = {
 
 module.exports = {
   USER_INFO,
+  expireUserInfo,
   resetUserInfo,
   HttpSetting,
   GLOBAL_YAK_SETTING,

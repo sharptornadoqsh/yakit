@@ -136,9 +136,11 @@
   "ConfigPrivateDomain": {
     "enterpriseLoginSuccess": "Service login successful",
     "enterpriseLoginFailed": "Service login failed: {{error}}",
+    "loginRequestRejected": "Check the account, password, service address, and network status",
     "privateDomainSetSuccess": "Service address configured successfully",
     "privateDomainSetFailed": "Failed to configure service address: {{error}}",
     "passwordRules": "Password must be 8-20 characters and include uppercase and lowercase letters, numbers, and special characters",
+    "httpTransportWarning": "This service address uses HTTP, which can expose login credentials and tokens. Internet-facing deployments must use HTTPS.",
     "privateDomainHasSpace": "Service address contains spaces",
     "enterValidPrivateDomain": "Please enter a valid service address",
     "enterpriseLogin": "Service Login",

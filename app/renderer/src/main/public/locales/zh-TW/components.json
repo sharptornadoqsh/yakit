@@ -136,9 +136,11 @@
   "ConfigPrivateDomain": {
     "enterpriseLoginSuccess": "服務登入成功",
     "enterpriseLoginFailed": "服務登入失敗：{{error}}",
+    "loginRequestRejected": "請核對帳號、密碼、服務位址及網路狀態",
     "privateDomainSetSuccess": "服務位址設定成功",
     "privateDomainSetFailed": "服務位址設定失敗：{{error}}",
     "passwordRules": "密碼為8-20位，且必須包含大小寫字母、數字及特殊字元",
+    "httpTransportWarning": "目前服務位址使用 HTTP，登入憑據和權杖可能被竊聽；面向網際網路部署必須使用 HTTPS。",
     "privateDomainHasSpace": "服務位址存在空格",
     "enterValidPrivateDomain": "請輸入有效的服務位址",
     "enterpriseLogin": "服務登入",

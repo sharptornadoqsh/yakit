@@ -22,6 +22,8 @@ import { JSONParseLog } from '@/utils/tool'
 import { yakitAuth, yakitCodec, yakitProfile, yakitUILayout } from '@/services/electronBridge'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import useAIGlobalConfig from '@/pages/ai-re-act/hooks/useAIGlobalConfig'
+import { YakitAlert } from '../yakitUI/YakitAlert/YakitAlert'
+import { isStrongPassword } from '@/utils/passwordPolicy'
 
 interface OnlineProfileProps {
   BaseUrl: string
@@ -136,11 +138,18 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
       }
     } catch (err) {
       setTimeout(() => setLoading(false), 300)
-      failed(t('ConfigPrivateDomain.enterpriseLoginFailed', { error: String(err) }))
+      failed(
+        t('ConfigPrivateDomain.enterpriseLoginFailed', {
+          error: t('ConfigPrivateDomain.loginRequestRejected'),
+        }),
+      )
       if (typeof err === 'string' && skipShow && (err.includes('密码不正确') || err.includes('用户不存在'))) {
         return
       }
       setShowSkip(true)
+    } finally {
+      form.setFieldsValue({ pwd: '' })
+      setFormValue({ ...getFormValue(), pwd: '' })
     }
   })
 
@@ -153,9 +162,18 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
       IsCompany: enterpriseLogin,
       BaseUrl,
     }
+    const persistedValues = {
+      BaseUrl: values.BaseUrl,
+      Proxy: values.Proxy,
+      user_name: values.user_name,
+      IsCompany: values.IsCompany,
+    }
     yakitProfile
       .setOnlineProfile({
-        ...values,
+        BaseUrl: persistedValues.BaseUrl,
+        Proxy: persistedValues.Proxy,
+        IsCompany: persistedValues.IsCompany,
+        Password: '',
       })
       .then(() => {
         addHttpHistoryList(values.BaseUrl)
@@ -171,17 +189,7 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
           failed(t('ConfigPrivateDomain.privateDomainSetFailed', { error: String(err) }))
           setShowSkip(true)
         })
-        if (v?.pwd) {
-          // 加密
-          yakitCodec
-            .run({ Type: 'base64', Text: v.pwd, Params: [], ScriptName: '' })
-            .then((res) => {
-              setRemoteValue(getRemoteHttpSettingGV(), JSON.stringify({ ...values, pwd: res.Result }))
-            })
-            .catch(() => {})
-        } else {
-          setRemoteValue(getRemoteHttpSettingGV(), JSON.stringify(values))
-        }
+        setRemoteValue(getRemoteHttpSettingGV(), JSON.stringify(persistedValues))
 
         uploadProjectEvent
           .startUpload({
@@ -218,25 +226,13 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
     getRemoteValue(getRemoteHttpSettingGV()).then((setting) => {
       if (!setting) return
       const value = JSONParseLog(setting, { page: 'ConfigPrivateDomain', fun: 'getHttpSetting' })
-      setDefaultHttpUrl(value.BaseUrl)
-      if (value?.pwd && value.pwd.length > 0) {
-        // 解密
-        yakitCodec
-          .run({ Type: 'base64-decode', Text: value.pwd, Params: [], ScriptName: '' })
-          .then((res) => {
-            form.setFieldsValue({
-              ...value,
-              pwd: res.Result,
-            })
-            setFormValue({ ...value, pwd: res.Result })
-          })
-          .catch(() => {})
-      } else {
-        form.setFieldsValue({
-          ...value,
-        })
-        setFormValue({ ...value })
+      const { pwd: storedPassword, ...safeValue } = value
+      setDefaultHttpUrl(safeValue.BaseUrl)
+      if (storedPassword) {
+        setRemoteValue(getRemoteHttpSettingGV(), JSON.stringify(safeValue))
       }
+      form.setFieldsValue(safeValue)
+      setFormValue({ ...safeValue, pwd: '' })
     })
   })
   /**@description 增加代理list历史 */
@@ -247,9 +243,7 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
   const judgePass = () => [
     {
       validator: (_, value) => {
-        let re =
-          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[.<>?;:\[\]{}~!@#$%^&*()_+-="])[A-Za-z\d.<>?;:\[\]{}~!@#$%^&*()_+-="]{8,20}/
-        if (re.test(value)) {
+        if (isStrongPassword(value)) {
           return Promise.resolve()
         } else {
           return Promise.reject(t('ConfigPrivateDomain.passwordRules'))
@@ -261,14 +255,16 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
   const judgeUrl = () => [
     {
       validator: (_, value) => {
-        let re = /http(s)?:\/\/([\w-]+\.)+[\w-]+(\/[\w- .\/?%&=]*)?/
         if (/\s/.test(value)) {
           return Promise.reject(t('ConfigPrivateDomain.privateDomainHasSpace'))
-        } else if (re.test(value)) {
-          return Promise.resolve()
-        } else {
+        }
+        try {
+          const parsed = new URL(value)
+          if (['http:', 'https:'].includes(parsed.protocol) && parsed.hostname) return Promise.resolve()
+        } catch (error) {
           return Promise.reject(t('ConfigPrivateDomain.enterValidPrivateDomain'))
         }
+        return Promise.reject(t('ConfigPrivateDomain.enterValidPrivateDomain'))
       },
     },
   ]
@@ -301,6 +297,13 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
             placeholder={t('ConfigPrivateDomain.enterPrivateDomain')}
             defaultOpen={!enterpriseLogin}
           />
+        </Form.Item>
+        <Form.Item noStyle shouldUpdate={(previous, current) => previous.BaseUrl !== current.BaseUrl}>
+          {({ getFieldValue }) =>
+            `${getFieldValue('BaseUrl') || ''}`.trim().toLowerCase().startsWith('http://') ? (
+              <YakitAlert type="warning" showIcon description={t('ConfigPrivateDomain.httpTransportWarning')} />
+            ) : null
+          }
         </Form.Item>
         {!enterpriseLogin && (
           <Form.Item

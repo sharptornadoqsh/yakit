@@ -54,8 +54,11 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
       .then((e: YakitAuthInfo[]) => {
         setAuths(
           e.map((item) => {
-            item.tls = !!item.tls
-            return item
+            const safeItem = { ...item, tls: !!item.tls, password: '' }
+            if (item.password) {
+              yakitEngine.saveRemoteAuth(safeItem).catch(() => {})
+            }
+            return safeItem
           }),
         )
       })
@@ -82,7 +85,7 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
       port: `${info.port === 0 ? 0 : info.port || ''}`,
       tls: info.tls,
       caPem: info.caPem,
-      password: info.password,
+      password: '',
     }
     setRemote(remoteInfo)
   })
@@ -102,7 +105,7 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
         port: +remote.port || 0,
         tls: remote.tls,
         caPem: remote.caPem || '',
-        password: remote.password || '',
+        password: '',
       }
       const index = auths.findIndex((item) => item.host === params.host && item.port === params.port)
       if (index === -1) setAuths((arr) => arr.concat([params]))
@@ -119,6 +122,7 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
   // 返回到软件初始化界面
   const handleSwitchLocalEngine = useMemoizedFn(() => {
     setRemote({ ...DefaultRemoteLink })
+    setLocalValue(LocalGVS.YaklangRemoteEngineCredential, { ...DefaultRemoteLink })
     setIsCheck(false)
     onSwitchLocalEngine()
   })

@@ -12,7 +12,7 @@
 | 跟踪目标 | origin/qsh |
 | 代码提交 | 3abd2868b7646af68e1e1d71c679ecd79e8926f2 |
 | 需求源 | D:\Desktop\Project\yakit围标\功能要求.xls |
-| 需求源摘要 | 7C0FB6DA86E83457B23510F097554A149A2CDC4B4E649B28A44C7ED7CBC91783 |
+| 需求源摘要 | F16C9C671CD3D7580027F0069146C6649907306D479624B6A50AD0125DE7D05D |
 | 建立日期 | 2026-07-13 |
 
 ## 文档职责
@@ -30,6 +30,9 @@
 | [阶段一测试证据](TEST_EVIDENCE.md) | 保存依赖、静态检查、测试、构建、打包和界面检查结果 |
 | [阶段一已知事项](KNOWN_ISSUES.md) | 保存旧名称有界检索分类、阻塞项与风险 |
 | [引擎兼容清单](ENGINE_COMPATIBILITY.md) | 保存阶段三客户端版本、引擎边界、平台工件、摘要证据与兼容规则 |
+| [账号服务安全控制](SECURITY_COMPLIANCE.md) | 保存 MD5、HTTPS、令牌、密码、权限、日志与未验证事项 |
+| [已知安全问题处置](VULNERABILITY_MANAGEMENT.md) | 保存问题影响、严重程度、状态、措施与责任边界 |
+| [第三方检测材料清单](THIRD_PARTY_SECURITY_REPORT_CHECKLIST.md) | 保存面向互联网部署前需取得的真实第三方材料 |
 
 ## 证据状态
 
