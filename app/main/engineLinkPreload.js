@@ -99,6 +99,8 @@ contextBridge.exposeInMainWorld('yakitBridge', {
     writeEngineKeyToYakitProjects: (version) => invokePrefixed('write-engine-key-to-yakit-projects', version),
     clearLocalYaklangVersionCache: () => invokePrefixed('clear-local-yaklang-version-cache'),
     installYakEngine: (version) => invokePrefixed('install-yak-engine', version),
+    installManualYakEngine: (selectedPath) => invokePrefixed('manual-install-yak-engine', selectedPath),
+    getEngineLifecycleInfo: () => invokePrefixed('get-engine-lifecycle-info'),
     cancelDownloadYakEngineVersion: (version) => invokePrefixed('cancel-download-yak-engine-version', version),
     getAvailableOSSDomain: () => invokePrefixed('get-available-oss-domain'),
     checkAllowSecretLocalYaklangEngine: (params) => invokePrefixed('check-allow-secret-local-yaklang-engine', params),
@@ -126,6 +128,7 @@ contextBridge.exposeInMainWorld('yakitBridge', {
     onDownloadYakEngineProgress: (callback) => subscribe('download-yak-engine-progress', callback),
     onDownloadYakitProgress: (callback) => subscribe('download-yakit-engine-progress', callback),
     onStartUpEngineMessage: (callback) => subscribe('startUp-engine-msg', callback),
+    onEngineLifecycleStage: (callback) => subscribe('engine-lifecycle-stage', callback),
   },
   dialog: {
     openFileSystemDialog: (options) => invokePrefixed('open-file-system-dialog', options),

@@ -91,7 +91,7 @@ function requestWithProgress(
       return new Promise((resolve, reject) => {
         writer.on('finish', () => {
           writer = null
-          onProgress && onProgress(100)
+          onProgress && onProgress(getProgressState())
           resolve()
         })
         writer.on('error', reject)
@@ -134,13 +134,13 @@ function engineCancelRequestWithProgress(version) {
     if (version === '') reject(new Error('Version number does not exist'))
     if (writer) {
       writer.on('close', () => {
-        // 主动点取消销毁流会触发 删掉不完整的引擎版本
+        // 取消下载时只移除临时文件，已验证缓存必须继续可用
         const dest = path.join(
           getYaklangEngineDir(),
           version.startsWith('dev/') ? 'yak-' + version.replace('dev/', 'dev-') : `yak-${version}`,
         )
         try {
-          fs.unlinkSync(dest)
+          fs.unlinkSync(`${dest}.download`)
         } catch (e) {}
         reject(new Error('Write operation cancelled'))
       })

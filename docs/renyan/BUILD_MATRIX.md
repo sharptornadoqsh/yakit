@@ -4,7 +4,7 @@
 
 | 平台 | 显示名称 | 可执行文件 | 图标输入 | 产物规则 | 验证状态 |
 | --- | --- | --- | --- | --- | --- |
-| Windows | 睿眼自动化渗透系统 | `RenYan-Pentest.exe` | `app/assets/renyan-icon.ico` | `RenYan-Pentest-<版本>-windows-amd64.exe` | 配置与早期诊断产物已验证；最终源码不再打包 |
+| Windows | 睿眼自动化渗透系统 | `RenYan-Pentest.exe` | `app/assets/renyan-icon.ico` | `RenYan-Pentest-<版本>-windows-amd64.exe` | 阶段三社区版打包成功；交付只提交源码，安装包由用户从提交重新生成 |
 | macOS | 睿眼自动化渗透系统 | `RenYan-Pentest` | `app/assets/renyan-icon.icns` | `RenYan-Pentest-<版本>-darwin-<架构>.dmg` | 未执行，用户要求仅查看企业版免许可证开发界面 |
 | Linux | 睿眼自动化渗透系统 | `renyan-pentest` | `product/brand/icons` | `RenYan-Pentest-<版本>-linux-<架构>.AppImage` | 未执行，用户要求仅查看企业版免许可证开发界面 |
 
@@ -26,9 +26,21 @@
 | 类别 | 命令 | 状态 |
 | --- | --- | --- |
 | 普通企业版开发构建 | `yarn build-renders-test-enterprise` | 早期成功，随后被免许可证要求取代 |
-| 社区版生产构建 | `yarn build-renders` | 早期源码状态曾成功；最终一次按用户新要求中止，不作为最终证据 |
-| 社区版 Windows 安装 | `yarn pack-win` | 早期诊断产物成功；早于最终源码，不作为交付 |
+| 社区版生产构建 | `yarn build-renders` | 阶段三最终源码构建成功，退出码为零，耗时约七百六十一秒 |
+| 社区版 Windows 安装 | `yarn pack-win` | 阶段三本地验证成功，退出码为零，耗时约四百零六秒；产物不提交 |
 | 企业版、轻量企业版、代码审计版、智能代理版安装 | 对应打包命令 | 未执行 |
 | macOS 与 Linux 构建 | 对应构建命令 | 未执行 |
 
 打包命令不会自动重建渲染器。若后续需要安装程序，应从已提交的干净源码重新执行匹配的渲染构建与平台打包，不应复用本阶段早期诊断安装文件。
+
+## 四、阶段三引擎预置矩阵
+
+| 平台 | 架构 | 源压缩包 | 打包位置 | 摘要状态 | 阶段三打包状态 |
+| --- | --- | --- | --- | --- | --- |
+| Windows | `x64` | `bins/yak_windows_amd64.zip` | `bins/yak.zip` | 压缩包与内部引擎摘要已验证 | 当前系统社区版打包成功；交付不包含本地产物 |
+| macOS | `x64` | `bins/yak_darwin_amd64.zip` | `bins/yak.zip` | `TBD` | 缺少实体工件，构建钩子拒绝发布打包 |
+| macOS | `arm64` | `bins/yak_darwin_arm64.zip` | `bins/yak.zip` | `TBD` | 缺少实体工件，构建钩子拒绝发布打包 |
+| Linux | `x64` | `bins/yak_linux_amd64.zip` | `bins/yak.zip` | `TBD` | 缺少实体工件，构建钩子拒绝发布打包 |
+| Linux | `arm64` | `bins/yak_linux_arm64.zip` | `bins/yak.zip` | `TBD` | 缺少实体工件，构建钩子拒绝发布打包 |
+
+阶段三打包钩子从 `product/engine-compatibility.json` 选择目标工件。实体文件缺失、摘要为 `TBD` 或压缩包摘要不一致时，打包在复制预置引擎前失败。该限制不影响独立渲染构建，但会阻止没有真实工件证据的安装程序生成。

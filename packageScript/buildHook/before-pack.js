@@ -1,5 +1,27 @@
+const fs = require('fs')
 const packageJson = require('../../package.json')
 const productConfig = require('../../product/renyan.json')
+const { calculateFileSha256, getCompatibilityEntry, normalizeSha256 } = require('../../app/main/engineLifecycle')
+
+const validateBundledEngine = async (platform, architecture) => {
+  const compatibility = getCompatibilityEntry({
+    clientVersion: packageJson.version,
+    platform,
+    architecture,
+  })
+  if (!compatibility) throw new Error(`兼容清单缺少 ${platform}/${architecture} 工件`)
+
+  const expectedSha256 = normalizeSha256(compatibility.artifact.archiveSha256)
+  if (!expectedSha256) throw new Error(`兼容清单中的 ${platform}/${architecture} 预置工件摘要仍为待定`)
+
+  const sourceArchive = compatibility.artifact.sourceArchive
+  if (!fs.existsSync(sourceArchive)) throw new Error(`预置引擎压缩包不存在：${sourceArchive}`)
+  const actualSha256 = await calculateFileSha256(sourceArchive)
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(`预置引擎压缩包摘要不匹配：${sourceArchive}`)
+  }
+  return compatibility.artifact
+}
 
 module.exports = async function (context) {
   const isLegacy = process.env.THE_LEGACY == 'true'
@@ -9,6 +31,8 @@ module.exports = async function (context) {
     3: 'arm64',
   }
   const arch = archMap[context.arch]
+  if (!arch) throw new Error(`不支持的构建架构编号：${context.arch}`)
+  const engineArtifact = await validateBundledEngine(context.electronPlatformName, arch)
   const baseInfo = context.packager.appInfo
   let productVersion = packageJson.version || baseInfo.version
   // CE
@@ -31,7 +55,7 @@ module.exports = async function (context) {
         to: 'bins/flag.windows.txt',
       },
       {
-        from: 'bins/yak_windows_amd64.zip',
+        from: engineArtifact.sourceArchive,
         to: 'bins/yak.zip',
       },
       {
@@ -65,7 +89,7 @@ module.exports = async function (context) {
         linuxConfig.extraFiles = [
           ...linuxExtraFiles,
           {
-            from: 'bins/yak_linux_arm64.zip',
+            from: engineArtifact.sourceArchive,
             to: 'bins/yak.zip',
           },
         ]
@@ -77,7 +101,7 @@ module.exports = async function (context) {
         linuxConfig.extraFiles = [
           ...linuxExtraFiles,
           {
-            from: 'bins/yak_linux_amd64.zip',
+            from: engineArtifact.sourceArchive,
             to: 'bins/yak.zip',
           },
         ]
@@ -107,12 +131,8 @@ module.exports = async function (context) {
         macConfig.extraFiles = [
           ...darwinExtraFiles,
           {
-            from: 'bins/yak_darwin_arm64.zip',
+            from: engineArtifact.sourceArchive,
             to: 'bins/yak.zip',
-          },
-          {
-            from: 'bins/yak_darwin_arm64.sha256.txt',
-            to: 'bins/engine-sha256.txt',
           },
         ]
         break
@@ -120,12 +140,8 @@ module.exports = async function (context) {
         macConfig.extraFiles = [
           ...darwinExtraFiles,
           {
-            from: 'bins/yak_darwin_amd64.zip',
+            from: engineArtifact.sourceArchive,
             to: 'bins/yak.zip',
-          },
-          {
-            from: 'bins/yak_darwin_amd64.sha256.txt',
-            to: 'bins/engine-sha256.txt',
           },
         ]
         break

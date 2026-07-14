@@ -5,6 +5,8 @@ import productSource from '../../../product/renyan.json'
 import { configureApplicationIdentity, getExecutableName, resolveUserDataPath } from '../product'
 import { normalizeSha, resolveBuildSha, resolveEdition } from '../../../product/build'
 import builderConfig from '../../../packageScript/electron-builder.config'
+import compatibilityManifest from '../../../product/engine-compatibility.json'
+import packageJson from '../../../package.json'
 
 describe('睿眼产品配置', () => {
   it('包含应用各层所需的必填字段', () => {
@@ -124,5 +126,27 @@ describe('构建元数据', () => {
         expect.objectContaining({ to: 'legal/THIRD_PARTY_NOTICES.md' }),
       ]),
     )
+    expect(builderConfig.files).toContain('product/engine-compatibility.json')
+  })
+})
+
+describe('引擎兼容清单', () => {
+  it('为当前客户端声明版本边界和各平台预置工件', () => {
+    const client = compatibilityManifest.clientVersions.find((item) => item.clientVersion === packageJson.version)
+
+    expect(client).toBeDefined()
+    expect(client.minimumEngineVersion).toBe('TBD')
+    expect(client.recommendedEngineVersion).toBe('1.4.8-beta3')
+    expect(client.highestVerifiedEngineVersion).toBe('1.4.8-beta3')
+    expect(client.compatibilityGate).toBe('check-secret-local-grpc')
+    expect(client.artifacts).toHaveLength(5)
+
+    client.artifacts.forEach((artifact) => {
+      expect(artifact.sourceArchive).toMatch(/^bins\/yak_/)
+      expect(artifact.packagedArchive).toBe('bins/yak.zip')
+      expect(artifact.archiveEntry).toMatch(/^bins\/yak_/)
+      expect(artifact.archiveSha256 === 'TBD' || /^[A-F0-9]{64}$/.test(artifact.archiveSha256)).toBe(true)
+      expect(artifact.engineSha256 === 'TBD' || /^[A-F0-9]{64}$/.test(artifact.engineSha256)).toBe(true)
+    })
   })
 })

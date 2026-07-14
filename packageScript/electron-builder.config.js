@@ -66,6 +66,7 @@ const configOption = {
     '!backups/**/*',
     '!product/**/*',
     'product/renyan.json',
+    'product/engine-compatibility.json',
     '!app/renderer/src/**/*',
     '!app/renderer/engine-link-startup/**/*',
     'app/renderer/engine-link-startup/dist/**/*',

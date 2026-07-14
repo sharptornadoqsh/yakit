@@ -13,10 +13,8 @@ import {
   grpcFetchDownloadYak,
   grpcFetchLatestYakVersion,
   grpcInstallYak,
-  grpcWriteEngineKeyToYakitProjects,
 } from '../../grpc'
 import { DragHeaderHeight, safeFormatDownloadProcessState } from '../../utils'
-import { YaklangInstallHintSvgIcon } from '@/assets/newIcon'
 import { OutlineQuestionmarkcircleIcon } from '@/assets/outline'
 import { QuestionModal } from '../QuestionModal'
 import { yakitEngine } from '@/utils/electronBridge'
@@ -95,12 +93,8 @@ export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props
           size: getDownloadProgress().size,
         })
 
-        // 这样在下次启动时，yakit会自动检测到引擎是否一致(用于解决yakit与irify在mac下的引擎冲突)
-        grpcWriteEngineKeyToYakitProjects({ version: yakLangVersion.current }, true).finally(() => {
-          // 清空主进程yaklang版本缓存
-          grpcClearLocalYaklangVersionCache(true)
-          onUpdate()
-        })
+        grpcClearLocalYaklangVersionCache(true)
+        onUpdate()
       })
       .catch((e: any) => {
         if (isBreakRef.current) return
@@ -202,7 +196,7 @@ export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props
 
               <div className={styles['hint-left-wrapper']}>
                 <div className={styles['hint-icon']}>
-                  <YaklangInstallHintSvgIcon />
+                  <span aria-hidden="true">引擎</span>
                 </div>
                 <div
                   className={styles['qs-icon']}
@@ -218,7 +212,7 @@ export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props
 
               <div className={styles['hint-right-wrapper']}>
                 <div className={classNames(styles['hint-right-download'], 'yakit-progress-wrapper')}>
-                  <div className={styles['hint-right-title']}>Yaklang 引擎下载中...</div>
+                  <div className={styles['hint-right-title']}>引擎下载与验证</div>
                   <Progress
                     strokeColor="var(--Colors-Use-Main-Primary)"
                     trailColor="var(--Colors-Use-Neutral-Bg)"

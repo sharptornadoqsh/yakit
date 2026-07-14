@@ -125,7 +125,11 @@ describe('YaklangEngineWatchDog 组件测试', () => {
       render(<YaklangEngineWatchDog {...props} />)
       triggerEngineTest()
 
-      expect(grpcStartLocalEngine).not.toHaveBeenCalled()
+      await waitFor(() => {
+        expect(grpcStartLocalEngine).not.toHaveBeenCalled()
+        expect(props.setYakitStatus).toHaveBeenCalledWith('error')
+        expect(props.setCheckLog).toHaveBeenCalledWith(['远程引擎连接失败：Error: fail'])
+      })
     })
   })
 

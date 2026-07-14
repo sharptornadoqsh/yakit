@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "clientVersions": [
+    {
+      "clientVersion": "1.4.8-0711",
+      "minimumEngineVersion": "TBD",
+      "recommendedEngineVersion": "1.4.8-beta3",
+      "highestVerifiedEngineVersion": "1.4.8-beta3",
+      "compatibilityGate": "check-secret-local-grpc",
+      "artifacts": [
+        {
+          "platform": "win32",
+          "architecture": "x64",
+          "sourceArchive": "bins/yak_windows_amd64.zip",
+          "packagedArchive": "bins/yak.zip",
+          "archiveEntry": "bins/yak_windows_amd64.exe",
+          "archiveSha256": "C53708BBBCC322C4C8BCEC344D237D424FD328FC0890F086D176FA3EBC8F3570",
+          "engineSha256": "808582299FA6E2211EC0268D112D6DE1EE9EAE9824F80CBBD50F16358CE8ADDF",
+          "verifiedAt": "2026-07-14",
+          "status": "verified-local-artifact"
+        },
+        {
+          "platform": "darwin",
+          "architecture": "x64",
+          "sourceArchive": "bins/yak_darwin_amd64.zip",
+          "packagedArchive": "bins/yak.zip",
+          "archiveEntry": "bins/yak_darwin_amd64",
+          "archiveSha256": "TBD",
+          "engineSha256": "TBD",
+          "verifiedAt": "TBD",
+          "status": "pending-artifact-verification"
+        },
+        {
+          "platform": "darwin",
+          "architecture": "arm64",
+          "sourceArchive": "bins/yak_darwin_arm64.zip",
+          "packagedArchive": "bins/yak.zip",
+          "archiveEntry": "bins/yak_darwin_arm64",
+          "archiveSha256": "TBD",
+          "engineSha256": "TBD",
+          "verifiedAt": "TBD",
+          "status": "pending-artifact-verification"
+        },
+        {
+          "platform": "linux",
+          "architecture": "x64",
+          "sourceArchive": "bins/yak_linux_amd64.zip",
+          "packagedArchive": "bins/yak.zip",
+          "archiveEntry": "bins/yak_linux_amd64",
+          "archiveSha256": "TBD",
+          "engineSha256": "TBD",
+          "verifiedAt": "TBD",
+          "status": "pending-artifact-verification"
+        },
+        {
+          "platform": "linux",
+          "architecture": "arm64",
+          "sourceArchive": "bins/yak_linux_arm64.zip",
+          "packagedArchive": "bins/yak.zip",
+          "archiveEntry": "bins/yak_linux_arm64",
+          "archiveSha256": "TBD",
+          "engineSha256": "TBD",
+          "verifiedAt": "TBD",
+          "status": "pending-artifact-verification"
+        }
+      ]
+    }
+  ]
+}

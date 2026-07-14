@@ -2,6 +2,7 @@ const { ipcMain, app } = require('electron')
 const fs = require('fs')
 const https = require('https')
 const { getLocalYaklangEngine } = require('../filePath')
+const { recoverInterruptedEngineInstall } = require('../engineLifecycle')
 const {
   fetchLatestYakEngineVersion,
   fetchLatestYakitEEVersion,
@@ -24,7 +25,8 @@ module.exports = (win, getClient) => {
   })
 
   /** yaklang引擎是否安装 */
-  ipcMain.handle('is-yaklang-engine-installed', () => {
+  ipcMain.handle('is-yaklang-engine-installed', async () => {
+    await recoverInterruptedEngineInstall(getLocalYaklangEngine())
     /** @returns {Boolean} */
     return fs.existsSync(getLocalYaklangEngine())
   })

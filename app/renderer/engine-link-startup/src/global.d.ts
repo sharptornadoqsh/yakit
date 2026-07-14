@@ -77,6 +77,39 @@ interface EchoResult {
   result: string
 }
 
+interface EngineLifecycleStage {
+  state: import('./pages/StartupPage/engineLifecycle').EngineLifecycleStateName
+  message: string
+  progress?: number
+  error?: string
+}
+
+interface EngineCompatibilityArtifact {
+  platform: string
+  architecture: string
+  sourceArchive: string
+  packagedArchive: string
+  archiveEntry: string
+  archiveSha256: string
+  engineSha256: string
+  verifiedAt: string
+  status: string
+}
+
+interface EngineLifecycleInfo {
+  installed: boolean
+  recovery: { recovered: boolean; source: string }
+  bundled: { exists: boolean; trusted: boolean; version: string; status: string }
+  compatibility?: {
+    clientVersion: string
+    minimumEngineVersion: string
+    recommendedEngineVersion: string
+    highestVerifiedEngineVersion: string
+    compatibilityGate: string
+    artifact: EngineCompatibilityArtifact
+  }
+}
+
 interface YakitHomeConfig {
   YAKIT_HOME: string
   language: string
@@ -180,6 +213,8 @@ interface YakitBridge {
     writeEngineKeyToYakitProjects: (version?: string) => Promise<unknown>
     clearLocalYaklangVersionCache: () => Promise<unknown>
     installYakEngine: (version: string) => Promise<unknown>
+    installManualYakEngine: (selectedPath: string) => Promise<unknown>
+    getEngineLifecycleInfo: () => Promise<EngineLifecycleInfo>
     cancelDownloadYakEngineVersion: (version: string) => Promise<unknown>
     getAvailableOSSDomain: () => Promise<string>
     checkAllowSecretLocalYaklangEngine: (params: CheckAllowSecretLocal) => Promise<AllowSecretLocalExecResult>
@@ -209,6 +244,7 @@ interface YakitBridge {
     onDownloadYakEngineProgress: (callback: (state: DownloadingState) => void) => BridgeCleanup
     onDownloadYakitProgress: (callback: (state: DownloadingState) => void) => BridgeCleanup
     onStartUpEngineMessage: (callback: (message: string) => void) => BridgeCleanup
+    onEngineLifecycleStage: (callback: (stage: EngineLifecycleStage) => void) => BridgeCleanup
   }
   dialog: {
     openFileSystemDialog: (options: OpenFileDialogOptions) => Promise<OpenFileDialogReturnValue>

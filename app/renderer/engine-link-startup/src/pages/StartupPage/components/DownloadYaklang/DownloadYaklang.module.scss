@@ -53,6 +53,13 @@
       .hint-icon {
         width: 32px;
         height: 32px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--Colors-Use-Main-Primary);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 600;
       }
       .qs-icon {
         width: 20px;

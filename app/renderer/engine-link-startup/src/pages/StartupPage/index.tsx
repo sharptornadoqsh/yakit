@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { useMemoizedFn, useUpdateEffect } from 'ahooks'
 import {
   DragHeaderHeight,
@@ -15,9 +15,7 @@ import {
   grpcFixupDatabase,
   grpcInitCVEDatabase,
   grpcReclaimDatabaseSpace,
-  grpcRelaunch,
   grpcUnpackBuildInYak,
-  grpcWriteEngineKeyToYakitProjects,
 } from './grpc'
 import { debugToPrintLog } from '@/utils/logCollection'
 import { LocalGVS } from '@/enums/yakitGV'
@@ -34,7 +32,7 @@ import {
 import { getLocalValue, setLocalValue } from '@/utils/kv'
 import useGetSetState from '@/hooks/useGetSetState'
 import { yakitNotify } from '@/utils/notification'
-import { YakitLoading } from './components/YakitLoading'
+import { EngineLifecyclePanel } from './components/EngineLifecyclePanel'
 import { DownloadYaklang } from './components/DownloadYaklang'
 import {
   FetchSoftwareVersion,
@@ -66,6 +64,13 @@ import { yakitApp, yakitEngine } from '@/utils/electronBridge'
 import { useYakitStatus } from '@/hooks/useYakitStatus'
 import styles from './index.module.scss'
 import { productConfig } from '@/config/product'
+import { handleOpenFileSystemDialog } from '@/utils/fileSystemDialog'
+import {
+  decideEngineStartup,
+  engineLifecycleReducer,
+  initialEngineLifecycleState,
+  type EngineLifecycleStateName,
+} from './engineLifecycle'
 
 const DefaultCredential: YaklangEngineWatchDogCredential = {
   Host: '127.0.0.1',
@@ -86,6 +91,16 @@ export const StartupPage: React.FC = () => {
   const [system, setSystem] = useState<System>('Darwin')
   /** 本地引擎自检输出日志 */
   const [checkLog, setCheckLog] = useState<string[]>(['正在进行环境检查...'])
+  const [engineLifecycle, dispatchEngineLifecycle] = useReducer(engineLifecycleReducer, initialEngineLifecycleState)
+  const transitionEngineLifecycle = useMemoizedFn(
+    (
+      state: EngineLifecycleStateName,
+      message: string,
+      extra: { progress?: number; error?: string; logPath?: string } = {},
+    ) => {
+      dispatchEngineLifecycle({ type: 'transition', state, message, ...extra })
+    },
+  )
   /** 引擎是否安装 */
   const isEngineInstalled = useRef<boolean>(false)
   /** 内置引擎版本号 */
@@ -152,15 +167,10 @@ export const StartupPage: React.FC = () => {
     handleFetchArchitecture()
   }, [])
 
-  // workspaceConfirmed 为 true 后，执行插件漏洞信息库自检 + 其他信息获取 + 连接引擎
+  // workspaceConfirmed 为 true 后，优先读取用户选择的引擎模式
   useEffect(() => {
     if (!workspaceConfirmed) return
-    // 插件漏洞信息库自检（不阻塞主流程）
-    handleBuiltInCheck()
-    // 获取其他信息，完成后进入连接引擎模式
-    handleFetchBaseInfo(() => {
-      handleLinkEngineMode()
-    })
+    handleLinkEngineMode()
   }, [workspaceConfirmed])
   // #endregion
 
@@ -180,7 +190,7 @@ export const StartupPage: React.FC = () => {
    * 3、本地软件版本号、更新yak版本检测状态
    * 4、获取本地缓存连接端口号
    */
-  const handleFetchBaseInfo = useMemoizedFn(async (nextFunc: () => void) => {
+  const handleFetchBaseInfo = useMemoizedFn(async () => {
     debugToPrintLog(`------ 获取系统基础信息 ------`)
     const tasks: Array<() => Promise<any>> = []
     // 引擎 是否安装
@@ -219,7 +229,6 @@ export const StartupPage: React.FC = () => {
     try {
       await Promise.allSettled(tasks.map((run) => run()))
     } catch (error) {}
-    nextFunc?.()
   })
 
   const cacheLocalModePort = useMemoizedFn((port: number) => {
@@ -274,28 +283,26 @@ export const StartupPage: React.FC = () => {
   }
 
   /** 获取上次连接引擎的模式 */
-  const handleLinkEngineMode = useMemoizedFn(() => {
+  const handleLinkEngineMode = useMemoizedFn(async () => {
     debugToPrintLog(`------ 获取上次连接引擎的模式 ------`)
     setCheckLog(['获取上次连接引擎的模式...'])
-    getLocalValue(LocalGVS.YaklangEngineMode).then((val: YaklangEngineMode) => {
-      switch (val) {
-        case 'remote':
-          setCheckLog((arr) => arr.concat(['获取连接模式成功——远程模式']))
-          debugToPrintLog(`------ 连接引擎的模式: remote ------`)
-          handleChangeLinkMode(true)
-          return
-        case 'local':
-          setCheckLog((arr) => arr.concat(['获取连接模式成功——本地模式']))
-          debugToPrintLog(`------ 连接引擎的模式: local ------`)
-          handleChangeLinkMode()
-          return
-        default:
-          setCheckLog((arr) => arr.concat(['未获取到连接模式-默认(本地)模式']))
-          debugToPrintLog(`------ 连接引擎的模式: local ------`)
-          handleChangeLinkMode()
-          return
-      }
-    })
+    const mode = await getLocalValue(LocalGVS.YaklangEngineMode).catch(() => undefined)
+    if (mode === 'remote') {
+      setCheckLog((current) => current.concat(['获取连接模式成功——远程模式']))
+      transitionEngineLifecycle('remote', '等待连接已选择的远程引擎')
+      debugToPrintLog(`------ 连接引擎的模式: remote ------`)
+      handleChangeLinkMode(true)
+      return
+    }
+
+    setCheckLog((current) =>
+      current.concat([mode === 'local' ? '获取连接模式成功——本地模式' : '未获取到连接模式——使用本地模式']),
+    )
+    transitionEngineLifecycle('checking-local', '正在检查本地引擎与预置工件')
+    await handleFetchBaseInfo()
+    handleBuiltInCheck()
+    debugToPrintLog(`------ 连接引擎的模式: local ------`)
+    handleChangeLinkMode()
   })
 
   // 切换连接模式
@@ -326,6 +333,7 @@ export const StartupPage: React.FC = () => {
     onDisconnect()
     safeSetYakitStatus('')
     onSetEngineMode('remote')
+    transitionEngineLifecycle('remote', '请确认远程引擎连接信息')
   })
 
   // 本地连接的状态设置
@@ -333,6 +341,7 @@ export const StartupPage: React.FC = () => {
     onDisconnect()
     safeSetYakitStatus('')
     onSetEngineMode('local')
+    transitionEngineLifecycle('ready-local', '本地引擎文件可用，正在检查兼容能力')
     debugToPrintLog(`------ 启动环境检查逻辑 ------`)
     // 等YakitStatus更新
     setTimeout(() => {
@@ -343,34 +352,50 @@ export const StartupPage: React.FC = () => {
 
   // 切换本地模式
   const handleLinkLocalMode = useMemoizedFn(() => {
-    if (isEngineInstalled.current) {
+    onSetEngineMode('local')
+    const decision = decideEngineStartup({
+      mode: 'local',
+      local: {
+        exists: isEngineInstalled.current,
+        compatibility: 'unknown',
+        updateAvailable: false,
+      },
+      bundled: { exists: Boolean(getBuildInEngineVersion()) },
+    })
+
+    if (decision.action === 'start-local') {
       if (!isInitLocalLink.current) {
         setLinkLocalEngine()
         return
       }
-      setCheckLog(['检查本地是否已安装引擎...'])
-      setCheckLog(['本地已安装引擎，准备环境检查中...'])
+      setCheckLog(['检查本地是否已安装引擎...', '本地已安装引擎，准备环境检查中...'])
       setTimeout(() => {
         setLinkLocalEngine()
       }, 500)
-    } else {
-      debugToPrintLog(`------ 启动无本地引擎逻辑 ------`)
-      setCheckLog(['检查本地是否已安装引擎...'])
-      setCheckLog(['本地没有引擎文件...'])
-      setTimeout(() => {
-        safeSetYakitStatus(getBuildInEngineVersion() ? 'install' : 'installNetWork')
-        onSetEngineMode(undefined)
-      }, 500)
+      return
     }
+
+    if (decision.action === 'extract-bundled') {
+      debugToPrintLog(`------ 启动无本地引擎逻辑 ------`)
+      setCheckLog(['检查本地是否已安装引擎...', '本地没有引擎文件...'])
+      transitionEngineLifecycle('extracting-bundled', `正在准备预置引擎 ${getBuildInEngineVersion()}`)
+      safeSetYakitStatus('install')
+      initializeEngine(() => {
+        isEngineInstalled.current = true
+        safeSetYakitStatus('')
+        setLinkLocalEngine()
+      })
+      return
+    }
+
+    transitionEngineLifecycle('missing', '未找到本地引擎或已验证的预置工件')
+    safeSetYakitStatus('installNetWork')
   })
   // #endregion
 
   // #region Yak引擎、Yakit下载更新逻辑
   // 检测到新版yakit的弹窗显示
   const [yakitUpdate, setYakitUpdate] = useState<boolean>(false)
-  /** 更多引擎列表 */
-  const [moreYaklangVersionList, setMoreYaklangVersionList] = useState<string[]>([])
-  const moreYaklangTime = useRef(null)
   /** 指定下载引擎版本 */
   const [yaklangSpecifyVersion, setYaklangSpecifyVersion] = useState<string>('')
   // 更新yaklang-modal
@@ -414,59 +439,6 @@ export const StartupPage: React.FC = () => {
       localEngineRef.current.checkEngineSource()
     }
   })
-
-  // 获取更多Yaklang引擎版本
-  const fetchMoreYaklangLastVersion = useMemoizedFn(() => {
-    yakitEngine
-      .fetchYaklangVersionList()
-      .then((data: string) => {
-        const arr = data.split('\n').filter((v) => v)
-        let devPrefix: string[] = []
-        let noPrefix: string[] = []
-        arr.forEach((item) => {
-          if (item.startsWith('dev')) {
-            devPrefix.push(item)
-          } else {
-            noPrefix.push(item)
-          }
-        })
-        setMoreYaklangVersionList(noPrefix.concat(devPrefix))
-      })
-      .catch((err) => {
-        setMoreYaklangVersionList([])
-      })
-  })
-  useEffect(() => {
-    // 出现更多版本按钮的情况、非连接状态，获取更多引擎列表，并启动定时器
-    const statusArr: YakitStatusType[] = [
-      'install',
-      'installNetWork',
-      'link_countdown',
-      'link',
-      'ready',
-      'init',
-      'reclaimDatabaseSpace_start',
-    ]
-    if (yakitStatus && !statusArr.includes(yakitStatus)) {
-      if (moreYaklangTime.current) clearInterval(moreYaklangTime.current)
-      fetchMoreYaklangLastVersion()
-      moreYaklangTime.current = setInterval(fetchMoreYaklangLastVersion, 60000)
-    } else {
-      if (moreYaklangTime.current) {
-        setMoreYaklangVersionList([])
-        clearInterval(moreYaklangTime.current)
-        moreYaklangTime.current = null
-      }
-    }
-  }, [yakitStatus])
-  useEffect(() => {
-    return () => {
-      if (moreYaklangTime.current) {
-        setMoreYaklangVersionList([])
-        clearInterval(moreYaklangTime.current)
-      }
-    }
-  }, [])
 
   // 判断引擎版本没有问题，则直接安装，否则重新下载
   const yakEngineVersionExistsAndCorrectness = async (
@@ -517,13 +489,11 @@ export const StartupPage: React.FC = () => {
             setYaklangSpecifyVersion('')
             breakHandleRef.current = false
             isCheckVersion.current = false
-            if (err.message === 'operation not permitted') {
-              setLinkLocalEngine()
-            } else {
-              // 引擎文件已经被删除了
-              safeSetYakitStatus('')
-              handleOperations('install')
-            }
+            setCheckLog([`安装失败：${String(err)}，继续使用原有引擎`])
+            transitionEngineLifecycle('recoverable-error', '安装失败，原有可用引擎仍然保留', {
+              error: String(err),
+            })
+            setLinkLocalEngine()
           },
           () => {
             setYaklangDownload(true)
@@ -534,10 +504,7 @@ export const StartupPage: React.FC = () => {
   }, [yaklangSpecifyVersion])
   // #endregion
 
-  // #region YakitLoading逻辑
-  // YakitLoading 界面暂时无法操作
-  const [yakitLoadingTip, setYakitLoadingTip] = useState<string>('')
-  const [disableYakitLoading, setDisableYakitLoading] = useState<boolean>(false)
+  // #region 初始化界面操作
   // 手动重连时按钮的loading
   const [restartLoading, setRestartLoading] = useState<boolean>(false)
   const setTimeoutLoading = useMemoizedFn((setLoading: (v: boolean) => any, time = 2000) => {
@@ -557,8 +524,10 @@ export const StartupPage: React.FC = () => {
       case 'install':
         // 解压内置引擎
         initializeEngine(() => {
-          setCheckLog([`引擎：${getBuildInEngineVersion()}，解压成功，即将重启`])
-          grpcRelaunch()
+          isEngineInstalled.current = true
+          setCheckLog([`预置引擎 ${getBuildInEngineVersion()} 已验证并安装`])
+          safeSetYakitStatus('')
+          setLinkLocalEngine()
         })
         return
       case 'installNetWork':
@@ -674,13 +643,9 @@ export const StartupPage: React.FC = () => {
           onDisconnect()
           setCheckLog(['已主动断开, 请点击手动连接引擎'])
           breakHandleRef.current = true
-          setYakitLoadingTip('中断中...')
           setRestartLoading(false)
-          setDisableYakitLoading(true)
           cancelAllTasks()
           setTimeout(() => {
-            setYakitLoadingTip('')
-            setDisableYakitLoading(false)
             if (extra.isRemote) {
               handleLinkRemoteMode()
             }
@@ -725,20 +690,23 @@ export const StartupPage: React.FC = () => {
   // 解压内置引擎
   const initializeEngine = useMemoizedFn((callback = () => {}) => {
     setCheckLog([`准备解压内置引擎：${getBuildInEngineVersion()}...`])
+    transitionEngineLifecycle('extracting-bundled', `正在验证并提取预置引擎 ${getBuildInEngineVersion()}`)
     setRestartLoading(true)
     setTimeout(async () => {
       try {
         await grpcUnpackBuildInYak(true)
-        grpcWriteEngineKeyToYakitProjects({}, true).finally(() => {
-          safeSetYakitStatus('')
-          callback()
-        })
+        transitionEngineLifecycle('ready-local', `预置引擎 ${getBuildInEngineVersion()} 已安装`)
+        safeSetYakitStatus('')
+        callback()
       } catch (error) {
         setCheckLog([
           isInitLocalLink.current
-            ? '初始化失败，请点击下载引擎继续使用...'
-            : `解压失败：${error}，请点击下载引擎继续使用...`,
+            ? '预置引擎初始化失败，可重试、查看日志或选择其他安装方式'
+            : `预置引擎提取失败：${error}`,
         ])
+        transitionEngineLifecycle('recoverable-error', '预置引擎恢复失败，原有可用版本未被删除', {
+          error: `${error}`,
+        })
         safeSetYakitStatus(isInitLocalLink.current ? 'installNetWork' : 'skipAgreement_InstallNetWork')
       } finally {
         setRestartLoading(false)
@@ -747,7 +715,7 @@ export const StartupPage: React.FC = () => {
   })
 
   // 数据库修复
-  const [dbPath, setDbPath] = useState<string[]>([])
+  const [, setDbPath] = useState<string[]>([])
   const handleFixupDatabase = useMemoizedFn(async () => {
     setCheckLog(['开始修复数据库中...'])
     try {
@@ -854,6 +822,7 @@ export const StartupPage: React.FC = () => {
       Port: parseInt(info.port),
       Mode: 'remote',
     })
+    transitionEngineLifecycle('remote', `正在连接远程引擎 ${info.host}:${info.port}`)
     onStartLinkEngine()
   })
   // 远程切换本地
@@ -877,6 +846,7 @@ export const StartupPage: React.FC = () => {
       Port: params.port,
       Mode: 'local',
     })
+    transitionEngineLifecycle('starting', `正在启动本地引擎，端口 ${params.port}`)
     safeSetYakitStatus('ready')
     onStartLinkEngine()
   })
@@ -911,11 +881,40 @@ export const StartupPage: React.FC = () => {
   useEffect(() => {
     const offStartEngineError = yakitEngine.onStartYaklangEngineError((error: string) => {
       setCheckLog((arr) => arr.concat([`${error}`]))
+      transitionEngineLifecycle('recoverable-error', '本地引擎启动失败，可重试或查看日志', { error })
     })
     return () => {
       offStartEngineError()
     }
   }, [])
+
+  useEffect(() => {
+    const offLifecycleStage = yakitEngine.onEngineLifecycleStage((stage) => {
+      transitionEngineLifecycle(stage.state, stage.message, {
+        progress: stage.progress,
+        error: stage.error,
+      })
+    })
+    return () => offLifecycleStage()
+  }, [])
+
+  useEffect(() => {
+    if (yakitStatus === 'old_version') {
+      transitionEngineLifecycle('incompatible', '当前本地引擎未通过兼容能力检查')
+    } else if (
+      yakitStatus === 'allow-secret-error' ||
+      yakitStatus === 'check_timeout' ||
+      yakitStatus === 'start_timeout' ||
+      yakitStatus === 'error'
+    ) {
+      transitionEngineLifecycle('recoverable-error', '引擎启动遇到可恢复错误')
+    } else if (
+      (yakitStatus === 'installNetWork' || yakitStatus === 'skipAgreement_InstallNetWork') &&
+      engineLifecycle.state !== 'recoverable-error'
+    ) {
+      transitionEngineLifecycle('missing', '请选择在线安装、手工安装或远程引擎')
+    }
+  }, [yakitStatus])
 
   // #region 连接成功
   const onReady = useMemoizedFn(() => {
@@ -924,6 +923,7 @@ export const StartupPage: React.FC = () => {
       return
     }
     if (getKeepalive()) {
+      transitionEngineLifecycle('connected', getEngineMode() === 'remote' ? '远程引擎已连接' : '本地引擎已连接')
       setCheckLog([])
       if (getEngineMode() === 'local') {
         // 先设置倒计时状态
@@ -1135,6 +1135,34 @@ export const StartupPage: React.FC = () => {
     }
   })
 
+  const handleManualInstall = useMemoizedFn(async () => {
+    const selection = await handleOpenFileSystemDialog({
+      title: '选择引擎文件',
+      buttonLabel: '验证并安装',
+      properties: ['openFile'],
+      message: '引擎文件所在目录必须包含同名的 .sha256.txt 摘要文件',
+    })
+    if (selection.canceled || !selection.filePaths[0]) return
+
+    setRestartLoading(true)
+    try {
+      transitionEngineLifecycle('verifying', '正在验证手工选择的引擎')
+      await yakitEngine.installManualYakEngine(selection.filePaths[0])
+      isEngineInstalled.current = true
+      breakHandleRef.current = false
+      safeSetYakitStatus('')
+      transitionEngineLifecycle('ready-local', '手工选择的引擎已验证并安装')
+      setLinkLocalEngine()
+    } catch (error) {
+      setCheckLog([`手工安装失败：${error}`])
+      transitionEngineLifecycle('recoverable-error', '手工安装失败，原有可用版本未被删除', {
+        error: `${error}`,
+      })
+    } finally {
+      setRestartLoading(false)
+    }
+  })
+
   const startupLogo = theme === 'light' ? renyanLogoLight : renyanLogoDark
   const startupRightImg = theme === 'light' ? renyanPanelLight : renyanPanelDark
 
@@ -1185,23 +1213,15 @@ export const StartupPage: React.FC = () => {
                 />
                 {!engineLink && (
                   <>
-                    <YakitLoading
-                      yakitLoadingTip={yakitLoadingTip}
-                      disableYakitLoading={disableYakitLoading}
-                      isTop={isTop}
-                      setIsTop={setIsTop}
-                      system={system}
-                      buildInEngineVersion={buildInEngineVersion}
-                      checkLog={checkLog}
+                    <EngineLifecyclePanel
+                      lifecycle={engineLifecycle}
                       yakitStatus={yakitStatus}
-                      engineMode={engineMode || 'local'}
-                      restartLoading={restartLoading}
-                      dbPath={dbPath}
-                      btnClickCallback={loadingClickCallback}
-                      port={customPort}
+                      logs={checkLog}
+                      busy={restartLoading}
+                      buildInEngineVersion={buildInEngineVersion}
                       countdown={countdown}
-                      moreYaklangVersionList={moreYaklangVersionList}
-                      setYaklangSpecifyVersion={setYaklangSpecifyVersion}
+                      onAction={loadingClickCallback}
+                      onManualInstall={handleManualInstall}
                     />
                     {/* 更新引擎 */}
                     {yaklangDownload && (

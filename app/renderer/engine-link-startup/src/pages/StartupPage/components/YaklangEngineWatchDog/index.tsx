@@ -91,6 +91,8 @@ export const YaklangEngineWatchDog: React.FC<YaklangEngineWatchDogProps> = React
             return
           case 'remote':
             outputToWelcomeConsole('远程模式不自动启动本地引擎')
+            props.setCheckLog([`远程引擎连接失败：${String(e)}`])
+            props.setYakitStatus('error')
             yakitNotify('error', e + '')
             return
         }
