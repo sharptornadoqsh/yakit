@@ -20,12 +20,12 @@
     "identityAccess": "企业身份认证",
     "localDataBoundary": "本地数据边界",
     "controlledAccess": "受控访问通道",
-    "accessPortal": "企业访问门户",
+    "accessPortal": "服务访问入口",
     "privateEnvironment": "私有环境",
     "formEyebrow": "身份验证",
-    "formTitle": "登录企业工作区",
-    "formDescription": "请输入私有域地址与企业账号信息",
-    "connectionNotice": "请连接已授权的企业服务地址"
+    "formTitle": "服务登录",
+    "formDescription": "请输入服务根地址与管理员账号信息",
+    "connectionNotice": "请连接已授权的账号权限服务"
   },
   "LicensePage": {
     "getLicenseFailed": "获取License失败: {{error}}",

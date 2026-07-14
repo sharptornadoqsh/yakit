@@ -333,7 +333,7 @@ export const YakitRouteToPageInfo: Record<
     describeUi: 'YakitRoute.customPayload',
   },
   'account-admin-page': { label: '用户管理', labelUi: 'YakitRoute.userManagement' },
-  'role-admin-page': { label: '角色管理', labelUi: 'YakitRoute.roleManagement' },
+  'role-admin-page': { label: '角色与权限', labelUi: 'YakitRoute.roleManagement' },
   'hole-collect-page': { label: '漏洞汇总', labelUi: 'YakitRoute.vulnerabilitySummary' },
   'license-admin-page': { label: 'License管理', labelUi: 'YakitRoute.licenseManagement' },
   'trust-list-admin-page': { label: '用户管理', labelUi: 'YakitRoute.userManagement' },

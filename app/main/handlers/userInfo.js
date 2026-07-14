@@ -1,6 +1,6 @@
 const { ipcMain, BrowserWindow, shell } = require('electron')
 const { httpApi, getSocketUrl } = require('../httpServer')
-const { USER_INFO, HttpSetting } = require('../state')
+const { USER_INFO, resetUserInfo, HttpSetting } = require('../state')
 const { templateStr } = require('./wechatWebTemplate/index')
 const urltt = require('url')
 const http = require('http')
@@ -319,19 +319,7 @@ module.exports = {
 
     ipcMain.on('user-sign-out', (event, arg) => {
       assertTrustedAppSender(event, 'user-sign-out')
-      USER_INFO.isLogin = false
-      USER_INFO.platform = null
-      USER_INFO.githubName = null
-      USER_INFO.githubHeadImg = null
-      USER_INFO.wechatName = null
-      USER_INFO.wechatHeadImg = null
-      USER_INFO.qqName = null
-      USER_INFO.qqHeadImg = null
-      USER_INFO.role = null
-      USER_INFO.token = null
-      USER_INFO.user_id = ''
-      USER_INFO.companyName = null
-      USER_INFO.companyHeadImg = null
+      resetUserInfo()
       win.webContents.send('login-out')
       // 企业版为强制登录 - 退出登录则需重新回到登录页
       if (arg?.isEnpriTrace) {
@@ -362,9 +350,13 @@ module.exports = {
         try {
           assertTrustedAppSender(event, 'edit-baseUrl')
           const baseUrl = normalizeHttpBaseUrl(arg?.baseUrl)
+          const isBaseUrlChanged = baseUrl !== HttpSetting.httpBaseURL
           HttpSetting.wsBaseURL = getSocketUrl(baseUrl)
           HttpSetting.httpBaseURL = baseUrl
-          USER_INFO.token = ''
+          if (isBaseUrlChanged) {
+            resetUserInfo()
+            win.webContents.send('login-out')
+          }
           win.webContents.send('edit-baseUrl-status', { ok: true, info: '更改成功' })
           win.webContents.send('refresh-new-home', { ok: true, info: '刷新成功' })
           resolve()

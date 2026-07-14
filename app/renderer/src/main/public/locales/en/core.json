@@ -20,12 +20,12 @@
     "identityAccess": "Enterprise identity verification",
     "localDataBoundary": "Local data boundary",
     "controlledAccess": "Controlled access channel",
-    "accessPortal": "Enterprise Access Portal",
+    "accessPortal": "Service Access Portal",
     "privateEnvironment": "Private environment",
     "formEyebrow": "Identity verification",
-    "formTitle": "Sign in to the enterprise workspace",
-    "formDescription": "Enter the private domain and your enterprise account credentials",
-    "connectionNotice": "Connect to an authorized enterprise service endpoint"
+    "formTitle": "Service Login",
+    "formDescription": "Enter the service root address and administrator credentials",
+    "connectionNotice": "Connect to an authorized account and permission service"
   },
   "LicensePage": {
     "getLicenseFailed": "Failed to get License: {{error}}",

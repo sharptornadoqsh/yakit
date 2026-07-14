@@ -19,6 +19,8 @@ import { YakitTreeSelect } from '@/components/yakitUI/YakitTreeSelect/YakitTreeS
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import styles from './RoleAdminPage.module.scss'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { useStore } from '@/store'
+import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 interface RoleListRequest {
   limit: number
   page: number
@@ -31,6 +33,8 @@ interface RemoveProps {
 export interface RoleAdminPageProp {}
 export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
   const { t } = useI18nNamespaces(['admin', 'yakitUi'])
+  const userInfo = useStore((state) => state.userInfo)
+  const canManageRoles = userInfo.isLogin && userInfo.role === 'admin'
   const [isRefresh, setIsRefresh] = useState<boolean>(false)
   const [allCheck, setAllCheck] = useState<boolean>(false)
   const [selectList, setSelectList] = useState<API.RoleList[]>([])
@@ -55,8 +59,8 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
   const roleInfoRef = useRef<API.RoleList>()
 
   useEffect(() => {
-    update(1)
-  }, [])
+    if (canManageRoles) update(1)
+  }, [canManageRoles])
 
   const columns: ColumnsTypeProps[] = [
     {
@@ -79,7 +83,7 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
       title: t('RoleAdminPage.operationPermissions'),
       dataKey: 'role',
       render: (text, record) => {
-        return <span>{['审核员'].includes(record.name) ? t('RoleAdminPage.auditPlugin') : '-'}</span>
+        return <span>{record.checkPlugin ? t('RoleAdminPage.auditPlugin') : '-'}</span>
       },
     },
     {
@@ -124,13 +128,12 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
     return selectList.map((item) => item.id)
   }, [compareSelectList])
   const selectNum = useMemo(() => {
-    if (allCheck) return response.pagemeta.total
-    else return selectList.length
-  }, [allCheck, compareSelectList, response.pagemeta.total])
+    return selectList.length
+  }, [compareSelectList])
   const onSelectAll = useMemoizedFn((newSelectedRowKeys: string[], selected: API.RoleList[], checked: boolean) => {
     if (checked) {
       setAllCheck(true)
-      setSelectList(response.data)
+      setSelectList(selected.filter((item) => !item.builtIn))
     } else {
       setAllCheck(false)
       setSelectList([])
@@ -184,7 +187,7 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
           setAllCheck(false)
         } else {
           if (allCheck) {
-            setSelectList(d)
+            setSelectList(d.filter((item) => !item.builtIn))
           }
         }
       })
@@ -221,12 +224,14 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
   }
 
   const onRemoveMultiple = () => {
+    const deletableRoleIds = selectList.filter((item) => !item.builtIn).map((item) => item.id)
+    if (deletableRoleIds.length === 0) return
     setLoading(true)
     NetWorkApi<RemoveProps, API.NewUrmResponse>({
       method: 'delete',
       url: 'roles',
       data: {
-        rid: selectedRowKeys,
+        rid: deletableRoleIds,
       },
     })
       .then((res) => {
@@ -242,6 +247,10 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
         yakitNotify('error', t('RoleAdminPage.deleteRoleFailed', { error: err }))
       })
       .finally(() => setTimeout(() => setLoading(false), 300))
+  }
+
+  if (!canManageRoles) {
+    return <RenyanState type="noPermission" />
   }
 
   return (
@@ -376,7 +385,7 @@ const RoleOperationForm: React.FC<RoleOperationFormProp> = (props) => {
       })
         .then((res: API.NewRoleRequest) => {
           let { name, plugin, pluginType = '' } = res
-          const pluginArr = (plugin || []).map((item) => ({ label: item.script_name, value: item.id }))
+          const pluginArr = (plugin || []).map((item) => item.id)
           const pluginTypeArr: string[] = pluginType.split(',').filter((item) => item.length > 0)
           const value = {
             name,
@@ -398,13 +407,12 @@ const RoleOperationForm: React.FC<RoleOperationFormProp> = (props) => {
     }
   }, [roleInfo])
 
-  // 保留数组中重复元素
-  const filterUnique = (arr) => arr.filter((i) => arr.indexOf(i) !== arr.lastIndexOf(i))
   const onFinish = useMemoizedFn((values) => {
     const { name, treeSelect } = values
     setLoading(true)
-    let pluginTypeArr: string[] = Array.from(new Set(filterUnique([...treeSelect, ...PluginTypeKeyArr])))
-    let pluginIdsArr: string[] = treeSelect.filter((item) => !pluginTypeArr.includes(item))
+    const treeSelectValues: string[] = (treeSelect || []).map((item) => String(item))
+    const pluginTypeArr: string[] = treeSelectValues.filter((item) => PluginTypeKeyArr.includes(item))
+    const pluginIdsArr: string[] = treeSelectValues.filter((item) => !PluginTypeKeyArr.includes(item))
     let params: API.NewRoleRequest = {
       name,
       pluginType: pluginTypeArr.join(','),

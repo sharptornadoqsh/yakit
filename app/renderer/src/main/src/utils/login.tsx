@@ -29,47 +29,50 @@ export const loginOut = async (userInfo: UserInfoProps) => {
   void stopIMControlForLogout()
   // 此处会导致退出接口异常时间调用
   // await aboutLoginUpload(userInfo.token)
-  NetWorkApi<null, API.ActionSucceeded>({
+  const remoteLogout = NetWorkApi<null, API.ActionSucceeded>({
     method: 'get',
     url: 'logout/online',
     headers: {
       Authorization: userInfo.token,
     },
-  })
-    .then((res) => {
-      loginOutLocal(userInfo)
-    })
-    .catch((e) => {})
-    .finally(globalUserLogout)
+  }).catch(() => undefined)
+  loginOutLocal(userInfo)
+  globalUserLogout()
+  await remoteLogout
 }
 
 export const loginOutLocal = (userInfo: UserInfoProps) => {
   if (!userInfo.isLogin) return
   void stopIMControlForLogout()
-  getRemoteValue(getRemoteHttpSettingGV()).then(async (setting) => {
-    if (!setting) return
-    const values = JSONParseLog(setting, { page: 'login', fun: 'loginOutLocal' })
-    const OnlineBaseUrl: string = values.BaseUrl
+  getRemoteValue(getRemoteHttpSettingGV())
+    .then(async (setting) => {
+      if (!setting) {
+        yakitApp.userSignOut()
+        return
+      }
+      const values = JSONParseLog(setting, { page: 'login', fun: 'loginOutLocal' })
+      const OnlineBaseUrl: string = values.BaseUrl
 
-    let isDelPrivate: boolean = false
-    try {
-      isDelPrivate = !!(await getLocalValue(LocalGVS.IsDeletePrivatePluginsOnLogout))
-    } catch (error) {}
+      let isDelPrivate: boolean = false
+      try {
+        isDelPrivate = !!(await getLocalValue(LocalGVS.IsDeletePrivatePluginsOnLogout))
+      } catch (error) {}
 
-    if (isDelPrivate) {
-      yakitPlugin
-        .deleteByUserId({
-          UserID: userInfo.user_id,
-          OnlineBaseUrl,
-        })
-        .finally(() => {
-          yakitApp.userSignOut()
-          emiter.emit('onRefreshLocalPluginList')
-        })
-    } else {
-      yakitApp.userSignOut()
-    }
-  })
+      if (isDelPrivate) {
+        yakitPlugin
+          .deleteByUserId({
+            UserID: userInfo.user_id,
+            OnlineBaseUrl,
+          })
+          .finally(() => {
+            yakitApp.userSignOut()
+            emiter.emit('onRefreshLocalPluginList')
+          })
+      } else {
+        yakitApp.userSignOut()
+      }
+    })
+    .catch(() => yakitApp.userSignOut())
 }
 
 export const refreshToken = (userInfo: UserInfoProps) => {

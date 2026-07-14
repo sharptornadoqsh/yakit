@@ -514,7 +514,11 @@ export const FuncDomain: React.FC<FuncDomainProp> = React.memo((props) => {
 
   useEffect(() => {
     // 退出菜单
-    const signOutMenu: YakitMenuItemType[] = [UserMenusMap['divider'], UserMenusMap['singOut']]
+    const signOutItem =
+      userInfo.platform === 'company'
+        ? { ...UserMenusMap['singOut'], label: 'FuncDomain.serviceSignOut' }
+        : UserMenusMap['singOut']
+    const signOutMenu: YakitMenuItemType[] = [UserMenusMap['divider'], signOutItem]
     // EE|SE 版本
     if (userInfo.platform === 'company') {
       const SetUserInfoModule = () => (

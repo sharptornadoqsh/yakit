@@ -1,5 +1,5 @@
 // user info
-const USER_INFO = {
+const createUserInfo = () => ({
   /** 是否登录 */
   isLogin: false,
   /** 登录平台 */
@@ -16,7 +16,9 @@ const USER_INFO = {
   role: null,
   token: null,
   user_id: 0,
-}
+})
+const USER_INFO = createUserInfo()
+const resetUserInfo = () => Object.assign(USER_INFO, createUserInfo())
 const HttpSetting = {
   httpBaseURL: 'https://www.yaklang.com',
   wsBaseURL: 'wss://www.yaklang.com',
@@ -39,6 +41,7 @@ const GLOBAL_YAK_SETTING = {
 
 module.exports = {
   USER_INFO,
+  resetUserInfo,
   HttpSetting,
   GLOBAL_YAK_SETTING,
 }

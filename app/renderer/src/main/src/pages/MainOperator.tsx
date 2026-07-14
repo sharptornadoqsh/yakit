@@ -211,18 +211,14 @@ export const SetUserInfo: React.FC<SetUserInfoProp> = React.memo((props) => {
         </div>
       </Upload.Dragger>
 
-      <div
-        className="content-box"
-        style={
-          userInfo.role !== 'admin'
-            ? { display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: 16 }
-            : {}
-        }
-      >
+      <div className="content-box">
+        <div className="service-label">{t('SetUserInfo.currentService')}</div>
         <div className="user-name">{userInfo.companyName}</div>
+        {userInfo.role && (
+          <div className="permission-show">{userInfo.role === 'admin' ? t('SetUserInfo.admin') : userInfo.role}</div>
+        )}
         {userInfo.role === 'admin' && (
           <>
-            <div className="permission-show">{t('SetUserInfo.admin')}</div>
             <span className="user-admin-icon">
               <EnterpriseLoginInfoIcon />
             </span>

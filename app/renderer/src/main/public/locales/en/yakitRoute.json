@@ -82,7 +82,7 @@
     "port": "Port",
     "manageAllDiscoveredPortAssets": "Manage All Discovered Port Assets",
     "userManagement": "User Management",
-    "roleManagement": "Role Management",
+    "roleManagement": "Roles and Permissions",
     "vulnerabilitySummary": "Vulnerability Summary",
     "licenseManagement": "License Management",
     "pluginPermissions": "Plugin Permissions",

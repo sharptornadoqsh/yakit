@@ -82,7 +82,7 @@
     "port": "埠",
     "manageAllDiscoveredPortAssets": "管理掃描出的所有埠資產",
     "userManagement": "使用者管理",
-    "roleManagement": "角色管理",
+    "roleManagement": "角色與權限",
     "vulnerabilitySummary": "漏洞彙總",
     "licenseManagement": "License管理",
     "pluginPermissions": "外掛許可權",

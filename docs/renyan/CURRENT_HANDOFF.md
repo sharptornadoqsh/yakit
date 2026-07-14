@@ -1,57 +1,57 @@
-# 睿眼自动化渗透系统阶段四交接
+# 睿眼自动化渗透系统阶段七移交
 
-## 一、本阶段完成内容
+## 一、阶段结果
 
-阶段四复用现有代理、重放、扫描、爆破、编解码、插件和项目管理能力，仅整理前端入口与页面呈现。用户可见名称统一为“交互代理”“报文重放”“历史流量”“漏洞检测”“爆破测试”“编解码工具”和“报文差异对比”，内部路由、进程间通信、远程过程调用、数据库字段与底层协议均未改变。
+客户端已复用用户启动的外部账号服务，服务登录、当前用户、用户管理列表和角色与权限列表均完成开发态验证。仓库内没有新增账号服务、模拟数据、团队工作区或共享项目能力。
 
-主工作区页面标题现可显示路由说明；目标页面的异步读取、空数据和错误反馈复用统一状态组件。爆破类型列表与编解码方法列表增加读取中、空数据、错误及重试状态。项目管理增加本地项目、加密存储、明文及加密导入导出的页面说明。工作台快捷入口、菜单和页面标题采用同一组用户可见名称。
+关键适配包括标准响应解析、服务根地址规范化、地址变化后的会话清理、本地退出保证、管理员页面权限门槛、服务权限字段展示、角色详情值序列化，以及六组用户可见名称统一。
 
-阶段二已有功能标志继续隐藏报告导出、完整国密算法工具、插件链路编排、服务端安全总览；序号二十五没有菜单节点。相关底层模块未删除。
+## 二、修改范围
 
-## 二、修改文件
+- 主侧 HTTP 与会话：`app/main/httpServer.js`、`app/main/state.js`、`app/main/handlers/userInfo.js`
+- 登录退出：`app/renderer/src/main/src/utils/login.tsx`
+- 用户与角色页面：`app/renderer/src/main/src/pages/loginOperationMenu/AccountAdminPage.tsx`、`app/renderer/src/main/src/pages/loginOperationMenu/RoleAdminPage.tsx`
+- 用户角色展示与菜单名称：`app/renderer/src/main/src/pages/MainOperator.tsx`、`app/renderer/src/main/src/pages/main.scss`、`app/renderer/src/main/src/components/layout/FuncDomain.tsx`
+- 路由名称：`app/renderer/src/main/src/routes/newRoute.tsx`
+- 多语言资源：`app/renderer/src/main/public/locales/{zh,en,zh-TW}/{components,core,layout,yakitRoute}.json`
+- 阶段文档：`docs/renyan/EXTERNAL_ACCOUNT_SERVICE.md`、`docs/renyan/CURRENT_HANDOFF.md`、`docs/renyan/IMPLEMENTATION_STATUS.md`
 
-- 路由与菜单：`app/renderer/src/main/src/routes/newRoute.tsx`、`app/renderer/src/main/src/routes/renyanMenu.ts`、`app/renderer/src/main/src/routes/__test__/renyanMenu.test.ts`
-- 页面标题：`app/renderer/src/main/src/components/layout/RenyanPageHeader.tsx`、`app/renderer/src/main/src/components/layout/RenyanPageHeader.module.scss`
-- 页面状态：`app/renderer/src/main/src/pages/codec/NewCodec.tsx`、`app/renderer/src/main/src/pages/codec/NewCodec.module.scss`、`app/renderer/src/main/src/pages/securityTool/newBrute/NewBrute.tsx`、`app/renderer/src/main/src/pages/securityTool/newBrute/NewBrute.module.scss`
-- 项目管理：`app/renderer/src/main/src/pages/softwareSettings/ProjectManage.tsx`、`app/renderer/src/main/src/pages/softwareSettings/ProjectManage.module.scss`
-- 多语言资源：`app/renderer/src/main/public/locales/{zh,en,zh-TW}/{home,layout,projectManage,yakitRoute}.json`
-- 阶段文档：`docs/renyan/CURRENT_HANDOFF.md`、`docs/renyan/IMPLEMENTATION_STATUS.md`
+没有改动协议定义、数据库、引擎、许可证判断、构建配置或服务端仓库。
 
-没有删除仓库文件或底层功能模块。
+## 三、动态查看结果
 
-## 三、实际查看的页面
-
-用户手动生成企业版免许可证开发工具界面并启动应用，随后在本地引擎与企业登录态下检查下列页面：
-
-| 页面 | 基础检查 | 结果 |
+| 页面或状态 | 查看内容 | 结果 |
 | --- | --- | --- |
-| 项目管理 | 页面说明、项目搜索框焦点、现有默认项目切换 | 可用 |
-| 交互代理 | 标题说明、配置区、首个可见控件焦点 | 可用 |
-| 历史流量 | 标题说明、流量表、域名搜索框焦点 | 可用 |
-| 报文重放 | 标题说明、请求编辑区、结果区、首个可见控件焦点 | 可用 |
-| 漏洞检测 | 通用扫描入口、插件区、目标区、首个可见控件焦点 | 可用 |
-| 专项漏洞检测 | FastJSON 与 Shiro 分类、目标区、首个可见控件焦点 | 可用 |
-| 爆破测试 | 协议列表、目标区、首个可见控件焦点 | 可用 |
-| 报文差异对比 | 标题说明、双栏内容区、首个可见控件焦点 | 可用 |
-| 编解码工具 | 分类、处理序列、输入输出区、首个可见控件焦点 | 可用 |
-| 插件中心 | 本地插件、筛选与管理入口、搜索框焦点 | 可用 |
-| 插件开发 | 基础信息、源码、执行结果与日志区域、首个可见控件焦点 | 可用 |
+| 服务登录 | 服务地址、账号、密码、登录请求、错误提示区域 | 登录成功 |
+| 当前用户 | 平台、角色、用户标识与令牌存在性 | 管理员状态有效 |
+| 管理员菜单 | 用户名称、管理员角色、用户管理、角色与权限 | 名称与角色显示有效 |
+| 用户管理 | 组织结构、账号列表、角色、创建时间、管理按钮 | 读取到一条服务记录 |
+| 角色与权限 | 内置角色列表、操作权限、创建时间、管理按钮 | 读取到三条服务记录 |
 
-动态检查未发现页面级脚本异常、致命错误状态或横向页面溢出。菜单逐组读取后未发现报告、完整国密算法、插件链路、服务端安全总览或压力测试入口。未使用截图自动化。
+角色列表包含三类内置角色。服务数据未给这些角色返回插件操作权限，页面权限列显示 `-`。动态查看未见致命脚本异常或横向溢出。
 
-## 四、未验证功能
+## 四、契约结论
 
-本阶段没有启动真实代理劫持会话，没有修改并转发实际请求或响应，没有执行请求重放、漏洞扫描、爆破任务、编解码转换、插件调试、插件批量导入、项目导入导出或项目加密验证。上述业务能力沿用既有实现，本次仅检查入口与页面基础可用性。
+- 服务根地址由客户端统一转换为单一 `/api/` 基址。
+- 登录使用 `POST /api/urm/login`，密码在客户端生成 MD5 后提交。
+- 用户 API 为 `/api/urm`、`/api/urm/edit` 与 `/api/urm/reset/pwd`。
+- 角色 API 为 `/api/roles` 与 `/api/roles/detail`。
+- 服务响应采用 `{code,message,data}`，令牌原值写入 `Authorization`。
+- 地址变化、用户退出或认证失效会清理本地会话。
 
-错误状态与重试按钮已通过源码和组件接口检查，但没有人为制造引擎或接口故障。没有执行全量类型检查、全量代码规则检查、全量测试、跨平台检查、安装包生成或性能压力测试。
+完整说明见 `docs/renyan/EXTERNAL_ACCOUNT_SERVICE.md`。
 
-## 五、已知问题
+## 五、未验证范围
 
-- 当前动态界面生成于工作台快捷入口文案最终修订之前，因此动态记录中的两张卡片仍显示旧名称；三个语言目录的 `home.json` 已改为“报文差异对比”和“漏洞检测”，本阶段没有再次生成界面。
-- 报文重放结果区在未发送请求时保留既有初始提示与读取文案，本阶段没有执行外部请求确认其后续状态。
-- 定向测试输出 Vite CommonJS 接口与 `punycode` 模块弃用警告，没有测试失败。
-- 仓库已有阶段五协作审计文档及实现状态。本任务依照用户指令仅插入阶段四记录，不改写阶段五审计结论，也未实施阶段五功能。
+- 只有管理员账号可用，非管理员页面与多角色权限差异没有动态证据。
+- 没有主动制造离线、错误密码、令牌过期或服务地址变化。
+- 没有提交用户或角色创建、编辑、删除与密码重置，外部服务数据保持原状。
+- 本地配置采用可逆 Base64 编码，服务端密码存储方式未知。
+- 团队工作区、共享项目、多客户端协作与服务端安全总览不属本阶段交付。
+- 没有启动全量测试、全量类型检查、全量规则检查、构建、打包、跨平台验证或性能测试。
 
-## 六、下一阶段建议
+## 六、复验资料
 
-后续任务应以现有阶段五协作审计为边界，先明确本地可验证的账号、角色、权限与共享项目服务契约，再决定团队入口是否启用。阶段四已保留的代理、重放、扫描、插件和项目管理接口不需要重复实现。
+动态截图保存在本机临时目录，没有纳入仓库。截图与文档均未记录真实密码、完整令牌或服务内账号详情。
+
+最终本地验证限定为分支名称、差异空白与工作区状态。提交目标仅为 `qsh`，`master` 保持原状。

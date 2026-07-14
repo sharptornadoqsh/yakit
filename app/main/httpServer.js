@@ -1,7 +1,7 @@
 const axios = require('axios')
 const https = require('https')
 const { ipcMain } = require('electron')
-const { USER_INFO, HttpSetting } = require('./state')
+const { USER_INFO, resetUserInfo, HttpSetting } = require('./state')
 const url = require('url')
 const { HttpsProxyAgent } = require('hpagent')
 const { printLogOutputFile } = require('./logFile')
@@ -35,12 +35,26 @@ const getSocketUrl = (inputUrl) => {
   return wsUrl
 }
 
+const buildApiBaseUrl = (inputUrl) => {
+  const parsedUrl = new url.URL(normalizeHttpBaseUrl(inputUrl))
+  const pathname = parsedUrl.pathname.replace(/\/+$/, '')
+  parsedUrl.pathname = pathname.endsWith('/api') ? `${pathname}/` : `${pathname}/api/`
+  parsedUrl.search = ''
+  parsedUrl.hash = ''
+  return parsedUrl.toString()
+}
+
 ipcMain.on('sync-edit-baseUrl', (event, arg) => {
   try {
     assertTrustedAppSender(event, 'sync-edit-baseUrl')
     const baseUrl = normalizeHttpBaseUrl(arg?.baseUrl)
+    const isBaseUrlChanged = baseUrl !== HttpSetting.httpBaseURL
     HttpSetting.httpBaseURL = baseUrl
     HttpSetting.wsBaseURL = getSocketUrl(baseUrl)
+    if (isBaseUrlChanged) {
+      resetUserInfo()
+      event.sender.send('login-out')
+    }
     event.returnValue = { baseUrl }
   } catch (error) {
     event.returnValue = {
@@ -61,7 +75,7 @@ const agent = !!add_proxy
 
 const service = axios.create({
   // baseURL: "http://onlinecs.vaiwan.cn/api/",
-  baseURL: `${HttpSetting.httpBaseURL}/api/`,
+  baseURL: buildApiBaseUrl(HttpSetting.httpBaseURL),
   timeout: DefaultTimeOut, // 请求超时时间
   maxBodyLength: Infinity, //设置适当的大小
   httpsAgent: agent,
@@ -72,7 +86,7 @@ const service = axios.create({
 service.interceptors.request.use(
   (config) => {
     const baseUrl = normalizeHttpBaseUrl(config.diyHome || HttpSetting.httpBaseURL)
-    config.baseURL = `${baseUrl}/api/`
+    config.baseURL = buildApiBaseUrl(baseUrl)
     config.headers = config.headers || {}
     if (USER_INFO.isLogin && USER_INFO.token) config.headers['Authorization'] = USER_INFO.token
     // console.log('request-config',config);
@@ -86,9 +100,24 @@ service.interceptors.request.use(
 // respone拦截器 拦截到所有的response，然后先做一些判断
 service.interceptors.response.use(
   (response) => {
+    const responseData = response.data
+    const responseCode = Number(responseData?.code)
+    const isServiceEnvelope =
+      responseData &&
+      typeof responseData === 'object' &&
+      !Array.isArray(responseData) &&
+      Number.isFinite(responseCode) &&
+      Object.prototype.hasOwnProperty.call(responseData, 'data')
+    if (isServiceEnvelope) {
+      return {
+        ...responseData,
+        code: responseCode,
+        ...(responseCode === 401 ? { userInfo: USER_INFO } : {}),
+      }
+    }
     const res = {
       code: response.status,
-      data: response.data,
+      data: responseData,
     }
     // console.log("response__1", response)
     return res
@@ -194,4 +223,5 @@ module.exports = {
   service,
   httpApi,
   getSocketUrl,
+  buildApiBaseUrl,
 }

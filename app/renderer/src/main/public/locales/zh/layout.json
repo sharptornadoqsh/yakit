@@ -307,7 +307,8 @@
     "avatarUpdateSuccess": "头像更换成功",
     "avatarUploadFailed": "头像上传失败",
     "avatarFileTypeLimit": "{{name}}非png、png、jpeg文件，请上传正确格式文件！",
-    "admin": "管理员"
+    "admin": "管理员",
+    "currentService": "当前服务"
   },
   "Main": {
     "renderCrashTitle": "渲染端崩溃提示",
@@ -328,7 +329,7 @@
   "NewApp": {
     "userClickEvent": "用户点击事件",
     "fetchFailed": "获取失败: {{error}}",
-    "setPrivateDomainFailed": "设置私有域失败: {{error}}",
+    "setPrivateDomainFailed": "服务地址配置失败: {{error}}",
     "remoteControlClosing": "远程控制关闭中..."
   },
   "CeUserMenu": {
@@ -350,13 +351,14 @@
   "FuncDomain": {
     "remoteInProgress": "远程中",
     "signOut": "退出登录",
+    "serviceSignOut": "退出服务登录",
     "pluginAudit": "插件管理",
     "misstatement": "误报记录",
     "trustList": "用户管理",
     "licenseAdmin": "License管理",
     "dataStatistics": "数据统计",
     "mobileControl": "移动端控制",
-    "roleAdmin": "角色管理",
+    "roleAdmin": "角色与权限",
     "accountAdmin": "用户管理",
     "uploadData": "上传数据",
     "controlAdmin": "远程管理",
@@ -435,7 +437,7 @@
   },
   "UIOpSetting": {
     "remoteModeCannotModify": "远程控制中，暂无法修改",
-    "configPrivateDomain": "配置私有域",
+    "configPrivateDomain": "服务地址配置",
     "configGlobalReverse": "配置全局反连",
     "alreadyLocalMode": "已为本地连接",
     "modeAlreadySet": "当前模式已设置"

@@ -56,16 +56,16 @@
       }
     },
     "RenyanState": {
-      "emptyTitle": "暂无数据",
-      "emptyDescription": "当前范围内没有可显示的数据。",
-      "loadingTitle": "正在读取",
-      "loadingDescription": "正在从当前工作区读取真实数据。",
-      "errorTitle": "读取失败",
-      "errorDescription": "当前数据源未返回有效结果。",
-      "noPermissionTitle": "无访问权限",
-      "noPermissionDescription": "当前身份无权访问此内容。",
-      "offlineTitle": "服务离线",
-      "offlineDescription": "当前服务不可用，请检查连接状态。"
+      "emptyTitle": "No data",
+      "emptyDescription": "No data is available in the current scope.",
+      "loadingTitle": "Loading",
+      "loadingDescription": "Reading data from the current workspace.",
+      "errorTitle": "Unable to load",
+      "errorDescription": "The current data source did not return a valid result.",
+      "noPermissionTitle": "Access denied",
+      "noPermissionDescription": "The current account cannot access this content.",
+      "offlineTitle": "Service offline",
+      "offlineDescription": "The current service is unavailable. Check the connection."
     },
     "PublicMenu": {
       "getUserMenuFailed": "Failed to get user menu:",
@@ -307,7 +307,8 @@
     "avatarUpdateSuccess": "Avatar updated successfully",
     "avatarUploadFailed": "Avatar upload failed",
     "avatarFileTypeLimit": "{{name}} is not a png, png, jpeg file, please upload the correct format file!",
-    "admin": "Admin"
+    "admin": "Admin",
+    "currentService": "Current Service"
   },
   "Main": {
     "renderCrashTitle": "Render crash prompt",
@@ -328,7 +329,7 @@
   "NewApp": {
     "userClickEvent": "User Click Event",
     "fetchFailed": "Failed to fetch: {{error}}",
-    "setPrivateDomainFailed": "Failed to set private domain: {{error}}",
+    "setPrivateDomainFailed": "Failed to configure service address: {{error}}",
     "remoteControlClosing": "Remote control is closing..."
   },
   "CeUserMenu": {
@@ -350,13 +351,14 @@
   "FuncDomain": {
     "remoteInProgress": "Remote in progress",
     "signOut": "Sign Out",
+    "serviceSignOut": "Sign Out of Service",
     "pluginAudit": "Plugin Management",
     "misstatement": "Misstatement Record",
     "trustList": "User Management",
     "licenseAdmin": "License Management",
     "dataStatistics": "Data Statistics",
     "mobileControl": "Mobile Control",
-    "roleAdmin": "Role Management",
+    "roleAdmin": "Roles and Permissions",
     "accountAdmin": "User Management",
     "uploadData": "Upload Data",
     "controlAdmin": "Remote Management",
@@ -435,7 +437,7 @@
   },
   "UIOpSetting": {
     "remoteModeCannotModify": "Cannot modify in remote control",
-    "configPrivateDomain": "Configure Private Domain",
+    "configPrivateDomain": "Service Address Configuration",
     "configGlobalReverse": "Configure Global Reverse Connection",
     "alreadyLocalMode": "Already in local connection",
     "modeAlreadySet": "Current mode has been set"

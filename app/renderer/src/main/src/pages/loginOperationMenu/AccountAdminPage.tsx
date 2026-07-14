@@ -35,6 +35,8 @@ import { DefaultOptionType } from 'antd/lib/cascader'
 import styles from './AccountAdminPage.module.scss'
 import { setClipboardText } from '@/utils/clipboard'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { useStore } from '@/store'
+import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 interface QueryAccountAdminRequest {
   departmentId?: number
   keywords: string
@@ -68,6 +70,7 @@ interface TreeReduceCount {
 export interface AccountAdminPageProp {}
 export const AccountAdminPage: React.FC<AccountAdminPageProp> = (props) => {
   const { t } = useI18nNamespaces(['admin'])
+  const userInfo = useStore((state) => state.userInfo)
   const [selectTitle, setSelectTitle] = useState<SelectTitleProps>()
   const [tableQuery, setTableQuery] = useState<QueryAccountAdminRequest>(defQueryAccountAdminRequest)
 
@@ -80,6 +83,10 @@ export const AccountAdminPage: React.FC<AccountAdminPageProp> = (props) => {
       departmentId: departmentId === -1 ? 0 : departmentId,
     }))
   })
+
+  if (!userInfo.isLogin || userInfo.role !== 'admin') {
+    return <RenyanState type="noPermission" />
+  }
 
   return (
     <div className={styles['accountAdminPage']}>
@@ -1183,7 +1190,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
               创建账号
             </YakitButton>
             <YakitPopconfirm
-              title={'确认删除选择的角色吗？不可恢复'}
+              title={'确认删除选择的用户吗？不可恢复'}
               onConfirm={(e) => {
                 e?.stopPropagation()
                 onRemoveMultiple()
@@ -1449,7 +1456,7 @@ const AccountForm: React.FC<AccountFormProps> = (props) => {
           onCancel()
         })
         .catch((err) => {
-          yakitNotify('error', '修改账号失败：' + err?.message || err)
+          yakitNotify('error', '修改账号失败：' + (err?.message || err))
         })
         .finally(() => {
           setLoading(false)

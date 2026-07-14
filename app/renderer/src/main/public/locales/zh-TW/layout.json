@@ -56,16 +56,16 @@
       }
     },
     "RenyanState": {
-      "emptyTitle": "暂无数据",
-      "emptyDescription": "当前范围内没有可显示的数据。",
-      "loadingTitle": "正在读取",
-      "loadingDescription": "正在从当前工作区读取真实数据。",
-      "errorTitle": "读取失败",
-      "errorDescription": "当前数据源未返回有效结果。",
-      "noPermissionTitle": "无访问权限",
-      "noPermissionDescription": "当前身份无权访问此内容。",
-      "offlineTitle": "服务离线",
-      "offlineDescription": "当前服务不可用，请检查连接状态。"
+      "emptyTitle": "暫無資料",
+      "emptyDescription": "目前範圍內沒有可顯示的資料。",
+      "loadingTitle": "正在讀取",
+      "loadingDescription": "正在從目前工作區讀取資料。",
+      "errorTitle": "讀取失敗",
+      "errorDescription": "目前資料來源未傳回有效結果。",
+      "noPermissionTitle": "無存取權限",
+      "noPermissionDescription": "目前帳號無權存取此內容。",
+      "offlineTitle": "服務離線",
+      "offlineDescription": "目前服務無法使用，請檢查連線狀態。"
     },
     "PublicMenu": {
       "getUserMenuFailed": "獲取使用者選單失敗：",
@@ -307,7 +307,8 @@
     "avatarUpdateSuccess": "頭像更換成功",
     "avatarUploadFailed": "頭像上傳失敗",
     "avatarFileTypeLimit": "{{name}}非png、png、jpeg檔案，請上傳正確格式檔案！",
-    "admin": "管理員"
+    "admin": "管理員",
+    "currentService": "目前服務"
   },
   "Main": {
     "renderCrashTitle": "渲染端崩潰提示",
@@ -328,7 +329,7 @@
   "NewApp": {
     "userClickEvent": "使用者點選事件",
     "fetchFailed": "獲取失敗: {{error}}",
-    "setPrivateDomainFailed": "設定私有域失敗: {{error}}",
+    "setPrivateDomainFailed": "服務位址設定失敗: {{error}}",
     "remoteControlClosing": "遠端控制關閉中..."
   },
   "CeUserMenu": {
@@ -350,13 +351,14 @@
   "FuncDomain": {
     "remoteInProgress": "遠端中",
     "signOut": "退出登入",
+    "serviceSignOut": "退出服務登入",
     "pluginAudit": "外掛管理",
     "misstatement": "誤報記錄",
     "trustList": "使用者管理",
     "licenseAdmin": "License管理",
     "dataStatistics": "資料統計",
     "mobileControl": "移動端控制",
-    "roleAdmin": "角色管理",
+    "roleAdmin": "角色與權限",
     "accountAdmin": "使用者管理",
     "uploadData": "上傳資料",
     "controlAdmin": "遠端管理",
@@ -435,7 +437,7 @@
   },
   "UIOpSetting": {
     "remoteModeCannotModify": "遠端控制中，暫無法修改",
-    "configPrivateDomain": "配置私有域",
+    "configPrivateDomain": "服務位址設定",
     "configGlobalReverse": "配置全域性反連",
     "alreadyLocalMode": "已為本地連線",
     "modeAlreadySet": "當前模式已設定"
