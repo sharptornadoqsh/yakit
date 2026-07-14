@@ -16,6 +16,8 @@ import {
   OutlineChevrondoublerightIcon,
   OutlineChevrondownIcon,
 } from '@/assets/icon/outline'
+import { usePageInfo } from '@/store/pageInfo'
+import { shallow } from 'zustand/shallow'
 import styles from './RenyanNavigation.module.scss'
 
 interface RenyanRouteSelection {
@@ -74,10 +76,16 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
   const { t, i18n } = useI18nNamespaces(['layout'])
   const menu = useMemo(() => buildRenyanMenu(), [])
   const getTitle = useMenuTitle()
+  const currentRoute = usePageInfo((state) => state.currentPageTabRouteKey, shallow)
+  const currentPath = useMemo(() => findRenyanMenuPath(currentRoute || '', menu), [currentRoute, menu])
   const [expanded, setExpanded] = useState(defaultExpand)
-  const [activeGroupKey, setActiveGroupKey] = useState(menu[0]?.key || '')
+  const [activeGroupKey, setActiveGroupKey] = useState(currentPath[0]?.key || menu[0]?.key || '')
 
   useEffect(() => setExpanded(defaultExpand), [defaultExpand])
+
+  useEffect(() => {
+    if (currentPath[0]?.key) setActiveGroupKey(currentPath[0].key)
+  }, [currentPath])
 
   useEffect(() => {
     const labels = new Map<string, string>()
