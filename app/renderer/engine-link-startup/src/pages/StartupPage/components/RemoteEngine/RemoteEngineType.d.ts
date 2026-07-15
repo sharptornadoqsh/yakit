@@ -2,6 +2,8 @@ export interface RemoteEngineProps {
   loading: boolean
   setLoading: (flag: boolean) => any
   onSubmit: (info: RemoteLinkInfo) => any
+  autoConnect?: boolean
+  headless?: boolean
   /** 取消 & 切换本地连接 */
   onSwitchLocalEngine: () => any
 }

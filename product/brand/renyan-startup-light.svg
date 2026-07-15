@@ -32,6 +32,6 @@
   <circle cx="512" cy="188" r="14" /><circle cx="512" cy="836" r="14" />
 </g></g>
 <text x="472" y="820" text-anchor="middle" fill="#14254A" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="54" font-weight="700">睿眼自动化渗透系统</text>
-<text x="472" y="884" text-anchor="middle" fill="#5B6D90" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="3">RuiYan Pentest</text>
+<text x="472" y="884" text-anchor="middle" fill="#5B6D90" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="3">RuiYan-Pentest</text>
 <text x="472" y="936" text-anchor="middle" fill="#5B6D90" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="27">自动化渗透与验证工作台</text>
 </svg>

@@ -1,8 +1,11 @@
 .startup-wrapper {
+  position: relative;
   height: 100%;
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 12px 32px;
+  overflow: hidden;
+  padding: 48px 32px;
   background-color: var(--Colors-Use-Basic-Background);
 
   .startup-header-drap {
@@ -13,51 +16,7 @@
     -webkit-app-region: drag;
   }
 
-  &-left {
-    width: 360px;
-    padding: 20px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 32px;
-
-    .startup-title {
-      .startup-logo {
-        margin-bottom: 8px;
-        img {
-          display: block;
-          max-width: 100%;
-          object-fit: contain;
-          object-position: left center;
-        }
-        svg {
-          height: 100%;
-        }
-      }
-
-      .startup-desc {
-        color: var(--Colors-Use-Neutral-Disable);
-        letter-spacing: 2px;
-        font-size: 20px;
-        font-style: normal;
-        font-weight: 200;
-        line-height: 20px;
-      }
-    }
-
-    .startup-engine-log {
-      background-color: var(--Colors-Use-Basic-Background);
-      padding: 12px 0;
-      border-top: 1px dashed var(--Colors-Use-Neutral-Border);
-      border-bottom: 1px dashed var(--Colors-Use-Neutral-Border);
-      height: 232px;
-      width: 100%;
-    }
-
-    .startup-content-wrapper {
-      display: flex;
-      flex: 1;
-      position: relative;
-      background-color: var(--Colors-Use-Basic-Background);
-    }
+  .startup-operation-layer {
+    display: none;
   }
 }

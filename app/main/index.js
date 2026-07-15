@@ -114,6 +114,8 @@ let ipcRegistered = false
  * ---------------- 创建 yakitEngineLink 窗口 ----------------
  */
 let readyEngineLinkShow = false
+const STARTUP_HINT_MINIMUM_VISIBLE_MS = 1200
+let engineLinkShownAt = 0
 function createEngineLinkWindow() {
   const state = windowStateKeeper({
     defaultWidth: 900,
@@ -163,12 +165,14 @@ function createEngineLinkWindow() {
   engineLinkWin.webContents.on('will-navigate', (e) => e.preventDefault())
 
   engineLinkWin.on('show', () => {
+    engineLinkShownAt = Date.now()
     printLogOutputFile(`[engineLinkWin] show event triggered`)
     state.manage(engineLinkWin)
   })
 
   engineLinkWin.once('ready-to-show', () => {
     readyEngineLinkShow = true
+    winShow(engineLinkWin, true)
     printLogOutputFile(
       `[engineLinkWin] ready-to-show, isVisible: ${engineLinkWin.isVisible()}, isDestroyed: ${engineLinkWin.isDestroyed()}`,
     )
@@ -274,7 +278,6 @@ function createWindow() {
 
   win.once('ready-to-show', () => {
     readyWinShow = true
-    winShow(win, true)
     printLogOutputFile(`[mainWin] ready-to-show, isVisible: ${win.isVisible()}, isDestroyed: ${win.isDestroyed()}`)
   })
 
@@ -565,6 +568,11 @@ function registerGlobalIPC() {
   // ------------------- 窗口发送数据操作 -------------------
   // engineLink 完成操作
   ipcMain.handle('engineLinkWin-done', async (event, data) => {
+    const startupHintVisibleMs = engineLinkShownAt ? Date.now() - engineLinkShownAt : 0
+    const startupHintWaitMs = Math.max(0, STARTUP_HINT_MINIMUM_VISIBLE_MS - startupHintVisibleMs)
+    if (startupHintWaitMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, startupHintWaitMs))
+    }
     winHide(engineLinkWin)
     winShow(win, readyWinShow)
     safeSend(win, 'from-engineLinkWin', data)

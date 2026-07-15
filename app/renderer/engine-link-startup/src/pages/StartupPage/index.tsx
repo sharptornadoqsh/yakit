@@ -12,7 +12,6 @@ import {
   grpcFetchBuildInYakVersion,
   grpcFetchLocalYakitVersion,
   grpcFetchYakInstallResult,
-  grpcFixupDatabase,
   grpcInitCVEDatabase,
   grpcReclaimDatabaseSpace,
   grpcUnpackBuildInYak,
@@ -20,8 +19,6 @@ import {
 import { debugToPrintLog } from '@/utils/logCollection'
 import { LocalGVS } from '@/enums/yakitGV'
 import {
-  IgnoreYakit,
-  LoadingClickExtra,
   ModalIsTop,
   System,
   TypeCallbackExtra,
@@ -31,13 +28,9 @@ import {
 } from './types'
 import { getLocalValue, setLocalValue } from '@/utils/kv'
 import useGetSetState from '@/hooks/useGetSetState'
-import { yakitNotify } from '@/utils/notification'
-import { EngineLifecyclePanel } from './components/EngineLifecyclePanel'
 import { DownloadYaklang } from './components/DownloadYaklang'
 import {
-  FetchSoftwareVersion,
   GetConnectPort,
-  getReleaseEditionName,
   isCommunityEdition,
   isCommunityIRify,
   isCommunityMemfit,
@@ -51,18 +44,13 @@ import { RemoteLinkInfo } from './components/RemoteEngine/RemoteEngineType'
 import { StringToUint8Array } from '@/utils/str'
 import { LocalEngine } from './components/LocalEngine'
 import { LocalEngineLinkFuncProps, LocalLinkParams } from './components/LocalEngine/LocalEngineType'
-import { EngineLog } from './components/EngineLog'
 import emiter from '@/utils/eventBus/eventBus'
 import { YaklangEngineWatchDog } from './components/YaklangEngineWatchDog'
-import renyanLogoLight from '@/assets/renyan-logo-light.svg'
-import renyanLogoDark from '@/assets/renyan-logo-dark.svg'
 import { useTheme } from '@/hooks/useTheme'
-import { SoftwareBasics } from './components/SoftwareBasics'
+import { StartupSplash } from './components/StartupSplash'
 import { yakitApp, yakitEngine } from '@/utils/electronBridge'
 import { useYakitStatus } from '@/hooks/useYakitStatus'
 import styles from './index.module.scss'
-import { productConfig } from '@/config/product'
-import { handleOpenFileSystemDialog } from '@/utils/fileSystemDialog'
 import {
   decideEngineStartup,
   engineLifecycleReducer,
@@ -80,9 +68,6 @@ const DefaultCredential: YaklangEngineWatchDogCredential = {
 }
 
 export const StartupPage: React.FC = () => {
-  /** 工作空间是否已确认（所有平台均需用户确认） */
-  const [workspaceConfirmed, setWorkspaceConfirmed] = useState<boolean>(false)
-
   /** 是否置顶 */
   const [isTop, setIsTop] = useState<ModalIsTop>(0)
   /** 操作系统 */
@@ -118,7 +103,7 @@ export const StartupPage: React.FC = () => {
   /** 手动点击倒计时连接取消 */
   const cancelCountdownLinkRef = useRef<boolean>(false)
   /** 倒计时步数（2秒共4步，每0.5秒递减1） */
-  const [countdown, setCountdown] = useState<number>(4)
+  const [, setCountdown] = useState<number>(4)
   /** 倒计时定时器引用 */
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null)
   /** 当前引擎连接状态 */
@@ -142,18 +127,12 @@ export const StartupPage: React.FC = () => {
   /** 本地连接自定义端口号 */
   const [customPort, setCustomPort, getCustomPort] = useGetSetState<number>(GetConnectPort())
   /** 主题 */
-  const { theme, setTheme } = useTheme()
+  const { theme } = useTheme()
 
-  // #region 工作空间确认回调
-  const handleWorkspaceConfirmed = useMemoizedFn(() => {
-    setWorkspaceConfirmed(true)
-  })
-  // #endregion
-
-  // #region 软件启动主流程（单一入口）所有平台均需要用户确认工作空间
+  // #region 软件启动主流程（单一入口）
   /**
    * 获取基本信息
-   * 1、操作系统类型（决定是否需要工作空间前置选择）
+   * 1、操作系统类型
    * 2、是否开发环境
    * 3、架构
    */
@@ -165,20 +144,14 @@ export const StartupPage: React.FC = () => {
     handleFetchArchitecture()
   }, [])
 
-  // workspaceConfirmed 为 true 后，优先读取用户选择的引擎模式
   useEffect(() => {
-    if (!workspaceConfirmed) return
     handleLinkEngineMode()
-  }, [workspaceConfirmed])
+  }, [])
   // #endregion
 
   /** 插件漏洞信息库自检 */
   const handleBuiltInCheck = useMemoizedFn(() => {
-    grpcInitCVEDatabase()
-      .then(() => {
-        yakitNotify('info', '漏洞信息库自检完成')
-      })
-      .catch((e: any) => {})
+    grpcInitCVEDatabase().catch(() => {})
   })
 
   /**
@@ -388,6 +361,7 @@ export const StartupPage: React.FC = () => {
 
     transitionEngineLifecycle('missing', '未找到本地引擎或已验证的预置工件')
     safeSetYakitStatus('installNetWork')
+    setYaklangDownload(true)
   })
   // #endregion
 
@@ -418,26 +392,6 @@ export const StartupPage: React.FC = () => {
     setLinkLocalEngine()
   })
 
-  // yakit不再提示更新
-  const noHintYakitUpdate = useMemoizedFn((ignoreYakit: IgnoreYakit) => {
-    safeSetYakitStatus('')
-    if (ignoreYakit === 'ignoreUpdates') {
-      setLocalValue(LocalGVS.NoAutobootLatestVersionCheck, true)
-    }
-    if (localEngineRef.current) {
-      localEngineRef.current.checkEngine()
-    }
-  })
-
-  // yak不再提示更新
-  const noHintYakUpdate = useMemoizedFn(() => {
-    safeSetYakitStatus('')
-    setLocalValue(LocalGVS.NoYakVersionCheck, true)
-    if (localEngineRef.current) {
-      localEngineRef.current.checkEngineSource()
-    }
-  })
-
   // 判断引擎版本没有问题，则直接安装，否则重新下载
   const yakEngineVersionExistsAndCorrectness = async (
     version: string,
@@ -453,15 +407,9 @@ export const StartupPage: React.FC = () => {
         yakitEngine
           .installYakEngine(version)
           .then(() => {
-            yakitNotify('info', '已检测到本地存在对应版本引擎，直接进行安装')
-            yakitNotify('success', `安装成功，如未生效，重启 ${getReleaseEditionName()} 即可`)
             installSuccessCallback()
           })
           .catch((err: any) => {
-            yakitNotify(
-              'error',
-              `安装失败：${err.message.indexOf('operation not permitted') > -1 ? '请关闭引擎后重试' : String(err)}`,
-            )
             installErrCallback(err)
           })
       } else {
@@ -504,7 +452,7 @@ export const StartupPage: React.FC = () => {
 
   // #region 初始化界面操作
   // 手动重连时按钮的loading
-  const [restartLoading, setRestartLoading] = useState<boolean>(false)
+  const [, setRestartLoading] = useState<boolean>(false)
   const setTimeoutLoading = useMemoizedFn((setLoading: (v: boolean) => any, time = 2000) => {
     setLoading(true)
     setTimeout(() => {
@@ -516,175 +464,6 @@ export const StartupPage: React.FC = () => {
       setRestartLoading(false)
     }
   }, [engineLink])
-  // Loading页面切换引擎连接模式
-  const loadingClickCallback = useMemoizedFn((type: YaklangEngineMode | YakitStatusType, extra?: LoadingClickExtra) => {
-    switch (type) {
-      case 'install':
-        // 解压内置引擎
-        initializeEngine(() => {
-          isEngineInstalled.current = true
-          setCheckLog([`预置引擎 ${getBuildInEngineVersion()} 已验证并安装`])
-          safeSetYakitStatus('')
-          setLinkLocalEngine()
-        })
-        return
-      case 'installNetWork':
-        // 一键安装（联网）
-        setRestartLoading(true)
-        setYaklangDownload(true)
-        return
-      case 'check_timeout':
-        // 超时手动校验引擎
-        setRestartLoading(true)
-        handleStartLocalLink(isCheckVersion.current)
-        return
-      case 'port_occupied_prev':
-        // 端口被占用前置操作
-        if (extra?.killCurProcess) {
-          setRestartLoading(true)
-          killCurrentProcess(() => {
-            handleStartLocalLink(isCheckVersion.current)
-          }, [getCustomPort()])
-        } else {
-          safeSetYakitStatus('port_occupied')
-        }
-        return
-      case 'port_occupied':
-        // 端口被占用
-        setRestartLoading(true)
-        setCustomPort(extra.port)
-        handleStartLocalLink(isCheckVersion.current)
-        return
-      case 'start_timeout':
-        // 启动yak超时
-        setTimeoutLoading(setRestartLoading, 5000)
-        onStartLinkEngine()
-        return
-      case 'remote':
-        handleLinkRemoteMode()
-        return
-      case 'local':
-        handleLinkLocalMode()
-        return
-      case 'database_error':
-      case 'fix_database_timeout':
-        setRestartLoading(true)
-        // 校验数据库出现错误或超时
-        handleFixupDatabase()
-        return
-      case 'update_yakit':
-        // 检测到新版本yakit
-        if (extra?.downYakit) {
-          setRestartLoading(true)
-          setYakitUpdate(true)
-        } else {
-          noHintYakitUpdate(extra?.ignoreYakit)
-        }
-        return
-      case 'update_yak':
-        // 检测到当前版本低于内置版本
-        if (extra?.downYak) {
-          initializeEngine(() => {
-            setCheckLog([`引擎：${getBuildInEngineVersion()}，解压成功`])
-            if (localEngineRef.current) {
-              localEngineRef.current.checkEngineSource(getBuildInEngineVersion())
-            }
-          })
-        } else {
-          noHintYakUpdate()
-        }
-        return
-      case 'check_yak_version_error':
-        // 引擎权限错误-手动重启引擎
-        setRestartLoading(true)
-        setLinkLocalEngine()
-        return
-      case 'error':
-        // 引擎连接超时或意外断掉连接
-        setTimeoutLoading(setRestartLoading)
-        handleStartLocalLink(false)
-        isCheckVersion.current = false
-        setKeepalive(false)
-        return
-      case 'reclaimDatabaseSpace_success':
-      case 'reclaimDatabaseSpace_error':
-        // 回收数据库空间成功或者失败
-        setRestartLoading(true)
-        safeSetYakitStatus('')
-        setTimeout(() => {
-          handleStartLocalLink(isCheckVersion.current)
-        }, 500)
-        break
-      case 'break':
-        // 用户点中断连接 或 手动连接引擎
-        if (extra?.linkAgain) {
-          // 手动点倒计时取消，再点连接
-          if (cancelCountdownLinkRef.current) {
-            cancelCountdownLinkRef.current = false
-            // 立即进入
-            setEngineLink(true)
-            safeSetYakitStatus('link')
-          } else {
-            breakHandleRef.current = false
-            safeSetYakitStatus('')
-            killCurrentProcess(() => {
-              setTimeout(() => {
-                handleStartLocalLink(isCheckVersion.current)
-              }, 500)
-            }, [getCustomPort()])
-          }
-        } else {
-          // 否则执行断开
-          outputToWelcomeConsole('手动触发中断连接')
-          debugToPrintLog(`------ 手动触发中断连接 ------`)
-          safeSetYakitStatus('break')
-          onDisconnect()
-          setCheckLog(['已主动断开, 请点击手动连接引擎'])
-          breakHandleRef.current = true
-          setRestartLoading(false)
-          cancelAllTasks()
-          setTimeout(() => {
-            if (extra.isRemote) {
-              handleLinkRemoteMode()
-            }
-          }, 3000)
-        }
-        return
-      case 'link_countdown':
-        // 倒计时用户点击立即进入或取消
-        clearCountDownTime()
-        if (extra?.enterNow) {
-          // 立即进入
-          setEngineLink(true)
-          safeSetYakitStatus('link')
-        } else {
-          cancelCountdownLinkRef.current = true
-          safeSetYakitStatus('break')
-        }
-        return
-      default:
-        return
-    }
-  })
-
-  // 在 3 秒内，不断尝试让主进程取消所有正在执行的任务
-  const cancelAllTasks = async () => {
-    const start = Date.now()
-    while (Date.now() - start < 3000) {
-      let res: any = null
-      try {
-        res = await yakitEngine.cancelAllTasks()
-      } catch (e) {
-        debugToPrintLog(`------ cancel-all-tasks failed: ${e}`)
-      }
-      if (!res || res.canceled === 0) {
-        await new Promise((r) => setTimeout(r, 300))
-      } else {
-        await new Promise((r) => setTimeout(r, 500))
-      }
-    }
-  }
-
   // 解压内置引擎
   const initializeEngine = useMemoizedFn((callback = () => {}) => {
     setCheckLog([`准备解压内置引擎：${getBuildInEngineVersion()}...`])
@@ -706,42 +485,11 @@ export const StartupPage: React.FC = () => {
           error: `${error}`,
         })
         safeSetYakitStatus(isInitLocalLink.current ? 'installNetWork' : 'skipAgreement_InstallNetWork')
+        setYaklangDownload(true)
       } finally {
         setRestartLoading(false)
       }
     }, 500)
-  })
-
-  // 数据库修复
-  const [, setDbPath] = useState<string[]>([])
-  const handleFixupDatabase = useMemoizedFn(async () => {
-    setCheckLog(['开始修复数据库中...'])
-    try {
-      const res = await grpcFixupDatabase({ softwareVersion: FetchSoftwareVersion() })
-      setRestartLoading(false)
-      if (res.ok && res.status === 'success') {
-        setCheckLog((arr) => arr.concat(['修复数据库成功']))
-        safeSetYakitStatus('')
-        setDbPath([])
-        handleStartLocalLink(true)
-        return
-      }
-      switch (res.status) {
-        case 'timeout':
-          setCheckLog((arr) => arr.concat(['命令执行超时，可查看日志详细信息...']))
-          safeSetYakitStatus('fix_database_timeout')
-          break
-        default:
-          setDbPath(res.json.path)
-          setCheckLog(['修复失败，可将日志信息发送给工作人员处理...'])
-          safeSetYakitStatus('fix_database_error')
-      }
-    } catch (error) {
-      // 如果意外情况则按照修复失败处理
-      outputToWelcomeConsole(`修复数据库出现意外情况：${error}`)
-      setCheckLog(['修复数据库出现意外情况，可查看日志详细信息...'])
-      safeSetYakitStatus('fix_database_error')
-    }
   })
 
   // 回收数据库空间
@@ -791,9 +539,9 @@ export const StartupPage: React.FC = () => {
         for (const pid of pidsToKill) {
           try {
             await yakitEngine.killYakGrpc(pid)
-            yakitNotify('info', `KILL yak PROCESS: ${pid}`)
+            debugToPrintLog(`------ terminated engine process: ${pid} ------`)
           } catch (err) {
-            yakitNotify('error', `Kill yak process failed: ${err}`)
+            debugToPrintLog(`------ terminate engine process failed: ${err} ------`)
           }
         }
 
@@ -1051,7 +799,6 @@ export const StartupPage: React.FC = () => {
     // 连接中触发
     if (getYakitStatus() === 'link') {
       if (getEngineMode() === 'remote') {
-        yakitNotify('error', '远程连接已断开')
         handleLinkRemoteMode()
       } else if (getEngineMode() === 'local') {
         setCheckLog(['引擎连接未成功, 正在尝试重连'])
@@ -1109,6 +856,7 @@ export const StartupPage: React.FC = () => {
         onDisconnect()
         onSetEngineMode(undefined)
         safeSetYakitStatus('skipAgreement_InstallNetWork')
+        setYaklangDownload(true)
         return
       case 'error':
         if (stopErrorStatusRef.current) return
@@ -1133,46 +881,11 @@ export const StartupPage: React.FC = () => {
     }
   })
 
-  const handleManualInstall = useMemoizedFn(async () => {
-    const selection = await handleOpenFileSystemDialog({
-      title: '选择引擎文件',
-      buttonLabel: '验证并安装',
-      properties: ['openFile'],
-      message: '引擎文件所在目录必须包含同名的 .sha256.txt 摘要文件',
-    })
-    if (selection.canceled || !selection.filePaths[0]) return
-
-    setRestartLoading(true)
-    try {
-      transitionEngineLifecycle('verifying', '正在验证手工选择的引擎')
-      await yakitEngine.installManualYakEngine(selection.filePaths[0])
-      isEngineInstalled.current = true
-      breakHandleRef.current = false
-      safeSetYakitStatus('')
-      transitionEngineLifecycle('ready-local', '手工选择的引擎已验证并安装')
-      setLinkLocalEngine()
-    } catch (error) {
-      setCheckLog([`手工安装失败：${error}`])
-      transitionEngineLifecycle('recoverable-error', '手工安装失败，原有可用版本未被删除', {
-        error: `${error}`,
-      })
-    } finally {
-      setRestartLoading(false)
-    }
-  })
-
-  const startupLogo = theme === 'light' ? renyanLogoLight : renyanLogoDark
-
   return (
     <div className={styles['startup-wrapper']}>
       <div className={styles['startup-header-drap']} style={{ height: DragHeaderHeight }}></div>
-      <div className={styles['startup-wrapper-left']}>
-        <div className={styles['startup-title']}>
-          <div className={styles['startup-logo']}>
-            <img src={startupLogo} alt={productConfig.displayName} width={300} height={72} />
-          </div>
-          <div className={styles['startup-desc']}>{productConfig.tagline}</div>
-        </div>
+      <StartupSplash theme={theme} />
+      <div className={styles['startup-operation-layer']} aria-hidden="true">
         <YaklangEngineWatchDog
           credential={credential}
           keepalive={keepalive}
@@ -1184,69 +897,40 @@ export const StartupPage: React.FC = () => {
           setYakitStatus={safeSetYakitStatus}
           setCheckLog={setCheckLog}
         />
-
-        {/* 工作空间选择前置步骤 */}
-        {!workspaceConfirmed ? (
-          <div className={styles['startup-content-wrapper']}>
-            <SoftwareBasics softTheme={theme} setSoftTheme={setTheme} onConfirm={handleWorkspaceConfirmed} />
-          </div>
+        {!isRemoteEngine ? (
+          <LocalEngine
+            ref={localEngineRef}
+            setLog={setCheckLog}
+            onLinkEngine={handleLinkLocalEngine}
+            yakitStatus={yakitStatus}
+            setYakitStatus={safeSetYakitStatus}
+            buildInEngineVersion={buildInEngineVersion}
+            setRestartLoading={setRestartLoading}
+            yakitUpdate={yakitUpdate}
+            setYakitUpdate={setYakitUpdate}
+          />
         ) : (
-          <>
-            <div className={styles['startup-engine-log']} style={{ display: isRemoteEngine ? 'none' : 'block' }}>
-              <EngineLog />
-            </div>
-            {!isRemoteEngine ? (
-              <div className={styles['startup-content-wrapper']}>
-                <LocalEngine
-                  ref={localEngineRef}
-                  setLog={setCheckLog}
-                  onLinkEngine={handleLinkLocalEngine}
-                  yakitStatus={yakitStatus}
-                  setYakitStatus={safeSetYakitStatus}
-                  buildInEngineVersion={buildInEngineVersion}
-                  setRestartLoading={setRestartLoading}
-                  yakitUpdate={yakitUpdate}
-                  setYakitUpdate={setYakitUpdate}
-                />
-                {!engineLink && (
-                  <>
-                    <EngineLifecyclePanel
-                      lifecycle={engineLifecycle}
-                      yakitStatus={yakitStatus}
-                      logs={checkLog}
-                      busy={restartLoading}
-                      buildInEngineVersion={buildInEngineVersion}
-                      countdown={countdown}
-                      onAction={loadingClickCallback}
-                      onManualInstall={handleManualInstall}
-                    />
-                    {/* 更新引擎 */}
-                    {yaklangDownload && (
-                      <DownloadYaklang
-                        isTop={isTop}
-                        setIsTop={setIsTop}
-                        yaklangSpecifyVersion={yaklangSpecifyVersion}
-                        system={system}
-                        visible={yaklangDownload}
-                        onCancel={onDownloadedYaklang}
-                      />
-                    )}
-                  </>
-                )}
-              </div>
-            ) : (
-              <>
-                {!engineLink && (
-                  <RemoteEngine
-                    loading={remoteLinkLoading}
-                    setLoading={setRemoteLinkLoading}
-                    onSubmit={handleLinkRemoteEngine}
-                    onSwitchLocalEngine={handleRemoteToLocal}
-                  />
-                )}
-              </>
-            )}
-          </>
+          !engineLink && (
+            <RemoteEngine
+              loading={remoteLinkLoading}
+              setLoading={setRemoteLinkLoading}
+              onSubmit={handleLinkRemoteEngine}
+              autoConnect={true}
+              headless={true}
+              onSwitchLocalEngine={handleRemoteToLocal}
+            />
+          )
+        )}
+        {!isRemoteEngine && !engineLink && yaklangDownload && (
+          <DownloadYaklang
+            isTop={isTop}
+            setIsTop={setIsTop}
+            yaklangSpecifyVersion={yaklangSpecifyVersion}
+            system={system}
+            visible={yaklangDownload}
+            headless={true}
+            onCancel={onDownloadedYaklang}
+          />
         )}
       </div>
     </div>

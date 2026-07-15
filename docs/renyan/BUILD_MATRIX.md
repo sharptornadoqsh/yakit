@@ -4,9 +4,9 @@
 
 | 平台 | 显示名称 | 可执行文件 | 图标输入 | 产物规则 | 验证状态 |
 | --- | --- | --- | --- | --- | --- |
-| Windows | 睿眼自动化渗透系统 | `RenYan-Pentest.exe` | `app/assets/renyan-icon.ico` | `RenYan-Pentest-<版本>-windows-amd64.exe` | 阶段三社区版打包成功；交付只提交源码，安装包由用户从提交重新生成 |
-| macOS | 睿眼自动化渗透系统 | `RenYan-Pentest` | `app/assets/renyan-icon.icns` | `RenYan-Pentest-<版本>-darwin-<架构>.dmg` | 未执行，用户要求仅查看企业版免许可证开发界面 |
-| Linux | 睿眼自动化渗透系统 | `renyan-pentest` | `product/brand/icons` | `RenYan-Pentest-<版本>-linux-<架构>.AppImage` | 未执行，用户要求仅查看企业版免许可证开发界面 |
+| Windows | 睿眼自动化渗透系统 | `RuiYan-Pentest.exe` | `app/assets/renyan-icon.ico` | `RuiYan-Pentest-<版本>-windows-amd64.exe` | 阶段三社区版打包成功；交付只提交源码，安装包由用户从提交重新生成 |
+| macOS | 睿眼自动化渗透系统 | `RuiYan-Pentest` | `app/assets/renyan-icon.icns` | `RuiYan-Pentest-<版本>-darwin-<架构>.dmg` | 未执行，用户要求仅查看企业版免许可证开发界面 |
+| Linux | 睿眼自动化渗透系统 | `ruiyan-pentest` | `product/brand/icons` | `RuiYan-Pentest-<版本>-linux-<架构>.AppImage` | 未执行，用户要求仅查看企业版免许可证开发界面 |
 
 ## 二、最终开发构建
 

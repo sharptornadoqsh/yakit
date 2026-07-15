@@ -1,5 +1,5 @@
 {
-  "name": "renyan-pentest",
+  "name": "ruiyan-pentest",
   "version": "1.4.8-0711",
   "description": "睿眼自动化渗透系统桌面客户端",
   "main": "app/main/index.js",

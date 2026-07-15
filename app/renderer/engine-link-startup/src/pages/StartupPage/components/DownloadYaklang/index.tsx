@@ -28,12 +28,13 @@ interface DownloadYaklangProps {
   yaklangSpecifyVersion: string
   system: System
   visible: boolean
+  headless?: boolean
   onCancel: (isOk: boolean) => any
 }
 
 /** @name Yaklang引擎更新下载弹窗 */
 export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props) => {
-  const { isTop, setIsTop, yaklangSpecifyVersion, system, visible, onCancel } = props
+  const { isTop, setIsTop, yaklangSpecifyVersion, system, visible, headless = false, onCancel } = props
 
   /** 常见问题弹窗是否展示 */
   const [qsShow, setQSShow] = useState<boolean>(false)
@@ -79,7 +80,7 @@ export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props
       .then(() => {
         if (isBreakRef.current) return
 
-        yakitNotify('success', '下载完毕')
+        if (!headless) yakitNotify('success', '下载完毕')
         if (!getDownloadProgress()?.size) return
 
         setDownloadProgress({
@@ -98,7 +99,7 @@ export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props
       })
       .catch((e: any) => {
         if (isBreakRef.current) return
-        yakitNotify('error', yakLangVersion.current + ' 下载失败：' + e)
+        if (!headless) yakitNotify('error', yakLangVersion.current + ' 下载失败：' + e)
         setDownloadProgress(undefined)
         setIsFailed(true)
       })
@@ -137,14 +138,16 @@ export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props
     if (isBreakRef.current) return
     grpcInstallYak(yakLangVersion.current, true)
       .then(() => {
-        yakitNotify('success', `安装成功，如未生效，重启 ${getReleaseEditionName()} 即可`)
+        if (!headless) yakitNotify('success', `安装成功，如未生效，重启 ${getReleaseEditionName()} 即可`)
         onClose(true)
       })
       .catch((err: any) => {
-        yakitNotify(
-          'error',
-          `安装失败: ${err.message.indexOf('operation not permitted') > -1 ? '请关闭引擎后重试' : err}`,
-        )
+        if (!headless) {
+          yakitNotify(
+            'error',
+            `安装失败: ${err.message.indexOf('operation not permitted') > -1 ? '请关闭引擎后重试' : err}`,
+          )
+        }
         onClose(false)
       })
   })
@@ -170,6 +173,8 @@ export const DownloadYaklang: React.FC<DownloadYaklangProps> = React.memo((props
     setQSShow(false)
     onCancel(isOk)
   })
+
+  if (headless) return null
 
   return (
     <div className={visible ? styles['mask-wrapper'] : styles['hidden-wrapper']}>

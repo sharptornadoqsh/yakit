@@ -1,3 +1,4 @@
+const fs = require('fs')
 const path = require('path')
 const productConfig = require('../../product/renyan.json')
 
@@ -30,8 +31,10 @@ const getExecutableName = (platform = process.platform) =>
 const resolveUserDataPath = (appDataPath) => path.join(appDataPath, productConfig.defaultDataDirectory)
 
 const configureApplicationIdentity = (electronApp, platform = process.platform) => {
+  const userDataPath = resolveUserDataPath(electronApp.getPath('appData'))
+  fs.mkdirSync(userDataPath, { recursive: true })
   electronApp.setName(productConfig.displayName)
-  electronApp.setPath('userData', resolveUserDataPath(electronApp.getPath('appData')))
+  electronApp.setPath('userData', userDataPath)
   if (platform === 'win32') electronApp.setAppUserModelId(productConfig.appId)
 }
 

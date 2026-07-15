@@ -1,4 +1,5 @@
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { describe, expect, it } from 'vitest'
 import productSource from '../../../product/renyan.json'
@@ -31,16 +32,18 @@ describe('睿眼产品配置', () => {
     ]
 
     requiredFields.forEach((field) => expect(productSource[field]).toBeTypeOf('string'))
-    expect(productSource.shortName).toBe('RuiYan Pentest')
+    expect(productSource.shortName).toBe('RuiYan-Pentest')
   })
 
   it('按操作系统选择可执行文件名', () => {
-    expect(getExecutableName('win32')).toBe('RenYan-Pentest')
-    expect(getExecutableName('darwin')).toBe('RenYan-Pentest')
-    expect(getExecutableName('linux')).toBe('renyan-pentest')
+    expect(getExecutableName('win32')).toBe('RuiYan-Pentest')
+    expect(getExecutableName('darwin')).toBe('RuiYan-Pentest')
+    expect(getExecutableName('linux')).toBe('ruiyan-pentest')
   })
 
   it('前端可见英文名称统一使用 RuiYan', () => {
+    const packageMetadata = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
+    const packageConfigSource = fs.readFileSync(path.resolve('packageScript/electron-builder.config.js'), 'utf8')
     const collectStringValues = (value) => {
       if (typeof value === 'string') return [value]
       if (Array.isArray(value)) return value.flatMap(collectStringValues)
@@ -62,7 +65,11 @@ describe('睿眼产品配置', () => {
     const displayedValues = displayedJsonFiles.flatMap((filePath) =>
       collectStringValues(JSON.parse(fs.readFileSync(filePath, 'utf8'))),
     )
-    expect(productSource.shortName).toBe('RuiYan Pentest')
+    expect(productSource.shortName).toBe('RuiYan-Pentest')
+    expect(productSource.executableName).toBe('RuiYan-Pentest')
+    expect(productSource.defaultDataDirectory).toBe('RuiYan-Pentest')
+    expect(packageMetadata.name).toBe('ruiyan-pentest')
+    expect(packageConfigSource).toContain("name: 'ruiyan-pentest'")
     expect(displayedValues.join('\n')).not.toMatch(/renyan/i)
 
     const visibleLogoFiles = [
@@ -77,7 +84,7 @@ describe('睿眼产品配置', () => {
     ]
     visibleLogoFiles.forEach((filePath) => {
       const source = fs.readFileSync(path.resolve(filePath), 'utf8')
-      expect(source).toContain('RuiYan Pentest')
+      expect(source).toContain('RuiYan-Pentest')
       expect(source).not.toMatch(/renyan/i)
     })
 
@@ -86,7 +93,9 @@ describe('睿眼产品配置', () => {
   })
 
   it('将用户数据定位到独立产品目录', () => {
-    const appDataPath = path.join('C:', 'Users', 'tester', 'AppData', 'Roaming')
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-product-'))
+    const appDataPath = path.join(tempRoot, 'AppData', 'Roaming')
+    fs.mkdirSync(appDataPath, { recursive: true })
     expect(resolveUserDataPath(appDataPath)).toBe(path.join(appDataPath, productSource.defaultDataDirectory))
 
     const calls = []
@@ -96,7 +105,10 @@ describe('睿眼产品配置', () => {
         return appDataPath
       },
       setName: (value) => calls.push(['setName', value]),
-      setPath: (name, value) => calls.push(['setPath', name, value]),
+      setPath: (name, value) => {
+        expect(fs.statSync(value).isDirectory()).toBe(true)
+        calls.push(['setPath', name, value])
+      },
       setAppUserModelId: (value) => calls.push(['setAppUserModelId', value]),
     }
     configureApplicationIdentity(electronApp, 'win32')
@@ -106,6 +118,7 @@ describe('睿眼产品配置', () => {
       ['setPath', 'userData', path.join(appDataPath, productSource.defaultDataDirectory)],
       ['setAppUserModelId', productSource.appId],
     ])
+    fs.rmSync(tempRoot, { recursive: true, force: true })
 
     const filePathSource = fs.readFileSync(path.resolve('app/main/filePath.js'), 'utf8')
     expect(filePathSource).not.toContain("getPath('exe')")
@@ -142,12 +155,28 @@ describe('睿眼产品配置', () => {
     expect(rendererAbout).toContain('productConfig.thirdPartyNoticesUrl')
   })
 
-  it('启动时直接显示系统界面并使用睿眼文件名称', () => {
+  it('启动时只显示品牌提示并在引擎完成后显示系统界面', () => {
     const mainProcessSource = fs.readFileSync(path.resolve('app/main/index.js'), 'utf8')
     expect(mainProcessSource).toMatch(
       /engineLinkWin = new BrowserWindow\(\{[\s\S]*?show: false,[\s\S]*?skipTaskbar: true,/,
     )
-    expect(mainProcessSource).toMatch(/win\.once\('ready-to-show',[\s\S]*?winShow\(win, true\)/)
+    const engineLinkReadyHandler = mainProcessSource.match(
+      /engineLinkWin\.once\('ready-to-show', \(\) => \{([\s\S]*?)\n  \}\)/,
+    )?.[1]
+    expect(engineLinkReadyHandler).toContain('winShow(engineLinkWin, true)')
+    expect(mainProcessSource).toContain('const STARTUP_HINT_MINIMUM_VISIBLE_MS = 1200')
+    expect(mainProcessSource).toContain('engineLinkShownAt = Date.now()')
+    const mainReadyHandler = mainProcessSource.match(/win\.once\('ready-to-show', \(\) => \{([\s\S]*?)\n  \}\)/)?.[1]
+    expect(mainReadyHandler).not.toContain('winShow(win, true)')
+    expect(mainProcessSource).toContain(
+      "ipcMain.handle('engineLinkWin-done', async (event, data) => {\n    const startupHintVisibleMs = engineLinkShownAt ? Date.now() - engineLinkShownAt : 0",
+    )
+    expect(mainProcessSource).toContain(
+      'const startupHintWaitMs = Math.max(0, STARTUP_HINT_MINIMUM_VISIBLE_MS - startupHintVisibleMs)',
+    )
+    expect(mainProcessSource).toContain(
+      'await new Promise((resolve) => setTimeout(resolve, startupHintWaitMs))\n    }\n    winHide(engineLinkWin)\n    winShow(win, readyWinShow)',
+    )
     expect(mainProcessSource).toContain(
       'engineLinkWin.webContents.reload()\n    winHide(engineLinkWin)\n    setTimeout(() => {\n      winShow(win, readyWinShow)',
     )
@@ -159,8 +188,24 @@ describe('睿眼产品配置', () => {
       path.resolve('app/renderer/engine-link-startup/src/pages/StartupPage/index.tsx'),
       'utf8',
     )
+    expect(startupSource).toContain('<StartupSplash theme={theme} />')
+    expect(startupSource).toContain("className={styles['startup-operation-layer']}")
+    expect(startupSource).not.toContain('<SoftwareBasics')
+    expect(startupSource).not.toContain('<EngineLog')
+    expect(startupSource).not.toContain('<EngineLifecyclePanel')
+    expect(startupSource).not.toContain('yakitNotify')
+    expect(startupSource).toContain('autoConnect={true}')
+    expect(startupSource).toContain('headless={true}')
     expect(startupSource).not.toContain('renyan-startup-panel')
     expect(startupSource).not.toContain('startup-wrapper-right')
+
+    const uiLayoutSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/components/layout/UILayout.tsx'),
+      'utf8',
+    )
+    expect(uiLayoutSource).toContain(
+      'handleFetchSystem((systemName) => {\n      if (systemName) setSystem(systemName)\n    })',
+    )
     const retiredAssets = [
       'app/renderer/engine-link-startup/src/assets/YakitLogo.png',
       'app/renderer/engine-link-startup/src/assets/yakit-right.png',
@@ -246,6 +291,8 @@ describe('构建元数据', () => {
     )
     expect(builderConfig.files).toContain('product/engine-compatibility.json')
     expect(builderConfig.files).toContain('product/build.js')
+    expect(builderConfig.files).toContain('!.claude/**/*')
+    expect(builderConfig.files).toContain('!.codegraph/**/*')
   })
 })
 

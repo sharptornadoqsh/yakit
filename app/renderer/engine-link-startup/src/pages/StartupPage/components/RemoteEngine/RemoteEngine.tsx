@@ -32,7 +32,7 @@ const DefaultRemoteLink: RemoteLinkInfo = {
 }
 
 export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
-  const { loading, setLoading, onSubmit, onSwitchLocalEngine } = props
+  const { loading, setLoading, onSubmit, autoConnect = false, headless = false, onSwitchLocalEngine } = props
 
   /** 远程主机参数 */
   const [remote, setRemote] = useState<RemoteLinkInfo>({ ...DefaultRemoteLink })
@@ -60,14 +60,22 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
       })
       .catch(() => {})
 
-    getLocalValue(LocalGVS.YaklangRemoteEngineCredential).then((result: RemoteLinkInfo) => {
-      try {
-        if (!result?.host || !result?.port) {
+    getLocalValue(LocalGVS.YaklangRemoteEngineCredential)
+      .then((result: RemoteLinkInfo) => {
+        if (!result?.host || !result?.port || (result.tls && !result.caPem)) {
+          if (autoConnect) onSwitchLocalEngine()
           return
         }
-        setRemote({ ...result })
-      } catch (e) {}
-    })
+        const remoteInfo = { ...result }
+        setRemote(remoteInfo)
+        if (autoConnect) {
+          setLoading(true)
+          onSubmit(remoteInfo)
+        }
+      })
+      .catch(() => {
+        if (autoConnect) onSwitchLocalEngine()
+      })
   }, [])
 
   const onSelectHistory = useMemoizedFn((name: string) => {
@@ -131,6 +139,8 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
       .then(() => {})
       .catch(() => {})
   })
+
+  if (headless) return null
 
   return (
     <div className={styles['remote-engine-wrapper']}>

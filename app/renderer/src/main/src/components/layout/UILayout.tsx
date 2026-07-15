@@ -73,7 +73,7 @@ import { clearTerminalMap, getMapAllTerminalKey } from '@/pages/yakRunner/Bottom
 import { grpcFetchLatestYakVersion, grpcFetchYakInstallResult } from '@/apiUtils/grpc'
 import { visitorsStatisticsFun } from '@/utils/visitorsStatistics'
 import useGetSetState from '@/pages/pluginHub/hooks/useGetSetState'
-import { handleFetchArchitecture, handleFetchIsDev, SystemInfo } from '@/constants/hardware'
+import { handleFetchArchitecture, handleFetchIsDev, handleFetchSystem, SystemInfo } from '@/constants/hardware'
 import { apiSplitUpload, ExportProjectRequest, grpcExportProject, grpcGetProjects, SplitUploadRequest } from './utils'
 import moment from 'moment'
 import { debugToPrintLog } from '@/utils/logCollection'
@@ -99,7 +99,6 @@ import {
   yakitFileSystem,
   yakitProject,
   yakitStream,
-  yakitSystem,
   yakitUILayout,
   yakitWindowControls,
 } from '@/services/electronBridge'
@@ -159,6 +158,11 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
 
   /** ---------- 软件状态相关属性 Start ---------- */
   const [system, setSystem] = useState<YakitSystem>('Darwin')
+  useEffect(() => {
+    handleFetchSystem((systemName) => {
+      if (systemName) setSystem(systemName)
+    })
+  }, [])
 
   /** 引擎是否安装 */
   const isEngineInstalled = useRef<boolean>(false)
@@ -363,8 +367,9 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
       if (SystemInfo.isDev === undefined) await handleFetchIsDev()
     } catch (error) {}
     try {
-      const systemName: YakitSystem = await yakitSystem.fetchSystemName()
-      setSystem(systemName)
+      await handleFetchSystem((systemName) => {
+        if (systemName) setSystem(systemName)
+      })
     } catch (error) {}
     try {
       if (SystemInfo.architecture === undefined) await handleFetchArchitecture()

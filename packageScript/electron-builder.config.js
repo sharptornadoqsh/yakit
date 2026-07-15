@@ -13,7 +13,7 @@ const configOption = {
   artifactName: `${productConfig.artifactPrefix}-${'${version}'}-${'${os}'}-${'${arch}'}.${'${ext}'}`,
   copyright: productConfig.copyright,
   extraMetadata: {
-    name: 'renyan-pentest',
+    name: 'ruiyan-pentest',
     author: {
       name: productConfig.supportName,
     },
@@ -58,6 +58,8 @@ const configOption = {
     'app/assets/导入模板.xlsx',
     '!bins/**/*',
     '!.github/**/*',
+    '!.claude/**/*',
+    '!.codegraph/**/*',
     '!multibuilder/**/*',
     '!scripts/**/*',
     '!buildutil/**/*',

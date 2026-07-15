@@ -20,7 +20,7 @@
 
 1. `app/main/index.js` 取得应用对象并调用 `configureApplicationIdentity`。
 2. 应用名称设置为“睿眼自动化渗透系统”，Windows 应用标识设置为 `io.github.sharptornadoqsh.renyan`。
-3. 用户目录设置为系统应用数据根目录下的 `RenYan-Pentest`，随后才载入路径、缓存、日志和窗口模块。
+3. 用户目录设置为系统应用数据根目录下的 `RuiYan-Pentest`，随后才载入路径、缓存、日志和窗口模块。
 4. 主窗口与引擎启动窗口使用产品标题和原创方形图标。
 5. 系统菜单、托盘与关于窗口在应用就绪后注册，退出路径统一销毁托盘并关闭日志句柄。
 
@@ -43,7 +43,7 @@
 默认目录结构如下：
 
 ```text
-%APPDATA%\RenYan-Pentest\
+%APPDATA%\RuiYan-Pentest\
 ├── config.json
 ├── renyan-window-state.json
 └── projects\

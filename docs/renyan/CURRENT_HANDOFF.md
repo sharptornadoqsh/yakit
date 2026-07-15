@@ -6,7 +6,7 @@
 
 默认路径生成无签名内部验证安装文件，不读取签名凭据。企业版调用 `yarn build-renders-enterprise` 并保留现有许可证校验；企业版免许可证调用仓库既有 `yarn build-renders-enterprise-no-license`，两类安装文件使用不同名称。
 
-前端可见英文短名称统一为 `RuiYan Pentest`。应用标识、可执行文件名、用户数据目录、代码符号和资源路径保留既有兼容名称。
+前端可见英文短名称、可执行文件名与用户数据目录统一为 `RuiYan-Pentest`。Linux 可执行文件名使用 `ruiyan-pentest`；内部代码符号、应用标识和资源路径保留既有兼容名称。
 
 ## 二、最终输入
 

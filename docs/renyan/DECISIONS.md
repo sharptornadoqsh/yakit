@@ -12,11 +12,11 @@
 
 ## RY-D-003 可执行文件与产物名
 
-Windows 与 macOS 基础名使用 `RenYan-Pentest`，Linux 使用 `renyan-pentest`，产物前缀使用 `RenYan-Pentest`。用户可见显示名统一为“睿眼自动化渗透系统”。
+Windows 与 macOS 基础名使用 `RuiYan-Pentest`，Linux 使用 `ruiyan-pentest`，产物前缀使用 `RuiYan-Pentest`。用户可见显示名统一为“睿眼自动化渗透系统”。
 
 ## RY-D-004 独立用户数据
 
-默认用户目录为系统应用数据根目录下的 `RenYan-Pentest`，项目目录为其下的 `projects`。不探测、不复制、不迁移旧产品数据；只有用户显式设置的 `YAKIT_HOME` 才能引用其他位置。
+默认用户目录为系统应用数据根目录下的 `RuiYan-Pentest`，项目目录为其下的 `projects`。不探测、不复制、不迁移旧产品数据；只有用户显式设置的 `YAKIT_HOME` 才能引用其他位置。
 
 ## RY-D-005 内部兼容名称
 
