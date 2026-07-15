@@ -127,7 +127,7 @@ export const ExportExcel: React.FC<ExportExcelProps> = (props) => {
             export_json_to_excel({
               header: header,
               data: exportData,
-              filename: `${fileNameMemo} 1-${exportData.length}`,
+              filename: `RuiYan-${fileNameMemo} 1-${exportData.length}`,
               autoWidth: true,
               bookType: 'xlsx',
               optsSingleCellSetting,
@@ -205,7 +205,7 @@ export const ExportExcel: React.FC<ExportExcelProps> = (props) => {
     export_json_to_excel({
       header: headerExcel.current,
       data: data,
-      filename: `${fileNameMemo} ${start}-${end}`,
+      filename: `RuiYan-${fileNameMemo} ${start}-${end}`,
       autoWidth: true,
       bookType: 'xlsx',
       optsSingleCellSetting: optsCell.current,

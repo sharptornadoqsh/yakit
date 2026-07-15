@@ -8,7 +8,7 @@
   "SettingReverseServer": {
     "getRemoteAddrFailed": "Get Remote Address Failed: ",
     "enablePublicTunnel": "Enable Public Tunnel",
-    "publicTunnelHelp": "Install yak core engine on your own server, execute to",
+    "publicTunnelHelp": "Install RuiYan Engine on your own server, then execute",
     "yakBridgeService": "Start Yak Bridge Public Service",
     "yakVersionRequirement": "yak version >= v1.0.11-sp9",
     "publicBridgeAddr": "Public Bridge Address",

@@ -23,6 +23,7 @@ import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { RefreshIcon } from '@/assets/newIcon'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { yakitReverse, yakitScript, yakitStream } from '@/services/electronBridge'
+import { productConfig } from '@/config/product'
 
 export const ConfigGlobalReverse = React.memo(() => {
   const { t, i18n } = useI18nNamespaces(['utils', 'yakitUi'])
@@ -257,7 +258,7 @@ export const ConfigGlobalReverse = React.memo(() => {
           help={t('basic.ConfigGlobalReverse.yakBridgePasswordHelp')}
         />
         <Divider orientation={'left'}>
-          {isCommunityEdition() && 'Yakit'} {t('basic.ConfigGlobalReverse.globalDNSLogConfig')}
+          {isCommunityEdition() && productConfig.shortName} {t('basic.ConfigGlobalReverse.globalDNSLogConfig')}
         </Divider>
         <SwitchItem
           label={t('basic.ConfigGlobalReverse.reuseYakBridgeConfig')}

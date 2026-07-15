@@ -653,7 +653,7 @@ export const DatabaseUpdateModal: React.FC<DatabaseUpdateModalProps> = React.mem
           </>
         )
       case 'done':
-        return <p>需要重启Yakit才能生效，如果重启后还未加载出数据，建议关掉当前页面重新打开。</p>
+        return <p>需要重启睿眼自动化渗透系统才能生效，如果重启后还未加载出数据，建议关掉当前页面重新打开。</p>
       default:
         break
     }

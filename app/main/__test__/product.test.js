@@ -92,6 +92,75 @@ describe('睿眼产品配置', () => {
     expect(rendererAbout).toContain('productConfig.licenseUrl')
     expect(rendererAbout).toContain('productConfig.thirdPartyNoticesUrl')
   })
+
+  it('启动时直接显示系统界面并使用睿眼文件名称', () => {
+    const mainProcessSource = fs.readFileSync(path.resolve('app/main/index.js'), 'utf8')
+    expect(mainProcessSource).toMatch(
+      /engineLinkWin = new BrowserWindow\(\{[\s\S]*?show: false,[\s\S]*?skipTaskbar: true,/,
+    )
+    expect(mainProcessSource).toMatch(/win\.once\('ready-to-show',[\s\S]*?winShow\(win, true\)/)
+    expect(mainProcessSource).toContain(
+      'engineLinkWin.webContents.reload()\n    winHide(engineLinkWin)\n    setTimeout(() => {\n      winShow(win, readyWinShow)',
+    )
+    expect(mainProcessSource).toContain(
+      'engineLinkWin.webContents.reloadIgnoringCache()\n    winHide(engineLinkWin)\n    setTimeout(() => {\n      winShow(win, readyWinShow)',
+    )
+
+    const startupSource = fs.readFileSync(
+      path.resolve('app/renderer/engine-link-startup/src/pages/StartupPage/index.tsx'),
+      'utf8',
+    )
+    expect(startupSource).not.toContain('renyan-startup-panel')
+    expect(startupSource).not.toContain('startup-wrapper-right')
+    const retiredAssets = [
+      'app/renderer/engine-link-startup/src/assets/YakitLogo.png',
+      'app/renderer/engine-link-startup/src/assets/yakit-right.png',
+      'app/renderer/engine-link-startup/src/assets/renyan-startup-panel-light.svg',
+      'app/renderer/src/main/src/assets/yakitCattle.png',
+      'app/renderer/src/main/src/assets/yakitLogo.png',
+    ]
+    retiredAssets.forEach((assetPath) => expect(fs.existsSync(path.resolve(assetPath))).toBe(false))
+
+    const certificateSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/pages/mitm/MITMServerStartForm/MITMCertificateDownloadModal.tsx'),
+      'utf8',
+    )
+    expect(certificateSource).toContain('RuiYan-MITM-CA.pem')
+    expect(certificateSource).toContain('RuiYan-MITM-GM-CA.pem')
+
+    const ruleExportSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/pages/mitm/MITMRule/MITMRuleConfigure/MITMRuleConfigure.tsx'),
+      'utf8',
+    )
+    expect(ruleExportSource).toContain('RuiYan-MITM-Replacer-Rules-Config.json')
+
+    const flowExportSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/components/HTTPFlowTable/HTTPFlowTable.tsx'),
+      'utf8',
+    )
+    expect(flowExportSource).toContain('RuiYan-HTTP-Flows-')
+
+    const historyExportSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/pages/hTTPHistoryAnalysis/HTTPHistory/HTTPHistoryFilter.tsx'),
+      'utf8',
+    )
+    expect(historyExportSource).toContain("`RuiYan-${!toWebFuzzer ? 'History' : 'WebFuzzer'}-${Date.now()}`")
+
+    const remoteEngineSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/components/layout/RemoteEngine/RemoteEngine.tsx'),
+      'utf8',
+    )
+    expect(remoteEngineSource).toContain('@/assets/renyan-icon.svg')
+    expect(remoteEngineSource).not.toContain('@/assets/yakitEE.png')
+    expect(remoteEngineSource).not.toContain('@/assets/yakitSE.png')
+
+    const zhLayout = JSON.parse(
+      fs.readFileSync(path.resolve('app/renderer/src/main/public/locales/zh/layout.json'), 'utf8'),
+    )
+    expect(zhLayout.GlobalState.mcp).toBe('RuiYan MCP')
+    expect(zhLayout.McpHook.MCPStopped).toBe('RuiYan MCP 服务已停用')
+    expect(zhLayout.PerformanceDisplay.localYakProcessManagement).toBe('本地 RuiYan Engine 进程管理')
+  })
 })
 
 describe('构建元数据', () => {

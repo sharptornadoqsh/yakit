@@ -5,7 +5,7 @@ export const getHtmlTemplate = () => {
 
     <head>
         <meta charset="UTF-8" />
-        <title>Yakit</title>
+        <title>RuiYan</title>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.21.7/antd.min.css" />
 
     </head>
@@ -284,7 +284,7 @@ export const getHtmlZhTWTemplate = () => {
 
 <head>
   <meta charset="UTF-8" />
-  <title>Yakit</title>
+  <title>RuiYan</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.21.7/antd.min.css" />
 
 </head>
@@ -566,7 +566,7 @@ export const getHtmlEnTemplate = () => {
 
 <head>
   <meta charset="UTF-8" />
-  <title>Yakit</title>
+  <title>RuiYan</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.21.7/antd.min.css" />
 
 </head>

@@ -383,7 +383,7 @@ class Screenshots extends Events {
       this.$win.setAlwaysOnTop(false)
 
       const { canceled, filePath } = await dialog.showSaveDialog(this.$win, {
-        defaultPath: `${year}${month}${date}${hours}${minutes}${seconds}${milliseconds}.png`,
+        defaultPath: `RuiYan-Screenshot-${year}${month}${date}${hours}${minutes}${seconds}${milliseconds}.png`,
         filters: [
           { name: 'Image (png)', extensions: ['png'] },
           { name: 'All Files', extensions: ['*'] },

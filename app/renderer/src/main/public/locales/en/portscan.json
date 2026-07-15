@@ -2,7 +2,7 @@
   "ScanPortForm": {
     "updateConfigSuccess": "Config updated successfully",
     "scanMode": "Scan Mode",
-    "synNeedRoot": "SYN scan requires root privileges when yak starts",
+    "synNeedRoot": "SYN scan requires root privileges when RuiYan Engine starts",
     "scanProto": "Scan Protocol",
     "networkCardConfig": "Network Card Config",
     "networkCardSelect": "Network Card Select",

@@ -344,7 +344,7 @@ const AIMCPList: React.FC<AIMCPListProps> = React.memo((props) => {
           <YakitRoundCornerTag>{response.Total}</YakitRoundCornerTag>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
-          <YakitButton onClick={() => setConfigMcpModalVisible(true)}>Yak Mcp</YakitButton>
+          <YakitButton onClick={() => setConfigMcpModalVisible(true)}>RuiYan MCP</YakitButton>
           <YakitButton icon={<OutlinePlussmIcon />} onClick={handleNewAIMCP} />
         </div>
       </div>

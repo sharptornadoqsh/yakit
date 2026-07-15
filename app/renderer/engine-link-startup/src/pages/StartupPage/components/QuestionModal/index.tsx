@@ -107,7 +107,7 @@ export const QuestionModal: React.FC<AgrAndQSModalProps> = React.memo((props) =>
                     </div>
                   )}
                 </div>
-                <span>Yak 核心引擎下载链接</span>
+                <span>RuiYan Engine 下载链接</span>
               </div>
             ) : (
               <div
@@ -118,7 +118,7 @@ export const QuestionModal: React.FC<AgrAndQSModalProps> = React.memo((props) =>
                 onMouseOut={() => setDisabled(true)}
                 onMouseDown={() => setIsTop(2)}
               >
-                <span className={styles['header-title']}>Yak 核心引擎下载链接</span>
+                <span className={styles['header-title']}>RuiYan Engine 下载链接</span>
                 <div className={styles['close-wrapper']} onClick={() => setVisible(false)}>
                   <WinUIOpCloseSvgIcon className={styles['icon-style']} />
                 </div>

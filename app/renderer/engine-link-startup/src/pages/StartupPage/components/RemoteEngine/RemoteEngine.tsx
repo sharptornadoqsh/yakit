@@ -172,7 +172,7 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
                 <Form.Item
                   label={
                     <div className={styles.requiredLabel}>
-                      Yak gRPC 主机地址<span className={styles.redStar}>*</span>
+                      RuiYan Engine gRPC 主机地址<span className={styles.redStar}>*</span>
                     </div>
                   }
                   required={true}
@@ -190,7 +190,7 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
                 <Form.Item
                   label={
                     <div className={styles.requiredLabel}>
-                      Yak gRPC 端口<span className={styles.redStar}>*</span>
+                      RuiYan Engine gRPC 端口<span className={styles.redStar}>*</span>
                     </div>
                   }
                   required={true}

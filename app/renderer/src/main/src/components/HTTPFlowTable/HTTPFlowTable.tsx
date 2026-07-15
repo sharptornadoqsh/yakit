@@ -1531,7 +1531,7 @@ export const HTTPFlowTable = React.memo<HTTPFlowTableProp>((props) => {
   const handleClickHarExport = useMemoizedFn((ids: number[]) => {
     handleSaveFileSystemDialog({
       title: t('HTTPFlowTable.saveFile'),
-      defaultPath: `History-${Date.now()}`,
+      defaultPath: `RuiYan-HTTP-Flows-${Date.now()}.har`,
       filters: [
         { name: 'HAR Files', extensions: ['har'] }, // 只允许保存 .har 文件
       ],

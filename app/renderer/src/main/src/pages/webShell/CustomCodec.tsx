@@ -257,15 +257,15 @@ const defPacketDecoder = `
 // 本质上这个函数是为了准确获取 payload 的值
 // 比如说，我的数据包编码器是给 payload 前面添加随机字符串
 // 那么这个函数就是为了减去随机的字符串获取 payload 的值
-// 比如 payload 是 "abcdef"，编码器给它加了 "Yakit"，
+// 比如 payload 是 "abcdef"，编码器给它加了 "RuiYan"，
 // 数据包如下
 // POST /1.jsp HTTP/1.1
 // Content-Type: application/json
 // Host: www.example.com
 //
-// Yakitabcdef
+// RuiYanabcdef
 
-// 那这个解码器需要使用对应的 shell 语言来去掉 "Yakit"
+// 那这个解码器需要使用对应的 shell 语言来去掉 "RuiYan"
 `
 
 const defPayloadEncoder = `

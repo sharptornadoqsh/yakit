@@ -995,7 +995,7 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
           : getHtmlEnTemplate()
     const params: ExportHtmlProps = {
       htmlContent,
-      fileName: `riskTable-${moment().valueOf()}`,
+      fileName: `RuiYan-Risks-${moment().valueOf()}`,
       data: newRisks,
     }
     apiExportHtml(params).catch((error) => {

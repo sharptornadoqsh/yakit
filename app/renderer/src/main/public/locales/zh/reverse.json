@@ -8,7 +8,7 @@
   "SettingReverseServer": {
     "getRemoteAddrFailed": "获取远程地址失败: ",
     "enablePublicTunnel": "启用公网穿透",
-    "publicTunnelHelp": "在自己的服务器安装 yak 核心引擎，执行",
+    "publicTunnelHelp": "在自己的服务器安装 RuiYan Engine，执行",
     "yakBridgeService": "启动 Yak Bridge 公网服务",
     "yakVersionRequirement": "yak version >= v1.0.11-sp9",
     "publicBridgeAddr": "公网Bridge地址",

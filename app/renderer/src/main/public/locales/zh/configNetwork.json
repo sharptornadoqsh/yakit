@@ -63,7 +63,7 @@
     "dumpPacketSize": "转储数据包大小",
     "dumpPacketSizeTip": "超过设置大小的数据包会转储为文件，不会直接入库",
     "autoPerformanceSampling": "自动性能采样",
-    "autoPerformanceSamplingTip": "开启后cpu、内存过高则会自动触发性能采样，采集到的文件会存在~yakit-projects/pprof-log文件夹里",
+    "autoPerformanceSamplingTip": "开启后 CPU、内存过高会自动触发性能采样，采集文件位于用户主目录下的 yakit-projects/pprof-log 文件夹",
     "secondaryTabsNum": "二级页签数量",
     "pluginLogCount": "插件日志条数",
     "performance": "关闭性能提示",

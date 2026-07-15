@@ -140,8 +140,8 @@ function createEngineLinkWindow() {
       sandbox: true,
     },
     titleBarStyle: 'hidden',
-    show: true,
-    skipTaskbar: false,
+    show: false,
+    skipTaskbar: true,
     fullscreenable: false,
     maximizable: false,
     title: productConfig.displayName,
@@ -274,6 +274,7 @@ function createWindow() {
 
   win.once('ready-to-show', () => {
     readyWinShow = true
+    winShow(win, true)
     printLogOutputFile(`[mainWin] ready-to-show, isVisible: ${win.isVisible()}, isDestroyed: ${win.isDestroyed()}`)
   })
 
@@ -525,10 +526,10 @@ function registerGlobalIPC() {
     clearRenderMap(engineLinkWin)
     clearRenderMap(win)
     win.webContents.reload()
-    winHide(win)
     engineLinkWin.webContents.reload()
+    winHide(engineLinkWin)
     setTimeout(() => {
-      winShow(engineLinkWin, readyEngineLinkShow)
+      winShow(win, readyWinShow)
     }, 500)
     return
   })
@@ -537,10 +538,10 @@ function registerGlobalIPC() {
     clearRenderMap(engineLinkWin)
     clearRenderMap(win)
     win.webContents.reloadIgnoringCache()
-    winHide(win)
     engineLinkWin.webContents.reloadIgnoringCache()
+    winHide(engineLinkWin)
     setTimeout(() => {
-      winShow(engineLinkWin, readyEngineLinkShow)
+      winShow(win, readyWinShow)
     }, 500)
     return
   })

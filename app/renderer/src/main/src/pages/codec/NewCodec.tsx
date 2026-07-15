@@ -215,7 +215,7 @@ export const NewCodecRightEditorBox: React.FC<NewCodecRightEditorBoxProps> = (pr
           .invoke('SaveCodecOutputToTxt', {
             data: Buffer.from(outputResponse.RawResult),
             outputDir: absolutePath,
-            fileName: `Output-${new Date().getTime()}.txt`,
+            fileName: `RuiYan-Codec-Output-${new Date().getTime()}.txt`,
           })
           .then((r) => {
             if (r?.ok) {

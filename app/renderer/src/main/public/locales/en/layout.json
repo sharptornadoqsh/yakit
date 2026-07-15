@@ -287,7 +287,7 @@
     "chromePath": "Chrome Startup Path",
     "chromePathDesc": "If Chrome cannot be started, please configure the Chrome startup path",
     "configured": "Configured",
-    "mcp": "Yak Mcp",
+    "mcp": "RuiYan MCP",
     "mcpDesc": "May affect the use of some features",
     "systemProxy": "System Proxy",
     "statusRefreshInterval": "Status Refresh Interval",
@@ -474,7 +474,7 @@
     "started": "MCP service started: {{serverUrl}}",
     "error": "MCP service error: {{message}}",
     "stopped": "MCP service stopped: {{message}}",
-    "MCPStopped": "Yak Mcp service stopped",
+    "MCPStopped": "RuiYan MCP service stopped",
     "serviceStopped": "Service stopped",
     "urlRequired": "Startup address cannot be empty",
     "urlFormatError": "Startup address format error, e.g. 127.0.0.1:11432",
@@ -499,7 +499,7 @@
     "installSuccess": "Installation successful. If it doesn't take effect, restart {{edition}}.",
     "installFailed": "Installation failed: {{error}}",
     "closeEngineRetry": "Please close the engine and try again",
-    "downloading": "Yaklang engine downloading..."
+    "downloading": "RuiYan Engine is downloading..."
   },
   "UpdateYakitAndYaklang": {
     "detectedUpdate": "Detected {{edition}} version upgrade",
@@ -525,7 +525,7 @@
     "exportBeforeExit": "You can export data in Settings > Project Management before exiting"
   },
   "PerformanceDisplay": {
-    "localYakProcessManagement": "Local Yak process management",
+    "localYakProcessManagement": "Local RuiYan Engine process management",
     "resetEngineVersionNotice": "Resetting the engine version will restore the factory engine version and force a restart",
     "remoteControlClosing": "Remote control is closing...",
     "restoreEngineSuccess": "Engine restored successfully",

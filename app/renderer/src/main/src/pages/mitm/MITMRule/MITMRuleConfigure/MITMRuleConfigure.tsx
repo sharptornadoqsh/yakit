@@ -40,7 +40,7 @@ export const MITMRuleExport: React.FC<MITMRuleExportProps> = (props) => {
       width={960}
       closable={true}
       onOk={() => {
-        saveABSFileToOpen('yakit-mitm-replacer-rules-config.json', value)
+        saveABSFileToOpen('RuiYan-MITM-Replacer-Rules-Config.json', value)
       }}
       bodyStyle={{ padding: 0 }}
     >

@@ -56,8 +56,6 @@ import emiter from '@/utils/eventBus/eventBus'
 import { YaklangEngineWatchDog } from './components/YaklangEngineWatchDog'
 import renyanLogoLight from '@/assets/renyan-logo-light.svg'
 import renyanLogoDark from '@/assets/renyan-logo-dark.svg'
-import renyanPanelLight from '@/assets/renyan-startup-panel-light.svg'
-import renyanPanelDark from '@/assets/renyan-startup-panel-dark.svg'
 import { useTheme } from '@/hooks/useTheme'
 import { SoftwareBasics } from './components/SoftwareBasics'
 import { yakitApp, yakitEngine } from '@/utils/electronBridge'
@@ -1164,7 +1162,6 @@ export const StartupPage: React.FC = () => {
   })
 
   const startupLogo = theme === 'light' ? renyanLogoLight : renyanLogoDark
-  const startupRightImg = theme === 'light' ? renyanPanelLight : renyanPanelDark
 
   return (
     <div className={styles['startup-wrapper']}>
@@ -1251,9 +1248,6 @@ export const StartupPage: React.FC = () => {
             )}
           </>
         )}
-      </div>
-      <div className={styles['startup-wrapper-right']}>
-        <img src={startupRightImg} alt={`${productConfig.displayName} 启动页`} />
       </div>
     </div>
   )

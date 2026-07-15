@@ -41,7 +41,6 @@ import { useScreenRecorder } from '@/store/screenRecorder'
 import PublicMenu, { RouteToPageProps } from './layout/publicMenu/PublicMenu'
 import { YakitRoute } from '@/enums/yakitRoute'
 import { YakChatCS } from '@/components/yakChat/chatCS'
-import yakitCattle from '../assets/yakitCattle.png'
 import { MainOperatorContent } from './layout/mainOperatorContent/MainOperatorContent'
 import { MultipleNodeInfo } from './layout/mainOperatorContent/MainOperatorContentType'
 import { WaterMark } from '@ant-design/pro-layout'
@@ -703,12 +702,6 @@ const Main: React.FC<MainProp> = React.memo((props) => {
           </YakitModal>
 
           {(isCommunityEdition() || isEnpriTrace()) && <YakChatCS visible={chatShow} setVisible={setChatShow} />}
-          {/* {(isCommunityEdition() || isEnpriTrace()) && !chatShow && (
-                        <div className='chat-icon-wrapper' onClick={onChatCS} draggable={true} ref={chartCSDragItemRef}>
-                            <img src={yakitCattle} />
-                        </div>
-                    )} */}
-
           {messageCenterShow && <MessageCenterModal visible={messageCenterShow} setVisible={setMessageCenterShow} />}
 
           <YakitHint

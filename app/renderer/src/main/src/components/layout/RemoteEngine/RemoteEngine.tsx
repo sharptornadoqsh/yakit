@@ -7,7 +7,6 @@ import { PEMExampleProps, RemoteEngineProps, RemoteLinkInfo, YakitAuthInfo } fro
 import { LocalGVS } from '@/enums/localGlobal'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { getReleaseEditionName, isCommunityEdition, isEnpriTrace, isEnpriTraceAgent, isIRify } from '@/utils/envfile'
-import { YakitThemeSvgIcon } from '../icons'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitSwitch } from '@/components/yakitUI/YakitSwitch/YakitSwitch'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
@@ -18,9 +17,7 @@ import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { YakEditor } from '@/utils/editors'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 
-import yakitEE from '@/assets/yakitEE.png'
-import yakitSE from '@/assets/yakitSE.png'
-import yakitSS from '@/assets/yakitSS.png'
+import renyanIcon from '@/assets/renyan-icon.svg'
 import classNames from 'classnames'
 import styles from './RemoteEngine.module.scss'
 import { SolidIrifyMiniLogoIcon } from '@/assets/icon/colors'
@@ -145,22 +142,23 @@ export const RemoteEngine: React.FC<RemoteEngineProps> = React.memo((props) => {
               <>
                 {isIRify() ? (
                   <div className={styles['logo-img']}>
-                    {/* <img src={yakitSS} alt='暂无图片' /> */}
                     <SolidIrifyMiniLogoIcon />
                   </div>
                 ) : (
-                  <YakitThemeSvgIcon className={styles['logo-img']} />
+                  <div className={styles['logo-img']}>
+                    <img src={renyanIcon} alt={getReleaseEditionName()} />
+                  </div>
                 )}
               </>
             )}
             {isEnpriTrace() && (
               <div className={styles['logo-img']}>
-                {isIRify() ? <SolidIrifyMiniLogoIcon /> : <img src={yakitEE} alt={t('YakitEmpty.noImage')} />}
+                {isIRify() ? <SolidIrifyMiniLogoIcon /> : <img src={renyanIcon} alt={getReleaseEditionName()} />}
               </div>
             )}
             {isEnpriTraceAgent() && (
               <div className={styles['logo-img']}>
-                <img src={yakitSE} alt={t('YakitEmpty.noImage')} />
+                <img src={renyanIcon} alt={getReleaseEditionName()} />
               </div>
             )}
             <div className={styles['title-style']}>{t('RemoteEngine.remoteMode')}</div>
