@@ -2,16 +2,16 @@
 
 ## 一、交付结论
 
-`.github/workflows/multi-platform-build.yml` 已改造为 `RuiYan Multi-Platform Package`。网页输入只保留目标平台、社区版或企业版、是否预置引擎、引擎版本、是否签名和产物保留天数。四个平台分别在原生执行环境中构建，每个被选任务独立上传安装文件、构建清单和摘要文件。
+`.github/workflows/multi-platform-build.yml` 已改造为 `RuiYan Multi-Platform Package`。网页输入只保留目标平台、社区版、企业版或企业版免许可证、是否预置引擎、引擎版本、是否签名和产物保留天数。四个平台分别在原生执行环境中构建，每个被选任务独立上传安装文件、构建清单和摘要文件。
 
-默认路径生成无签名内部验证安装文件，不读取签名凭据。企业版只调用 `yarn build-renders-enterprise`，其现有许可证校验和企业登录机制保持不变；工作流不存在跳过许可证参数，也不调用免许可证构建命令。
+默认路径生成无签名内部验证安装文件，不读取签名凭据。企业版调用 `yarn build-renders-enterprise` 并保留现有许可证校验；企业版免许可证调用仓库既有 `yarn build-renders-enterprise-no-license`，两类安装文件和产物容器使用不同名称。
 
 ## 二、最终输入
 
 | 参数 | 默认值 | 可选值或约束 |
 | --- | --- | --- |
 | `target` | `macos-both` | `macos-x64`、`macos-arm64`、`macos-both`、`windows-x64`、`linux-x64`、`all` |
-| `edition` | `community` | `community`、`enterprise` |
+| `edition` | `community` | `community`、`enterprise`、`enterprise-no-license` |
 | `include_engine` | `false` | 布尔值 |
 | `engine_version` | 空 | 仅允许版本所需字符，空值读取兼容清单 |
 | `sign_installers` | `false` | 布尔值 |
@@ -25,8 +25,9 @@
 | --- | --- | --- | --- |
 | `community` | `yarn build-renders` | 睿眼社区版无签名或签名环境 | 不启用企业类别变量 |
 | `enterprise` | `yarn build-renders-enterprise` | 睿眼企业版无签名或签名环境，并设置 `PLATFORM=yakitEE` | 保留原有校验 |
+| `enterprise-no-license` | `yarn build-renders-enterprise-no-license` | 睿眼企业版免许可证无签名或签名环境，并设置 `PLATFORM=yakitEE` | 构建期设置 `REACT_APP_REQUIRE_ENTERPRISE_LICENSE=false` |
 
-项目中既有的免许可证开发命令没有被本工作流引用。网页和命令行输入均不能关闭企业版许可证校验。
+普通企业版与免许可证企业版使用不同输入值，选择免许可证类别不会改变 `enterprise` 的既有行为。
 
 ## 四、平台、架构与执行环境
 
@@ -41,7 +42,7 @@
 
 ## 五、打包命令与文件名称
 
-`package.json` 增加八条无签名命令和四条苹果系统签名命令。社区版和企业版分别采用独立的睿眼环境，所有命令显式指定平台、架构和 `--publish never`，不会创建正式发布。
+`package.json` 提供十二条无签名命令和六条苹果系统签名命令。三种类别分别采用独立的睿眼环境，所有命令显式指定平台、架构和 `--publish never`，不会创建正式发布。
 
 版本只读取根 `package.json`。安装文件名称为：
 
@@ -54,6 +55,10 @@ RuiYan-Pentest-Enterprise-<version>-darwin-x64.dmg
 RuiYan-Pentest-Enterprise-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Enterprise-<version>-windows-x64.exe
 RuiYan-Pentest-Enterprise-<version>-linux-x64.AppImage
+RuiYan-Pentest-Enterprise-No-License-<version>-darwin-x64.dmg
+RuiYan-Pentest-Enterprise-No-License-<version>-darwin-arm64.dmg
+RuiYan-Pentest-Enterprise-No-License-<version>-windows-x64.exe
+RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
 ```
 
 ## 六、引擎预置与摘要
@@ -79,6 +84,10 @@ RuiYan-Enterprise-macOS-x64-unsigned
 RuiYan-Enterprise-macOS-arm64-unsigned
 RuiYan-Enterprise-Windows-x64-unsigned
 RuiYan-Enterprise-Linux-x64-unsigned
+RuiYan-Enterprise-No-License-macOS-x64-unsigned
+RuiYan-Enterprise-No-License-macOS-arm64-unsigned
+RuiYan-Enterprise-No-License-Windows-x64-unsigned
+RuiYan-Enterprise-No-License-Linux-x64-unsigned
 ```
 
 签名产物将后缀改为 `signed`。
@@ -98,15 +107,15 @@ RuiYan-Enterprise-Linux-x64-unsigned
 ## 十、验证与未执行事项
 
 - 本地脚本语法、配置结构与工作流语法解析已经通过。
-- 定向测试两个文件、十四项用例通过。
+- 定向测试两个文件、十六项用例通过。
 - 当前打包器版本与本地命令帮助确认平台和架构参数可用。
 - 四个推荐引擎摘要地址均返回有效摘要。
 - `actionlint` 未安装，因此采用仓库现有解析库和定向契约测试。
 - 没有在微软系统主机生成苹果磁盘映像。
 - 没有执行全量测试、全量规则检查、全量类型检查、浏览器测试或性能测试。
-- 没有实际运行 GitHub Actions，没有创建发布、标签或合并请求。
+- 本次变更没有触发 GitHub Actions，也没有创建发布、标签或合并请求。用户手动触发的任务 `29392044377` 基于变更前的 `b812e3b`，不作为新增免许可证类别的远端验证。
 
-首次远端运行仍需验证托管执行环境中的完整依赖安装、签名账号权限、苹果公证、微软密钥库访问和四类最终安装文件。默认的社区版、双苹果架构、无引擎、无签名参数可用于首次远端验证。
+新增免许可证类别的首次远端运行仍需验证托管执行环境中的完整依赖安装、签名账号权限、苹果公证、微软密钥库访问和四类最终安装文件。默认的免许可证企业版、微软系统、无引擎、无签名参数可用于首次定向验证。
 
 ## 十一、已知事项
 

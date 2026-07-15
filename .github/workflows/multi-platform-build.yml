@@ -16,13 +16,14 @@ on:
           - linux-x64
           - all
       edition:
-        description: 选择社区版或企业版客户端
+        description: 选择社区版、企业版或企业版免许可证客户端
         required: true
         type: choice
         default: community
         options:
           - community
           - enterprise
+          - enterprise-no-license
       include_engine:
         description: 是否在安装文件中预置对应平台和架构的 Yak 引擎
         required: false
@@ -33,7 +34,7 @@ on:
         required: false
         type: string
       sign_installers:
-        description: 是否启用已经配置的安装文件签名和苹果系统公证
+        description: 是否启用安装文件签名；仓库未配置对应凭据时保持 false
         required: false
         type: boolean
         default: false
@@ -74,10 +75,10 @@ jobs:
           fi
 
       - name: 检出 RuiYan 源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 配置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22.12.0
           cache: yarn
@@ -98,7 +99,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn build-renders-enterprise-no-license
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn build-renders-enterprise
           else
             yarn build-renders
@@ -149,7 +152,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn pack-renyan-mac-x64-enterprise-no-license-unsigned
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn pack-renyan-mac-x64-enterprise-unsigned
           else
             yarn pack-renyan-mac-x64-unsigned
@@ -166,7 +171,9 @@ jobs:
           CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn pack-renyan-mac-x64-enterprise-no-license-signed
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn pack-renyan-mac-x64-enterprise-signed
           else
             yarn pack-renyan-mac-x64-signed
@@ -183,7 +190,7 @@ jobs:
         run: node packageScript/script/create-renyan-build-metadata.js
 
       - name: 上传 RuiYan macOS x64 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.metadata.outputs.artifact_container }}
           path: |
@@ -219,10 +226,10 @@ jobs:
           fi
 
       - name: 检出 RuiYan 源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 配置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22.12.0
           cache: yarn
@@ -243,7 +250,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn build-renders-enterprise-no-license
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn build-renders-enterprise
           else
             yarn build-renders
@@ -294,7 +303,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn pack-renyan-mac-arm64-enterprise-no-license-unsigned
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn pack-renyan-mac-arm64-enterprise-unsigned
           else
             yarn pack-renyan-mac-arm64-unsigned
@@ -311,7 +322,9 @@ jobs:
           CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn pack-renyan-mac-arm64-enterprise-no-license-signed
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn pack-renyan-mac-arm64-enterprise-signed
           else
             yarn pack-renyan-mac-arm64-signed
@@ -328,7 +341,7 @@ jobs:
         run: node packageScript/script/create-renyan-build-metadata.js
 
       - name: 上传 RuiYan macOS arm64 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.metadata.outputs.artifact_container }}
           path: |
@@ -364,10 +377,10 @@ jobs:
           fi
 
       - name: 检出 RuiYan 源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 配置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22.12.0
           cache: yarn
@@ -388,7 +401,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn build-renders-enterprise-no-license
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn build-renders-enterprise
           else
             yarn build-renders
@@ -409,7 +424,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn pack-renyan-win-x64-enterprise-no-license-unsigned
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn pack-renyan-win-x64-enterprise-unsigned
           else
             yarn pack-renyan-win-x64-unsigned
@@ -439,7 +456,7 @@ jobs:
         run: node packageScript/script/create-renyan-build-metadata.js
 
       - name: 上传 RuiYan Windows x64 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.metadata.outputs.artifact_container }}
           path: |
@@ -474,10 +491,10 @@ jobs:
           fi
 
       - name: 检出 RuiYan 源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 配置 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22.12.0
           cache: yarn
@@ -498,7 +515,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn build-renders-enterprise-no-license
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn build-renders-enterprise
           else
             yarn build-renders
@@ -519,7 +538,9 @@ jobs:
         env:
           PACKAGE_EDITION: ${{ inputs.edition }}
         run: |
-          if [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn pack-renyan-linux-x64-enterprise-no-license-unsigned
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
             yarn pack-renyan-linux-x64-enterprise-unsigned
           else
             yarn pack-renyan-linux-x64-unsigned
@@ -536,7 +557,7 @@ jobs:
         run: node packageScript/script/create-renyan-build-metadata.js
 
       - name: 上传 RuiYan Linux x64 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.metadata.outputs.artifact_container }}
           path: |

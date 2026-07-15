@@ -16,6 +16,7 @@ const targetDefinitions = {
 const editionLabels = {
   community: 'Community',
   enterprise: 'Enterprise',
+  'enterprise-no-license': 'Enterprise-No-License',
 }
 
 const parseBoolean = (value) => {

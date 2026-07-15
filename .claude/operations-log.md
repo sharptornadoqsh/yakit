@@ -378,3 +378,36 @@
 - `git diff --check`、工作流禁止项检索、锁文件状态、八种安装文件名、无引擎配置、CodeGraph 同步、分支和远端检查通过。
 - `actionlint` 当前未安装，没有增加工具；工作流采用仓库现有 YAML 解析库和定向契约测试进行补偿验证。
 - 没有执行全量测试、全量规则检查、全量类型检查、浏览器测试、性能测试、苹果安装文件本机构建或 GitHub Actions。
+
+## 四十一、企业版免许可证工作流初始化与编码前检查
+
+- 时间：2026-07-15 13:32:45 +08:00。
+- 当前分支为 `qsh`，工作树无改动，本地与 `origin/qsh` 无提交差异，远端地址保持 `https://github.com/sharptornadoqsh/yakit.git`。
+- CodeGraph 索引有效且为最新状态；已调查工作流、根构建命令、渲染器环境、产品类别解析、打包环境、安装文件命名、元数据和定向测试。
+- 已查阅 `.claude/context-summary-enterprise-no-license-workflow.md`。
+- 复用 `yarn build-renders-enterprise-no-license`、现有企业打包环境结构、`resolveRuiYanArtifactName`、`createArtifactIdentity`、`createBuildMetadata` 和四个原生任务。
+- 遵循现有短横线类别、两空格、单引号、无分号、尾逗号、JSON 与 YAML 排序及相邻测试约定。
+- 已对比社区版工作流分支、普通企业版工作流分支、免许可证双渲染命令和产品类别解析，不建立新的许可证实现。
+- 方案新增 `enterprise-no-license`，保留 `enterprise` 原有许可证校验，并让安装文件、产物容器和构建清单显式标识免许可证类别。
+- 验收条件为三种类别可选、四个平台均映射免许可证命令、普通企业行为不变、六条免许可证打包命令完整、类别产物证据一致、定向测试与静态验证通过。
+
+## 四十二、企业版免许可证工作流实施记录
+
+- 时间：2026-07-15 13:53:52 +08:00。
+- `edition` 新增 `enterprise-no-license`，四个原生任务分别映射仓库既有 `yarn build-renders-enterprise-no-license`；`enterprise` 仍映射 `yarn build-renders-enterprise`。
+- 增加免许可证企业版签名与无签名打包环境，设置 `PLATFORM=yakitEE`、独立类别和 `REACT_APP_REQUIRE_ENTERPRISE_LICENSE=false`；普通企业环境未增加该变量。
+- 增加四条无签名与两条苹果系统签名打包命令，全部指定平台、架构、统一配置和 `--publish never`。
+- 安装钩子与元数据程序统一使用 `Enterprise-No-License` 标签，生成独立安装文件名、构建清单类别和产物容器。
+- `actions/checkout`、`actions/setup-node` 与 `actions/upload-artifact` 分别更新至采用 Node.js 24 的 v7、v6 与 v7，替换当前工作流中的 Node.js 20 运行时版本。
+- 更新定向测试、网页操作文档、交接文档和任务上下文摘要；没有修改许可证判断源码、签名动作、引擎流程或其他产品类别。
+
+## 四十三、企业版免许可证工作流验证记录
+
+- 时间：2026-07-15 13:53:52 +08:00。
+- 定向测试两个文件、十六项用例通过，覆盖三类别输入、四个免许可证渲染分支、六条打包命令、两套环境、普通企业语义、独立安装文件名、构建清单和产物容器。
+- 工作流 YAML、根配置和打包环境 JSON 解析通过；两个 JavaScript 脚本通过语法检查。
+- 契约检查确认唯一触发器为 `workflow_dispatch`，免许可证命令数量正确，三个官方 Action 版本正确，工作流没有发布命令、推送命令、非加密地址或旧跳过许可证字段。
+- Prettier 检查、差异空白检查、UTF-8 无字节顺序标记检查和换行检查通过；三份锁文件未修改。
+- CodeGraph 同步完成，索引为最新状态，受影响测试指向 `app/main/__test__/renyanPackaging.test.js`。
+- 初次环境命令经 Windows 命令文件调用时受到圆括号转义影响，改用依赖的 Node.js 入口后验证环境值通过；该差异只涉及本地验证命令。
+- 用户触发的 `qsh` 远端任务 `29392044377` 与旧 `master` 任务 `29390830179` 分开记录；当前未取消、重试或修改该任务。

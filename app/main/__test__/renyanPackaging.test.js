@@ -58,7 +58,7 @@ describe('睿眼多平台安装文件工作流', () => {
     })
     expect(workflow.on.workflow_dispatch.inputs.edition).toMatchObject({
       default: 'community',
-      options: ['community', 'enterprise'],
+      options: ['community', 'enterprise', 'enterprise-no-license'],
     })
     expect(workflow.jobs['build-macos-x64'].if).toContain("inputs.target == 'macos-both'")
     expect(workflow.jobs['build-macos-arm64'].if).toContain("inputs.target == 'macos-both'")
@@ -66,9 +66,9 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(workflow.jobs['build-linux-x64'].if).not.toContain('macos-both')
 
     Object.values(workflow.jobs).forEach((job) => {
-      const setupNode = job.steps.find((step) => step.uses === 'actions/setup-node@v4')
-      const uploadArtifact = job.steps.find((step) => step.uses === 'actions/upload-artifact@v4')
-      expect(job.steps.some((step) => step.uses === 'actions/checkout@v4')).toBe(true)
+      const setupNode = job.steps.find((step) => step.uses === 'actions/setup-node@v6')
+      const uploadArtifact = job.steps.find((step) => step.uses === 'actions/upload-artifact@v7')
+      expect(job.steps.some((step) => step.uses === 'actions/checkout@v7')).toBe(true)
       expect(setupNode.with['node-version']).toBe('22.12.0')
       expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/src/main/yarn.lock')
       expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/engine-link-startup/yarn.lock')
@@ -80,8 +80,8 @@ describe('睿眼多平台安装文件工作流', () => {
         .forEach((step) => expect(step.if).toContain('inputs.sign_installers'))
     })
 
-    expect(source).toContain('yarn build-renders-enterprise')
-    expect(source).not.toMatch(/build-renders-enterprise-/)
+    expect(source.match(/^\s+yarn build-renders-enterprise$/gm)).toHaveLength(4)
+    expect(source.match(/^\s+yarn build-renders-enterprise-no-license$/gm)).toHaveLength(4)
     expect(source).not.toContain('skipEnterpriseLicense')
     expect(source).not.toContain('build-renders-simple-enterprise')
     expect(source).not.toContain('build-renders-irify')
@@ -106,6 +106,18 @@ describe('睿眼多平台安装文件工作流', () => {
       PLATFORM: 'yakitEE',
     })
     expect(packageEnvironments.renyanEnterpriseSigned).not.toHaveProperty('REACT_APP_REQUIRE_ENTERPRISE_LICENSE')
+    expect(packageEnvironments.renyanEnterpriseNoLicenseUnsigned).toEqual({
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+      RENYAN_PACKAGE_EDITION: 'enterprise-no-license',
+      PLATFORM: 'yakitEE',
+      REACT_APP_REQUIRE_ENTERPRISE_LICENSE: 'false',
+    })
+    expect(packageEnvironments.renyanEnterpriseNoLicenseSigned).toEqual({
+      CSC_IDENTITY_AUTO_DISCOVERY: 'true',
+      RENYAN_PACKAGE_EDITION: 'enterprise-no-license',
+      PLATFORM: 'yakitEE',
+      REACT_APP_REQUIRE_ENTERPRISE_LICENSE: 'false',
+    })
 
     const requiredScripts = [
       'pack-renyan-mac-x64-unsigned',
@@ -116,10 +128,16 @@ describe('睿眼多平台安装文件工作流', () => {
       'pack-renyan-mac-arm64-enterprise-unsigned',
       'pack-renyan-win-x64-enterprise-unsigned',
       'pack-renyan-linux-x64-enterprise-unsigned',
+      'pack-renyan-mac-x64-enterprise-no-license-unsigned',
+      'pack-renyan-mac-arm64-enterprise-no-license-unsigned',
+      'pack-renyan-win-x64-enterprise-no-license-unsigned',
+      'pack-renyan-linux-x64-enterprise-no-license-unsigned',
       'pack-renyan-mac-x64-signed',
       'pack-renyan-mac-arm64-signed',
       'pack-renyan-mac-x64-enterprise-signed',
       'pack-renyan-mac-arm64-enterprise-signed',
+      'pack-renyan-mac-x64-enterprise-no-license-signed',
+      'pack-renyan-mac-arm64-enterprise-no-license-signed',
     ]
     requiredScripts.forEach((name) => {
       expect(packageJson.scripts[name]).toBeTypeOf('string')
@@ -183,15 +201,16 @@ describe('睿眼预置引擎准备', () => {
 })
 
 describe('睿眼安装文件元数据', () => {
-  it('生成类别化文件名、构建清单和非空摘要', async () => {
+  it('生成免许可证企业类别文件名、构建清单和非空摘要', async () => {
     const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'renyan-package-'))
     try {
       fs.mkdirSync(path.join(temporaryRoot, 'release'), { recursive: true })
-      const identity = createArtifactIdentity({ edition: 'enterprise', target: 'windows-x64' })
+      const standardIdentity = createArtifactIdentity({ edition: 'enterprise', target: 'windows-x64' })
+      const identity = createArtifactIdentity({ edition: 'enterprise-no-license', target: 'windows-x64' })
       fs.writeFileSync(path.join(temporaryRoot, 'release', identity.artifactName), 'installer')
 
       const result = await createBuildMetadata({
-        edition: 'enterprise',
+        edition: 'enterprise-no-license',
         target: 'windows-x64',
         signed: true,
         includeEngine: false,
@@ -204,10 +223,11 @@ describe('睿眼安装文件元数据', () => {
         buildTime: '2026-07-15T00:00:00.000Z',
       })
 
-      expect(identity.artifactName).toBe(`RuiYan-Pentest-Enterprise-${packageJson.version}-windows-x64.exe`)
-      expect(result.artifactContainer).toBe('RuiYan-Enterprise-Windows-x64-signed')
+      expect(standardIdentity.artifactName).toBe(`RuiYan-Pentest-Enterprise-${packageJson.version}-windows-x64.exe`)
+      expect(identity.artifactName).toBe(`RuiYan-Pentest-Enterprise-No-License-${packageJson.version}-windows-x64.exe`)
+      expect(result.artifactContainer).toBe('RuiYan-Enterprise-No-License-Windows-x64-signed')
       expect(result.manifest).toMatchObject({
-        edition: 'enterprise',
+        edition: 'enterprise-no-license',
         gitBranch: 'qsh',
         target: 'windows-x64',
         platform: 'windows',
@@ -217,7 +237,7 @@ describe('睿眼安装文件元数据', () => {
         engineVersion: null,
       })
       expect(fs.readFileSync(result.checksumPath, 'utf8')).toMatch(
-        /^[0-9a-f]{64}  RuiYan-Pentest-Enterprise-.+-windows-x64\.exe\n$/,
+        /^[0-9a-f]{64}  RuiYan-Pentest-Enterprise-No-License-.+-windows-x64\.exe\n$/,
       )
     } finally {
       fs.rmSync(temporaryRoot, { recursive: true, force: true })
@@ -243,6 +263,25 @@ describe('睿眼安装文件元数据', () => {
     )
     expect(context.packager.config.mac.extraFiles).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ to: 'bins/yak.zip' })]),
+    )
+  })
+
+  it('免许可证企业打包使用独立文件名', async () => {
+    process.env.INCLUDE_ENGINE = 'false'
+    process.env.RENYAN_PACKAGE_EDITION = 'enterprise-no-license'
+    const context = {
+      arch: 3,
+      electronPlatformName: 'darwin',
+      packager: {
+        appInfo: { version: packageJson.version },
+        config: { mac: {} },
+      },
+    }
+
+    await beforePack(context)
+
+    expect(context.packager.config.mac.artifactName).toBe(
+      `RuiYan-Pentest-Enterprise-No-License-${packageJson.version}-darwin-arm64.${'${ext}'}`,
     )
   })
 })

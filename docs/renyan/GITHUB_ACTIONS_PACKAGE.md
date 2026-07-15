@@ -2,7 +2,7 @@
 
 ## 一、工作流范围
 
-工作流文件为 `.github/workflows/multi-platform-build.yml`，页面名称为 `RuiYan Multi-Platform Package`。工作流只允许从 `qsh` 分支构建社区版或企业版客户端，不包含轻量企业版、代码审计版、代码审计企业版和智能代理版。
+工作流文件为 `.github/workflows/multi-platform-build.yml`，页面名称为 `RuiYan Multi-Platform Package`。工作流只允许从 `qsh` 分支构建社区版、企业版或企业版免许可证客户端，不包含轻量企业版、代码审计版、代码审计企业版和智能代理版。
 
 四类安装文件分别在原生执行环境中生成：
 
@@ -24,7 +24,7 @@
 5. 在 `Use workflow from` 中选择 `qsh`。
 6. 不选择 `master`。
 7. 设置 `target`。
-8. 设置 `edition`，值只能为 `community` 或 `enterprise`。
+8. 设置 `edition`，值只能为 `community`、`enterprise` 或 `enterprise-no-license`。
 9. 设置 `include_engine`。
 10. 启用预置引擎且需要指定版本时填写 `engine_version`。
 11. 首次验证保持 `sign_installers=false`。
@@ -41,13 +41,13 @@
 | 参数 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `target` | 选择 | `macos-both` | 选择一个平台、两个苹果系统架构或全部平台 |
-| `edition` | 选择 | `community` | 选择社区版或企业版 |
+| `edition` | 选择 | `community` | 选择社区版、企业版或企业版免许可证 |
 | `include_engine` | 布尔 | `false` | 是否预置目标平台和架构的 Yak 引擎 |
 | `engine_version` | 字符串 | 空 | 启用预置引擎时指定版本；空值读取兼容清单推荐版本 |
 | `sign_installers` | 布尔 | `false` | 是否启用已经配置的安装文件签名与苹果系统公证 |
 | `retention_days` | 选择 | `14` | 产物容器保留天数 |
 
-社区版调用 `yarn build-renders`，企业版调用 `yarn build-renders-enterprise`。企业版构建保留原有许可证校验和企业登录机制，页面没有免许可证参数，工作流也不调用任何免许可证构建命令。
+社区版调用 `yarn build-renders`，企业版调用 `yarn build-renders-enterprise`，企业版免许可证调用 `yarn build-renders-enterprise-no-license`。普通企业版保留原有许可证校验和企业登录机制；免许可证类别只复用仓库已有构建变量，不修改许可证判断源码。
 
 ## 四、首次验证参数
 
@@ -63,7 +63,7 @@
 | `sign_installers` | `false` |
 | `retention_days` | `14` |
 
-企业版首次验证将 `edition` 改为 `enterprise`，其余字段保持相同。企业版许可证校验继续启用，不存在可选择的跳过方式。
+企业版首次验证将 `edition` 改为 `enterprise`，其余字段保持相同。免许可证企业版将 `edition` 改为 `enterprise-no-license`。未配置签名凭据时，两种类别均保持 `sign_installers=false`。
 
 ## 五、命令行运行
 
@@ -89,6 +89,20 @@ gh workflow run multi-platform-build.yml \
   --ref qsh \
   -f target=macos-both \
   -f edition=enterprise \
+  -f include_engine=false \
+  -f engine_version="" \
+  -f sign_installers=false \
+  -f retention_days=14
+```
+
+企业版免许可证苹果系统双架构命令：
+
+```bash
+gh workflow run multi-platform-build.yml \
+  --repo sharptornadoqsh/yakit \
+  --ref qsh \
+  -f target=macos-both \
+  -f edition=enterprise-no-license \
   -f include_engine=false \
   -f engine_version="" \
   -f sign_installers=false \
@@ -134,7 +148,7 @@ gh workflow run multi-platform-build.yml \
 - `AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME`
 - `AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL`
 
-缺少必要凭据时，对应任务明确失败。当前仓库没有开源系统安装文件签名机制，因此开源系统任务会拒绝 `sign_installers=true`，不会把无签名文件标记为签名文件。
+缺少必要凭据时，对应任务明确失败。错误列出全部微软签名输入时，表示选择了 `sign_installers=true`，但上述六项仓库密钥为空；无需签名时重新选择 `false`。当前仓库没有开源系统安装文件签名机制，因此开源系统任务会拒绝 `sign_installers=true`，不会把无签名文件标记为签名文件。
 
 ## 八、安装文件与产物容器
 
@@ -149,6 +163,10 @@ RuiYan-Pentest-Enterprise-<version>-darwin-x64.dmg
 RuiYan-Pentest-Enterprise-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Enterprise-<version>-windows-x64.exe
 RuiYan-Pentest-Enterprise-<version>-linux-x64.AppImage
+RuiYan-Pentest-Enterprise-No-License-<version>-darwin-x64.dmg
+RuiYan-Pentest-Enterprise-No-License-<version>-darwin-arm64.dmg
+RuiYan-Pentest-Enterprise-No-License-<version>-windows-x64.exe
+RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
 ```
 
 产物容器采用以下规则：
@@ -162,17 +180,25 @@ RuiYan-Enterprise-macOS-x64-unsigned
 RuiYan-Enterprise-macOS-arm64-unsigned
 RuiYan-Enterprise-Windows-x64-unsigned
 RuiYan-Enterprise-Linux-x64-unsigned
+RuiYan-Enterprise-No-License-macOS-x64-unsigned
+RuiYan-Enterprise-No-License-macOS-arm64-unsigned
+RuiYan-Enterprise-No-License-Windows-x64-unsigned
+RuiYan-Enterprise-No-License-Linux-x64-unsigned
 ```
 
 签名任务将末尾的 `unsigned` 改为 `signed`。每个容器只包含安装文件、`build-manifest.json` 和 `SHA256SUMS.txt`。摘要文件记录真实安装文件名和非空摘要，不包含依赖目录、解包目录、证书、密钥或环境变量文件。
 
 ## 九、页面仍显示旧输入
 
-页面仍显示 `Select version type`、`ce`、`ee`、`se`、`irify`、`memfit`、`Legacy system version` 或跳过许可证选项时，检查 `Use workflow from` 是否为 `qsh`。选择 `master` 时，页面可能载入旧工作流定义。
+页面仍显示 `Select version type`、`ce`、`ee`、`se`、`irify`、`memfit` 或 `Legacy system version` 时，检查 `Use workflow from` 是否为 `qsh`。选择 `master` 时，页面会载入旧工作流定义；任务名称为 `Multi-Platform Build Develop` 且分支显示 `master` 也属于旧定义。
 
 将 `Use workflow from` 改为 `qsh` 后刷新页面。页面没有载入 `qsh` 输入时，可以采用第五节命令，并保留 `--ref qsh`。不要修改 `master` 来改变页面定义。
 
-## 十、图片与扩展文件
+## 十、Action 运行时
+
+`qsh` 工作流使用 `actions/checkout@v7`、`actions/setup-node@v6` 和 `actions/upload-artifact@v7`，三者均采用 Node.js 24。旧工作流中的 v4 与第三方 Action 可能显示 Node.js 20 弃用警告；该警告不同于签名凭据缺失错误。
+
+## 十一、图片与扩展文件
 
 安装配置已引用 `app/assets/renyan-icon.icns`、`app/assets/renyan-icon.ico` 和 `product/brand/icons`。这些文件存在且可读取，全尺寸图标已经完成视觉检查，用户无需上传图片。
 
