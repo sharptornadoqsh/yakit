@@ -285,6 +285,36 @@
   letter-spacing: 0.14em;
 }
 
+.form-options,
+.theme-switch,
+.theme-option {
+  display: flex;
+  align-items: center;
+}
+
+.form-options {
+  gap: 12px;
+}
+
+.theme-switch {
+  gap: 6px;
+}
+
+.theme-label {
+  color: var(--Colors-Use-Neutral-Text-4-Help-text);
+  letter-spacing: 0.04em;
+}
+
+.theme-option {
+  gap: 4px;
+  line-height: 1;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
 .environment-chip {
   display: inline-flex;
   align-items: center;
@@ -399,6 +429,19 @@
   .form-panel {
     min-height: 600px;
     padding: 38px 52px 32px;
+  }
+}
+
+@media (max-width: 560px) {
+  .form-topline {
+    gap: 12px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .form-options {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 

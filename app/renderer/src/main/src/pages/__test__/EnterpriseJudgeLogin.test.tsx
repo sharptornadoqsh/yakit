@@ -1,9 +1,10 @@
 import React from 'react'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const testState = vi.hoisted(() => ({
   configPrivateDomainProps: vi.fn(),
+  setTheme: vi.fn(),
   uploadStart: vi.fn(),
 }))
 
@@ -50,6 +51,42 @@ vi.mock('@/components/layout/utils', () => ({
 vi.mock('@/utils/tool', () => ({ JSONParseLog: vi.fn() }))
 vi.mock('@/constants/hardware', () => ({ SystemInfo: { isDev: false } }))
 vi.mock('@/config/product', () => ({ productConfig: { displayName: '睿眼自动化渗透系统' } }))
+vi.mock('@/hook/useTheme', () => ({
+  useTheme: () => ({ theme: 'dark', setTheme: testState.setTheme }),
+}))
+vi.mock('@/components/yakitUI/YakitRadioButtons/YakitRadioButtons', () => {
+  const React = require('react')
+
+  return {
+    YakitRadioButtons: ({
+      'aria-label': ariaLabel,
+      onChange,
+      options,
+      value,
+    }: {
+      'aria-label': string
+      onChange: (event: { target: { value: string } }) => void
+      options: Array<{ label: React.ReactNode; value: string }>
+      value: string
+    }) =>
+      React.createElement(
+        'div',
+        { role: 'radiogroup', 'aria-label': ariaLabel },
+        options.map((option) =>
+          React.createElement(
+            'button',
+            {
+              key: option.value,
+              role: 'radio',
+              'aria-checked': option.value === value,
+              onClick: () => onChange({ target: { value: option.value } }),
+            },
+            option.label,
+          ),
+        ),
+      ),
+  }
+})
 vi.mock('@/i18n/useI18nNamespaces', () => ({
   useI18nNamespaces: () => ({
     t: (key: string) =>
@@ -65,6 +102,9 @@ vi.mock('@/i18n/useI18nNamespaces', () => ({
         'EnterpriseJudgeLogin.controlledAccess': '受控访问通道',
         'EnterpriseJudgeLogin.accessPortal': '企业访问门户',
         'EnterpriseJudgeLogin.privateEnvironment': '私有环境',
+        'EnterpriseJudgeLogin.themeLabel': '显示主题',
+        'EnterpriseJudgeLogin.lightTheme': '浅色',
+        'EnterpriseJudgeLogin.darkTheme': '深色',
         'EnterpriseJudgeLogin.formEyebrow': '身份验证',
         'EnterpriseJudgeLogin.formTitle': '登录企业工作区',
         'EnterpriseJudgeLogin.formDescription': '请输入私有域地址与企业账号信息',
@@ -97,6 +137,7 @@ afterAll(() => {
 
 beforeEach(() => {
   testState.configPrivateDomainProps.mockClear()
+  testState.setTheme.mockClear()
   testState.uploadStart.mockClear()
 })
 
@@ -109,9 +150,19 @@ describe('企业登录页面', () => {
     expect(screen.getByRole('heading', { level: 2, name: '登录企业工作区' })).toBeInTheDocument()
     expect(screen.getByText('睿眼自动化渗透系统')).toBeInTheDocument()
     expect(screen.getByTestId('enterprise-login-form')).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: '显示主题' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /深色/ })).toHaveAttribute('aria-checked', 'true')
 
     const formProps = testState.configPrivateDomainProps.mock.calls.at(-1)?.[0]
     expect(formProps).toMatchObject({ enterpriseLogin: true, pageMode: true, skipShow: true })
+  })
+
+  it('选择浅色主题时调用现有主题状态', () => {
+    render(<EnterpriseJudgeLogin setJudgeLicense={vi.fn()} setJudgeLogin={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('radio', { name: /浅色/ }))
+
+    expect(testState.setTheme).toHaveBeenCalledWith('light')
   })
 
   it('认证成功后退出企业登录门禁', () => {

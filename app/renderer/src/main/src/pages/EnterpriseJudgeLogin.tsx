@@ -11,6 +11,9 @@ import { SystemInfo } from '@/constants/hardware'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { productConfig } from '@/config/product'
 import productIcon from '@/assets/renyan-icon.svg'
+import { OutlineMoonIcon, OutlineSunIcon } from '@/assets/icon/outline'
+import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
+import { Theme, useTheme } from '@/hook/useTheme'
 import styles from './EnterpriseJudgeLogin.module.scss'
 const { ipcRenderer } = window.require('electron')
 
@@ -24,6 +27,7 @@ export interface EnterpriseJudgeLoginProps {
 const EnterpriseJudgeLogin: React.FC<EnterpriseJudgeLoginProps> = (props) => {
   const { t } = useI18nNamespaces(['core'])
   const { setJudgeLicense, setJudgeLogin } = props
+  const { theme, setTheme } = useTheme()
   // License
   // const [licenseVerified, setLicenseVerified] = useState<boolean>(false)
   const [activateLicense, setActivateLicense] = useState<boolean>(!requireEnterpriseLicense || !!SystemInfo.isDev)
@@ -172,7 +176,39 @@ const EnterpriseJudgeLogin: React.FC<EnterpriseJudgeLoginProps> = (props) => {
         <section className={styles['form-panel']}>
           <div className={styles['form-topline']}>
             <span>{t('EnterpriseJudgeLogin.accessPortal')}</span>
-            <span className={styles['environment-chip']}>{t('EnterpriseJudgeLogin.privateEnvironment')}</span>
+            <div className={styles['form-options']}>
+              <span className={styles['environment-chip']}>{t('EnterpriseJudgeLogin.privateEnvironment')}</span>
+              <div className={styles['theme-switch']}>
+                <span className={styles['theme-label']}>{t('EnterpriseJudgeLogin.themeLabel')}</span>
+                <YakitRadioButtons
+                  aria-label={t('EnterpriseJudgeLogin.themeLabel')}
+                  buttonStyle="solid"
+                  size="small"
+                  value={theme}
+                  onChange={(event) => setTheme(event.target.value as Theme)}
+                  options={[
+                    {
+                      value: 'light',
+                      label: (
+                        <span className={styles['theme-option']}>
+                          <OutlineSunIcon />
+                          {t('EnterpriseJudgeLogin.lightTheme')}
+                        </span>
+                      ),
+                    },
+                    {
+                      value: 'dark',
+                      label: (
+                        <span className={styles['theme-option']}>
+                          <OutlineMoonIcon />
+                          {t('EnterpriseJudgeLogin.darkTheme')}
+                        </span>
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+            </div>
           </div>
 
           <div className={styles['form-heading']}>
