@@ -353,7 +353,7 @@
       "knowledgeBase": "Knowledge base"
     },
     "KnowledgeBaseGraphDemo": {
-      "techDocs": "RenYan Pentest technical docs"
+      "techDocs": "RuiYan Pentest technical docs"
     },
     "RagEntryTable": {
       "fetchFailed": "Failed to fetch vector store entries: {{error}}",

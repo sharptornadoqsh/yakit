@@ -52,6 +52,28 @@ const appendEngine = (extraFiles, engineArtifact) => {
   ]
 }
 
+const resolveBuildArchitecture = (
+  contextArchitecture,
+  configuredArchitecture = process.env.RENYAN_PACKAGE_ARCHITECTURE,
+) => {
+  const supportedArchitectures = new Set(['x64', 'arm64'])
+  const configured = `${configuredArchitecture || ''}`.trim()
+  if (configured) {
+    if (!supportedArchitectures.has(configured)) {
+      throw new Error(`不支持的显式构建架构：${configured}`)
+    }
+    return configured
+  }
+
+  const architectureByCode = {
+    1: 'x64',
+    3: 'arm64',
+  }
+  const detected = architectureByCode[contextArchitecture]
+  if (!detected) throw new Error(`不支持的构建架构编号：${contextArchitecture}`)
+  return detected
+}
+
 const resolveRuiYanArtifactName = ({ platform, architecture, productVersion }) => {
   const editionLabels = {
     community: 'Community',
@@ -90,12 +112,7 @@ const resolveLegacyArtifactName = ({ platform, architecture, productVersion, isL
 const beforePack = async (context) => {
   const isLegacy = process.env.THE_LEGACY == 'true'
   const includeEngine = process.env.INCLUDE_ENGINE !== 'false'
-  const archMap = {
-    1: 'x64',
-    3: 'arm64',
-  }
-  const architecture = archMap[context.arch]
-  if (!architecture) throw new Error(`不支持的构建架构编号：${context.arch}`)
+  const architecture = resolveBuildArchitecture(context.arch)
 
   const platform = context.electronPlatformName
   const engineArtifact = includeEngine ? await validateBundledEngine(platform, architecture) : null
@@ -140,5 +157,6 @@ const beforePack = async (context) => {
 }
 
 module.exports = beforePack
+module.exports.resolveBuildArchitecture = resolveBuildArchitecture
 module.exports.resolveExpectedArchiveSha256 = resolveExpectedArchiveSha256
 module.exports.resolveRuiYanArtifactName = resolveRuiYanArtifactName

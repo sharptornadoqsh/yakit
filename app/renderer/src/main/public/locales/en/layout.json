@@ -490,7 +490,7 @@
   },
   "DownloadYakit": {
     "downloading": "{{edition}} downloading...",
-    "officialDownloadLink": "RenYan Pentest project homepage",
+    "officialDownloadLink": "RuiYan Pentest project homepage",
     "officialDownloadHint": "If the download fails due to network issues, please install from the official website:",
     "website": "Website"
   },

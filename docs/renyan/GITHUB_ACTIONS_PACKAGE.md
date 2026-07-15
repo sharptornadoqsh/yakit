@@ -32,7 +32,7 @@
 13. 点击 `Run workflow`。
 14. 等待被选任务完成。
 15. 打开对应的工作流运行记录。
-16. 在 `Artifacts` 区域下载安装文件产物。
+16. 在 `Artifacts` 区域点击安装文件名，直接下载 `.exe`、`.dmg` 或 `.AppImage`。
 
 工作流内的分支检查会拒绝任何非 `qsh` 的运行。应用版本只读取根目录 `package.json`，网页没有独立版本输入。
 
@@ -45,7 +45,7 @@
 | `include_engine` | 布尔 | `false` | 是否预置目标平台和架构的 Yak 引擎 |
 | `engine_version` | 字符串 | 空 | 启用预置引擎时指定版本；空值读取兼容清单推荐版本 |
 | `sign_installers` | 布尔 | `false` | 是否启用已经配置的安装文件签名与苹果系统公证 |
-| `retention_days` | 选择 | `14` | 产物容器保留天数 |
+| `retention_days` | 选择 | `14` | 直接安装文件保留天数 |
 
 社区版调用 `yarn build-renders`，企业版调用 `yarn build-renders-enterprise`，企业版免许可证调用 `yarn build-renders-enterprise-no-license`。普通企业版保留原有许可证校验和企业登录机制；免许可证类别只复用仓库已有构建变量，不修改许可证判断源码。
 
@@ -115,6 +115,8 @@ gh workflow run multi-platform-build.yml \
 
 关闭 `include_engine` 时，任务不访问引擎文件或摘要文件，不签名引擎，也不把引擎版本文件加入安装文件。应用继续采用现有的引擎安装或下载流程。
 
+复查任务日志时，以任务步骤的 `INCLUDE_ENGINE` 环境值为准。任务 `29396021957` 的四个平台均记录为 `true`，因此该次任务确实启用了预置引擎；网页表单当前未勾选只影响下一次创建的任务。未勾选后，新任务应记录 `INCLUDE_ENGINE: false`，引擎准备步骤应显示为跳过。
+
 开启 `include_engine` 时，工作流执行以下约束：
 
 1. 从 `engine_version` 或 `product/engine-compatibility.json` 确定版本。
@@ -126,6 +128,8 @@ gh workflow run multi-platform-build.yml \
 7. 在 `build-manifest.json` 中记录最终版本。
 
 项目当前推荐引擎版本为 `1.4.8-beta3`。该版本四个目标工件的摘要地址已取得有效响应；工作流仍会在每次启用预置引擎时重新下载并验证摘要。
+
+每个原生任务还会显式声明安装文件目标架构。打包钩子优先使用该声明选择兼容清单工件，避免苹果臂架构误取英特尔压缩包，或开源系统英特尔架构误取臂架构压缩包。直接在本地调用打包命令时，钩子继续使用打包器传入的架构编号。
 
 ## 七、签名
 
@@ -150,7 +154,7 @@ gh workflow run multi-platform-build.yml \
 
 缺少必要凭据时，对应任务明确失败。错误列出全部微软签名输入时，表示选择了 `sign_installers=true`，但上述六项仓库密钥为空；无需签名时重新选择 `false`。当前仓库没有开源系统安装文件签名机制，因此开源系统任务会拒绝 `sign_installers=true`，不会把无签名文件标记为签名文件。
 
-## 八、安装文件与产物容器
+## 八、安装文件与直接下载
 
 安装文件名称由 `product/renyan.json` 中的 `artifactPrefix` 与根版本共同生成：
 
@@ -169,24 +173,7 @@ RuiYan-Pentest-Enterprise-No-License-<version>-windows-x64.exe
 RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
 ```
 
-产物容器采用以下规则：
-
-```text
-RuiYan-Community-macOS-x64-unsigned
-RuiYan-Community-macOS-arm64-unsigned
-RuiYan-Community-Windows-x64-unsigned
-RuiYan-Community-Linux-x64-unsigned
-RuiYan-Enterprise-macOS-x64-unsigned
-RuiYan-Enterprise-macOS-arm64-unsigned
-RuiYan-Enterprise-Windows-x64-unsigned
-RuiYan-Enterprise-Linux-x64-unsigned
-RuiYan-Enterprise-No-License-macOS-x64-unsigned
-RuiYan-Enterprise-No-License-macOS-arm64-unsigned
-RuiYan-Enterprise-No-License-Windows-x64-unsigned
-RuiYan-Enterprise-No-License-Linux-x64-unsigned
-```
-
-签名任务将末尾的 `unsigned` 改为 `signed`。每个容器只包含安装文件、`build-manifest.json` 和 `SHA256SUMS.txt`。摘要文件记录真实安装文件名和非空摘要，不包含依赖目录、解包目录、证书、密钥或环境变量文件。
+每个任务只上传一个安装文件，并设置 `archive: false`。Actions 页面使用真实安装文件名作为产物名，点击后直接返回该文件，不再生成外层 ZIP。构建清单和摘要仍在任务工作目录生成，但不作为单独下载项上传。
 
 ## 九、页面仍显示旧输入
 
@@ -196,10 +183,24 @@ RuiYan-Enterprise-No-License-Linux-x64-unsigned
 
 ## 十、Action 运行时
 
-`qsh` 工作流使用 `actions/checkout@v7`、`actions/setup-node@v6` 和 `actions/upload-artifact@v7`，三者均采用 Node.js 24。旧工作流中的 v4 与第三方 Action 可能显示 Node.js 20 弃用警告；该警告不同于签名凭据缺失错误。
+`qsh` 工作流使用 `actions/checkout@v7`、`actions/setup-node@v6` 和 `actions/upload-artifact@v7`，三者均采用 Node.js 24。`upload-artifact@v7` 的非归档模式只接受一个文件，因此四个原生任务分别上传对应架构的单个安装文件。旧工作流中的 v4 与第三方 Action 可能显示 Node.js 20 弃用警告；该警告不同于签名凭据缺失错误。
+
+任务 `29396021957` 中，微软系统任务完成，苹果臂架构与开源系统任务在打包钩子中分别选错引擎架构，苹果英特尔任务随后被取消。该问题已经通过固定任务架构声明修正。该任务的 `sign_installers` 为 `false`，所以开源系统日志中的失败不属于签名故障。
+
+旧提交 `b812e3b` 的安装文件没有包含 `product/build.js`，启动时会在主进程报告模块缺失。使用修复后的 `qsh` 提交重新构建即可，旧安装文件不应继续发布。
+
+在源码目录使用生产资源启动时，必须先生成与类别对应的两个渲染器。企业版的本地检查顺序如下：
+
+```powershell
+yarn build-renders-enterprise
+$env:ELECTRON_IS_DEV = '0'
+yarn start-electron
+```
+
+`ELECTRON_IS_DEV=0` 不会代替渲染器构建。缺少 `app/renderer/pages/main/index.html` 时，Electron 会报告 `ERR_FILE_NOT_FOUND` 并显示空白窗口。源码生产模式现在会从仓库根目录解析 `bins`，已安装程序仍从安装资源目录解析。
 
 ## 十一、图片与扩展文件
 
 安装配置已引用 `app/assets/renyan-icon.icns`、`app/assets/renyan-icon.ico` 和 `product/brand/icons`。这些文件存在且可读取，全尺寸图标已经完成视觉检查，用户无需上传图片。
 
-`bins/scripts/google-chrome-plugin.zip` 已存在，并由既有打包配置加入安装文件。工作流不再访问旧版非加密扩展版本地址，也不在运行期间下载扩展。
+`bins/scripts/google-chrome-plugin.zip` 不受版本控制，因此托管任务会在打包前从固定的 HTTPS 地址下载 `0.0.7` 版本，并校验 SHA256 `5b250638ce76c95e9bc2c25db48049eac1f7af25fe34187e2b0997b872811f6d`。下载失败或摘要不一致会明确终止任务；工作流不读取动态最新版，也不访问非加密版本地址。

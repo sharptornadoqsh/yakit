@@ -2,9 +2,11 @@
 
 ## 一、交付结论
 
-`.github/workflows/multi-platform-build.yml` 已改造为 `RuiYan Multi-Platform Package`。网页输入只保留目标平台、社区版、企业版或企业版免许可证、是否预置引擎、引擎版本、是否签名和产物保留天数。四个平台分别在原生执行环境中构建，每个被选任务独立上传安装文件、构建清单和摘要文件。
+`.github/workflows/multi-platform-build.yml` 已改造为 `RuiYan Multi-Platform Package`。网页输入只保留目标平台、社区版、企业版或企业版免许可证、是否预置引擎、引擎版本、是否签名和产物保留天数。四个平台分别在原生执行环境中构建，每个被选任务只上传对应的一个安装文件，网页下载不再封装为 ZIP。
 
-默认路径生成无签名内部验证安装文件，不读取签名凭据。企业版调用 `yarn build-renders-enterprise` 并保留现有许可证校验；企业版免许可证调用仓库既有 `yarn build-renders-enterprise-no-license`，两类安装文件和产物容器使用不同名称。
+默认路径生成无签名内部验证安装文件，不读取签名凭据。企业版调用 `yarn build-renders-enterprise` 并保留现有许可证校验；企业版免许可证调用仓库既有 `yarn build-renders-enterprise-no-license`，两类安装文件使用不同名称。
+
+前端可见英文短名称统一为 `RuiYan Pentest`。应用标识、可执行文件名、用户数据目录、代码符号和资源路径保留既有兼容名称。
 
 ## 二、最终输入
 
@@ -67,30 +69,15 @@ RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
 
 关闭预置引擎时，打包配置不加入引擎版本文件，打包钩子不读取预置工件。开启时，最终版本写入 `bins/engine-version.txt` 和构建清单。项目推荐版本 `1.4.8-beta3` 的四个目标摘要地址均已取得有效响应。
 
-## 七、构建清单、摘要与产物容器
+四个任务分别声明 `x64`、`arm64`、`x64` 与 `x64` 目标架构，打包钩子优先采用该声明选择预置工件。本地直接调用打包命令时仍按打包器传入的架构编号解析。
+
+## 七、构建元数据与直接安装文件
 
 `packageScript/script/create-renyan-build-metadata.js` 根据集中品牌配置、根版本和目标定义检查真实安装文件，生成 `release/build-manifest.json` 与 `release/SHA256SUMS.txt`。
 
-清单包含产品名称、短名称、品牌前缀、版本、类别、分支、提交、目标、平台、架构、签名状态、预置引擎状态、引擎版本、运行时版本、打包器版本、工作流运行编号和构建时间。清单与日志不包含密码、令牌、授权头、证书或私钥。
+清单包含产品名称、短名称、品牌前缀、版本、类别、分支、提交、目标、平台、架构、签名状态、预置引擎状态、引擎版本、运行时版本、打包器版本、工作流运行编号和构建时间。清单与摘要仍在任务工作目录生成，用于确认安装文件身份。
 
-无签名产物容器名称为：
-
-```text
-RuiYan-Community-macOS-x64-unsigned
-RuiYan-Community-macOS-arm64-unsigned
-RuiYan-Community-Windows-x64-unsigned
-RuiYan-Community-Linux-x64-unsigned
-RuiYan-Enterprise-macOS-x64-unsigned
-RuiYan-Enterprise-macOS-arm64-unsigned
-RuiYan-Enterprise-Windows-x64-unsigned
-RuiYan-Enterprise-Linux-x64-unsigned
-RuiYan-Enterprise-No-License-macOS-x64-unsigned
-RuiYan-Enterprise-No-License-macOS-arm64-unsigned
-RuiYan-Enterprise-No-License-Windows-x64-unsigned
-RuiYan-Enterprise-No-License-Linux-x64-unsigned
-```
-
-签名产物将后缀改为 `signed`。
+上传步骤使用 `actions/upload-artifact@v7` 的 `archive: false`，输入只包含元数据步骤解析出的安装文件路径。Actions 页面中的产物名称等于安装文件名，点击后直接得到 `.exe`、`.dmg` 或 `.AppImage`。
 
 ## 八、签名机制
 
@@ -107,7 +94,7 @@ RuiYan-Enterprise-No-License-Linux-x64-unsigned
 ## 十、验证与未执行事项
 
 - 本地脚本语法、配置结构与工作流语法解析已经通过。
-- 定向测试两个文件、十六项用例通过。
+- 定向测试两个文件、十八项用例通过。
 - 当前打包器版本与本地命令帮助确认平台和架构参数可用。
 - 四个推荐引擎摘要地址均返回有效摘要。
 - `actionlint` 未安装，因此采用仓库现有解析库和定向契约测试。
@@ -122,7 +109,10 @@ RuiYan-Enterprise-No-License-Linux-x64-unsigned
 - 工作流页面载入 `master` 定义时仍可能显示旧输入；必须在 `Use workflow from` 中选择 `qsh`。
 - 开源系统签名未配置，启用签名会得到明确失败。
 - 苹果和微软签名依赖仓库外部凭据，本地静态验证不能证明凭据有效。
-- `bins/scripts/google-chrome-plugin.zip` 已存在并由既有打包配置引用，工作流不下载浏览器扩展。
+- `bins/scripts/google-chrome-plugin.zip` 只存在于本地且不受版本控制；工作流按固定版本 `0.0.7` 下载并校验固定 SHA256，避免托管安装文件缺少扩展资源。
 - 三份锁文件未修改，工作流采用冻结锁文件安装方式。
+- 旧提交 `b812e3b` 生成的安装文件缺少 `product/build.js`，不能作为修复后的发布文件；必须使用包含启动修复的新提交重新构建。
+- 源码目录设置 `ELECTRON_IS_DEV=0` 前必须执行对应的双渲染器构建；缺少 `app/renderer/pages/main/index.html` 会产生空白窗口。未打包的生产资源路径现在以仓库根目录为基准，避免错误定位到仓库上两级目录。
+- 任务 `29396021957` 实际记录 `INCLUDE_ENGINE=true`，与网页表单当前未勾选状态无关；该次任务还暴露了苹果臂架构与开源系统英特尔架构在打包钩子中选择相反工件的问题，固定任务架构声明已经修正该路径。
 
 网页与命令行操作见 `GITHUB_ACTIONS_PACKAGE.md`。

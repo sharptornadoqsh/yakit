@@ -18,5 +18,5 @@
   <circle cx="512" cy="188" r="14" /><circle cx="512" cy="836" r="14" />
 </g></g>
 <text x="230" y="100" fill="#12213F" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="52" font-weight="700">睿眼自动化渗透系统</text>
-<text x="232" y="148" fill="#52627F" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="2">RENYAN PENTEST</text>
+<text x="232" y="148" fill="#52627F" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="2">RuiYan Pentest</text>
 </svg>

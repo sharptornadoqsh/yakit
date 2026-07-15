@@ -51,6 +51,16 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(workflow.jobs['build-macos-arm64']['runs-on']).toBe('macos-15')
     expect(workflow.jobs['build-windows-x64']['runs-on']).toBe('windows-2022')
     expect(workflow.jobs['build-linux-x64']['runs-on']).toBe('ubuntu-22.04')
+    expect(workflow.jobs['build-macos-x64'].env.RENYAN_PACKAGE_ARCHITECTURE).toBe('x64')
+    expect(workflow.jobs['build-macos-arm64'].env.RENYAN_PACKAGE_ARCHITECTURE).toBe('arm64')
+    expect(workflow.jobs['build-windows-x64'].env.RENYAN_PACKAGE_ARCHITECTURE).toBe('x64')
+    expect(workflow.jobs['build-linux-x64'].env.RENYAN_PACKAGE_ARCHITECTURE).toBe('x64')
+    expect(workflow.env.RUIYAN_CHROME_EXTENSION_URL).toBe(
+      'https://yaklang.oss-accelerate.aliyuncs.com/chrome-extension/yakit-chrome-extension-v0.0.7.zip',
+    )
+    expect(workflow.env.RUIYAN_CHROME_EXTENSION_SHA256).toBe(
+      '5b250638ce76c95e9bc2c25db48049eac1f7af25fe34187e2b0997b872811f6d',
+    )
     expect(workflow.permissions).toEqual({ contents: 'read' })
     expect(workflow.on.workflow_dispatch.inputs.target).toMatchObject({
       default: 'macos-both',
@@ -60,6 +70,14 @@ describe('睿眼多平台安装文件工作流', () => {
       default: 'community',
       options: ['community', 'enterprise', 'enterprise-no-license'],
     })
+    expect(workflow.on.workflow_dispatch.inputs.include_engine).toMatchObject({
+      type: 'boolean',
+      default: false,
+    })
+    expect(workflow.on.workflow_dispatch.inputs.sign_installers).toMatchObject({
+      type: 'boolean',
+      default: false,
+    })
     expect(workflow.jobs['build-macos-x64'].if).toContain("inputs.target == 'macos-both'")
     expect(workflow.jobs['build-macos-arm64'].if).toContain("inputs.target == 'macos-both'")
     expect(workflow.jobs['build-windows-x64'].if).not.toContain('macos-both')
@@ -68,12 +86,18 @@ describe('睿眼多平台安装文件工作流', () => {
     Object.values(workflow.jobs).forEach((job) => {
       const setupNode = job.steps.find((step) => step.uses === 'actions/setup-node@v6')
       const uploadArtifact = job.steps.find((step) => step.uses === 'actions/upload-artifact@v7')
+      const prepareChromeExtension = job.steps.find((step) => step.name === '准备固定浏览器扩展')
       expect(job.steps.some((step) => step.uses === 'actions/checkout@v7')).toBe(true)
       expect(setupNode.with['node-version']).toBe('22.12.0')
       expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/src/main/yarn.lock')
       expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/engine-link-startup/yarn.lock')
       expect(uploadArtifact.with['if-no-files-found']).toBe('error')
       expect(uploadArtifact.with['retention-days']).toBe('${{ inputs.retention_days }}')
+      expect(uploadArtifact.with.path).toBe('${{ steps.metadata.outputs.artifact_path }}')
+      expect(uploadArtifact.with.archive).toBe(false)
+      expect(uploadArtifact.with).not.toHaveProperty('name')
+      expect(prepareChromeExtension.run).toContain('RUIYAN_CHROME_EXTENSION_URL')
+      expect(prepareChromeExtension.run).toContain('RUIYAN_CHROME_EXTENSION_SHA256')
 
       job.steps
         .filter((step) => JSON.stringify(step).includes('${{ secrets.'))
@@ -147,6 +171,13 @@ describe('睿眼多平台安装文件工作流', () => {
 })
 
 describe('睿眼预置引擎准备', () => {
+  it('优先使用固定任务声明的目标架构', () => {
+    expect(beforePack.resolveBuildArchitecture(1)).toBe('x64')
+    expect(beforePack.resolveBuildArchitecture(3)).toBe('arm64')
+    expect(beforePack.resolveBuildArchitecture(1, 'arm64')).toBe('arm64')
+    expect(() => beforePack.resolveBuildArchitecture(1, 'ia32')).toThrow('不支持的显式构建架构')
+  })
+
   it('从兼容清单读取推荐版本并拒绝不安全版本', () => {
     expect(resolveEngineVersion('')).toBe('1.4.8-beta3')
     expect(resolveEngineVersion('1.4.8_beta3')).toBe('1.4.8_beta3')
@@ -247,6 +278,7 @@ describe('睿眼安装文件元数据', () => {
   it('无引擎打包不会读取预置工件', async () => {
     process.env.INCLUDE_ENGINE = 'false'
     process.env.RENYAN_PACKAGE_EDITION = 'community'
+    process.env.RENYAN_PACKAGE_ARCHITECTURE = 'x64'
     const context = {
       arch: 1,
       electronPlatformName: 'darwin',

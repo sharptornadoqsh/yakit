@@ -31,12 +31,58 @@ describe('睿眼产品配置', () => {
     ]
 
     requiredFields.forEach((field) => expect(productSource[field]).toBeTypeOf('string'))
+    expect(productSource.shortName).toBe('RuiYan Pentest')
   })
 
   it('按操作系统选择可执行文件名', () => {
     expect(getExecutableName('win32')).toBe('RenYan-Pentest')
     expect(getExecutableName('darwin')).toBe('RenYan-Pentest')
     expect(getExecutableName('linux')).toBe('renyan-pentest')
+  })
+
+  it('前端可见英文名称统一使用 RuiYan', () => {
+    const collectStringValues = (value) => {
+      if (typeof value === 'string') return [value]
+      if (Array.isArray(value)) return value.flatMap(collectStringValues)
+      if (value && typeof value === 'object') return Object.values(value).flatMap(collectStringValues)
+      return []
+    }
+    const localeRoot = path.resolve('app/renderer/src/main/public/locales')
+    const displayedJsonFiles = [
+      path.resolve('app/renderer/src/main/public/manifest.json'),
+      ...fs.readdirSync(localeRoot).flatMap((locale) => {
+        const localeDirectory = path.join(localeRoot, locale)
+        if (!fs.statSync(localeDirectory).isDirectory()) return []
+        return fs
+          .readdirSync(localeDirectory)
+          .filter((filename) => filename.endsWith('.json'))
+          .map((filename) => path.join(localeDirectory, filename))
+      }),
+    ]
+    const displayedValues = displayedJsonFiles.flatMap((filePath) =>
+      collectStringValues(JSON.parse(fs.readFileSync(filePath, 'utf8'))),
+    )
+    expect(productSource.shortName).toBe('RuiYan Pentest')
+    expect(displayedValues.join('\n')).not.toMatch(/renyan/i)
+
+    const visibleLogoFiles = [
+      'app/renderer/src/main/src/assets/renyan-logo-light.svg',
+      'app/renderer/src/main/src/assets/renyan-logo-dark.svg',
+      'app/renderer/engine-link-startup/src/assets/renyan-logo-light.svg',
+      'app/renderer/engine-link-startup/src/assets/renyan-logo-dark.svg',
+      'product/brand/renyan-logo-light.svg',
+      'product/brand/renyan-logo-dark.svg',
+      'product/brand/renyan-startup-light.svg',
+      'product/brand/renyan-startup-dark.svg',
+    ]
+    visibleLogoFiles.forEach((filePath) => {
+      const source = fs.readFileSync(path.resolve(filePath), 'utf8')
+      expect(source).toContain('RuiYan Pentest')
+      expect(source).not.toMatch(/renyan/i)
+    })
+
+    const brandGenerator = fs.readFileSync(path.resolve('product/scripts/generate_brand_assets.py'), 'utf8')
+    expect(brandGenerator).not.toContain("CONFIG['shortName'].upper()")
   })
 
   it('将用户数据定位到独立产品目录', () => {
@@ -64,6 +110,8 @@ describe('睿眼产品配置', () => {
     const filePathSource = fs.readFileSync(path.resolve('app/main/filePath.js'), 'utf8')
     expect(filePathSource).not.toContain("getPath('exe')")
     expect(filePathSource).not.toContain("'yakit-projects'")
+    expect(filePathSource).toContain('if (!app.isPackaged)')
+    expect(filePathSource).toContain('return path.resolve(app.getAppPath(), s)')
 
     const localCacheSource = fs.readFileSync(path.resolve('app/main/localCache.js'), 'utf8')
     expect(localCacheSource).toContain('productConfig.displayName')
@@ -197,6 +245,7 @@ describe('构建元数据', () => {
       ]),
     )
     expect(builderConfig.files).toContain('product/engine-compatibility.json')
+    expect(builderConfig.files).toContain('product/build.js')
   })
 })
 

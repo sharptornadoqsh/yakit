@@ -51,6 +51,10 @@ on:
 permissions:
   contents: read
 
+env:
+  RUIYAN_CHROME_EXTENSION_URL: https://yaklang.oss-accelerate.aliyuncs.com/chrome-extension/yakit-chrome-extension-v0.0.7.zip
+  RUIYAN_CHROME_EXTENSION_SHA256: 5b250638ce76c95e9bc2c25db48049eac1f7af25fe34187e2b0997b872811f6d
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.target }}-${{ inputs.edition }}
   cancel-in-progress: true
@@ -65,6 +69,7 @@ jobs:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      RENYAN_PACKAGE_ARCHITECTURE: x64
     steps:
       - name: 验证 RuiYan 构建分支
         shell: bash
@@ -93,6 +98,13 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 准备固定浏览器扩展
+        shell: bash
+        run: |
+          mkdir -p bins/scripts
+          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
+          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -192,11 +204,8 @@ jobs:
       - name: 上传 RuiYan macOS x64 产物
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.metadata.outputs.artifact_container }}
-          path: |
-            ${{ steps.metadata.outputs.artifact_path }}
-            release/build-manifest.json
-            release/SHA256SUMS.txt
+          path: ${{ steps.metadata.outputs.artifact_path }}
+          archive: false
           if-no-files-found: error
           retention-days: ${{ inputs.retention_days }}
 
@@ -216,6 +225,7 @@ jobs:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      RENYAN_PACKAGE_ARCHITECTURE: arm64
     steps:
       - name: 验证 RuiYan 构建分支
         shell: bash
@@ -244,6 +254,13 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 准备固定浏览器扩展
+        shell: bash
+        run: |
+          mkdir -p bins/scripts
+          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
+          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -343,11 +360,8 @@ jobs:
       - name: 上传 RuiYan macOS arm64 产物
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.metadata.outputs.artifact_container }}
-          path: |
-            ${{ steps.metadata.outputs.artifact_path }}
-            release/build-manifest.json
-            release/SHA256SUMS.txt
+          path: ${{ steps.metadata.outputs.artifact_path }}
+          archive: false
           if-no-files-found: error
           retention-days: ${{ inputs.retention_days }}
 
@@ -367,6 +381,7 @@ jobs:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      RENYAN_PACKAGE_ARCHITECTURE: x64
     steps:
       - name: 验证 RuiYan 构建分支
         shell: bash
@@ -395,6 +410,13 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 准备固定浏览器扩展
+        shell: bash
+        run: |
+          mkdir -p bins/scripts
+          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
+          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -458,11 +480,8 @@ jobs:
       - name: 上传 RuiYan Windows x64 产物
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.metadata.outputs.artifact_container }}
-          path: |
-            ${{ steps.metadata.outputs.artifact_path }}
-            release/build-manifest.json
-            release/SHA256SUMS.txt
+          path: ${{ steps.metadata.outputs.artifact_path }}
+          archive: false
           if-no-files-found: error
           retention-days: ${{ inputs.retention_days }}
 
@@ -475,6 +494,7 @@ jobs:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      RENYAN_PACKAGE_ARCHITECTURE: x64
     steps:
       - name: 验证 RuiYan 构建分支与签名能力
         shell: bash
@@ -509,6 +529,13 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 准备固定浏览器扩展
+        shell: bash
+        run: |
+          mkdir -p bins/scripts
+          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
+          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -559,10 +586,7 @@ jobs:
       - name: 上传 RuiYan Linux x64 产物
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.metadata.outputs.artifact_container }}
-          path: |
-            ${{ steps.metadata.outputs.artifact_path }}
-            release/build-manifest.json
-            release/SHA256SUMS.txt
+          path: ${{ steps.metadata.outputs.artifact_path }}
+          archive: false
           if-no-files-found: error
           retention-days: ${{ inputs.retention_days }}

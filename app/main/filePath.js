@@ -150,6 +150,10 @@ const loadExtraFilePath = (s) => {
     return s
   }
 
+  if (!app.isPackaged) {
+    return path.resolve(app.getAppPath(), s)
+  }
+
   switch (os.platform()) {
     case 'darwin':
       return path.join(app.getAppPath(), '../..', s)

@@ -67,6 +67,7 @@ const configOption = {
     '!product/**/*',
     'product/renyan.json',
     'product/engine-compatibility.json',
+    'product/build.js',
     '!app/renderer/src/**/*',
     '!app/renderer/engine-link-startup/**/*',
     'app/renderer/engine-link-startup/dist/**/*',

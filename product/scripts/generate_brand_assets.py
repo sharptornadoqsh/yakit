@@ -167,7 +167,7 @@ def wordmark_svg(theme):
 <title id="title">{escape(CONFIG['displayName'])}</title>
 <g transform="translate(18 18) scale(.18)">{icon_markup(f'wordmark-{theme}')}</g>
 <text x="230" y="100" fill="{foreground}" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="52" font-weight="700">{escape(CONFIG['displayName'])}</text>
-<text x="232" y="148" fill="{secondary}" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="2">{escape(CONFIG['shortName'].upper())}</text>
+<text x="232" y="148" fill="{secondary}" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="2">{escape(CONFIG['shortName'])}</text>
 </svg>
 '''
 
@@ -199,7 +199,7 @@ def startup_panel_svg(theme):
 <g fill="{success}"><circle cx="96" cy="844" r="12" /><circle cx="848" cy="866" r="12" /><circle cx="566" cy="750" r="12" /></g>
 <g transform="translate(300 394) scale(.34)">{icon_markup(f'panel-mark-{theme}')}</g>
 <text x="472" y="820" text-anchor="middle" fill="{foreground}" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="54" font-weight="700">{escape(CONFIG['displayName'])}</text>
-<text x="472" y="884" text-anchor="middle" fill="{secondary}" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="3">{escape(CONFIG['shortName'].upper())}</text>
+<text x="472" y="884" text-anchor="middle" fill="{secondary}" font-family="Inter, Segoe UI, sans-serif" font-size="25" font-weight="600" letter-spacing="3">{escape(CONFIG['shortName'])}</text>
 <text x="472" y="936" text-anchor="middle" fill="{secondary}" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif" font-size="27">{escape(CONFIG['tagline'])}</text>
 </svg>
 '''
@@ -242,7 +242,7 @@ def wordmark_png(master, theme):
     image.alpha_composite(master.resize((184, 184), Image.Resampling.LANCZOS), (18, 18))
     draw = ImageDraw.Draw(image)
     draw.text((230, 45), CONFIG['displayName'], font=ImageFont.truetype(find_font(True), 52), fill=foreground)
-    draw.text((232, 126), CONFIG['shortName'].upper(), font=ImageFont.truetype(find_font(False), 25), fill=secondary, stroke_width=0)
+    draw.text((232, 126), CONFIG['shortName'], font=ImageFont.truetype(find_font(False), 25), fill=secondary, stroke_width=0)
     return image
 
 
