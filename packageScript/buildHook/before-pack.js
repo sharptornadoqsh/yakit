@@ -3,6 +3,23 @@ const packageJson = require('../../package.json')
 const productConfig = require('../../product/renyan.json')
 const { calculateFileSha256, getCompatibilityEntry, normalizeSha256 } = require('../../app/main/engineLifecycle')
 
+const normalizePath = (value) => `${value || ''}`.replace(/\\/g, '/')
+
+const resolveExpectedArchiveSha256 = (artifact, platform, architecture) => {
+  const verificationPath = `${artifact.sourceArchive}.verified.json`
+  if (!fs.existsSync(verificationPath)) return normalizeSha256(artifact.archiveSha256)
+
+  const verification = JSON.parse(fs.readFileSync(verificationPath, 'utf8'))
+  if (
+    verification.platform !== platform ||
+    verification.architecture !== architecture ||
+    normalizePath(verification.archivePath) !== normalizePath(artifact.sourceArchive)
+  ) {
+    throw new Error(`预置引擎验证记录与 ${platform}/${architecture} 不匹配`)
+  }
+  return normalizeSha256(verification.archiveSha256)
+}
+
 const validateBundledEngine = async (platform, architecture) => {
   const compatibility = getCompatibilityEntry({
     clientVersion: packageJson.version,
@@ -11,11 +28,12 @@ const validateBundledEngine = async (platform, architecture) => {
   })
   if (!compatibility) throw new Error(`兼容清单缺少 ${platform}/${architecture} 工件`)
 
-  const expectedSha256 = normalizeSha256(compatibility.artifact.archiveSha256)
-  if (!expectedSha256) throw new Error(`兼容清单中的 ${platform}/${architecture} 预置工件摘要仍为待定`)
-
   const sourceArchive = compatibility.artifact.sourceArchive
   if (!fs.existsSync(sourceArchive)) throw new Error(`预置引擎压缩包不存在：${sourceArchive}`)
+
+  const expectedSha256 = resolveExpectedArchiveSha256(compatibility.artifact, platform, architecture)
+  if (!expectedSha256) throw new Error(`预置引擎 ${platform}/${architecture} 缺少有效摘要`)
+
   const actualSha256 = await calculateFileSha256(sourceArchive)
   if (actualSha256 !== expectedSha256) {
     throw new Error(`预置引擎压缩包摘要不匹配：${sourceArchive}`)
@@ -23,132 +41,103 @@ const validateBundledEngine = async (platform, architecture) => {
   return compatibility.artifact
 }
 
-module.exports = async function (context) {
-  const isLegacy = process.env.THE_LEGACY == 'true'
+const appendEngine = (extraFiles, engineArtifact) => {
+  if (!engineArtifact) return extraFiles
+  return [
+    ...extraFiles,
+    {
+      from: engineArtifact.sourceArchive,
+      to: 'bins/yak.zip',
+    },
+  ]
+}
 
+const resolveRuiYanArtifactName = ({ platform, architecture, productVersion }) => {
+  const editionLabels = {
+    community: 'Community',
+    enterprise: 'Enterprise',
+  }
+  const editionLabel = editionLabels[process.env.RENYAN_PACKAGE_EDITION]
+  if (!editionLabel) return ''
+
+  const platformLabels = {
+    darwin: 'darwin',
+    win32: 'windows',
+    linux: 'linux',
+  }
+  const platformLabel = platformLabels[platform]
+  if (!platformLabel) throw new Error(`不支持的睿眼打包平台：${platform}`)
+
+  return `${productConfig.artifactPrefix}-${editionLabel}-${productVersion}-${platformLabel}-${architecture}.${'${ext}'}`
+}
+
+const resolveLegacyArtifactName = ({ platform, architecture, productVersion, isLegacy }) => {
+  const legacySuffix = isLegacy ? '-legacy' : ''
+  if (platform === 'win32') {
+    return `${productConfig.artifactPrefix}-${productVersion}-windows${legacySuffix}-amd64.${'${ext}'}`
+  }
+  if (platform === 'linux') {
+    const architectureLabel = architecture === 'x64' ? 'amd64' : architecture
+    return `${productConfig.artifactPrefix}-${productVersion}-linux${legacySuffix}-${architectureLabel}.${'${ext}'}`
+  }
+  if (platform === 'darwin') {
+    return `${productConfig.artifactPrefix}-${productVersion}-darwin${legacySuffix}-${architecture}.${'${ext}'}`
+  }
+  throw new Error(`不支持的打包平台：${platform}`)
+}
+
+const beforePack = async (context) => {
+  const isLegacy = process.env.THE_LEGACY == 'true'
+  const includeEngine = process.env.INCLUDE_ENGINE !== 'false'
   const archMap = {
     1: 'x64',
     3: 'arm64',
   }
-  const arch = archMap[context.arch]
-  if (!arch) throw new Error(`不支持的构建架构编号：${context.arch}`)
-  const engineArtifact = await validateBundledEngine(context.electronPlatformName, arch)
+  const architecture = archMap[context.arch]
+  if (!architecture) throw new Error(`不支持的构建架构编号：${context.arch}`)
+
+  const platform = context.electronPlatformName
+  const engineArtifact = includeEngine ? await validateBundledEngine(platform, architecture) : null
   const baseInfo = context.packager.appInfo
-  let productVersion = packageJson.version || baseInfo.version
-  // CE
-  if (productVersion.endsWith('-ce')) {
-    productVersion = productVersion.replace('-ce', '')
-  }
-  // EE
-  if (productVersion.endsWith('-ee')) {
-    productVersion = productVersion.replace('-ee', '')
-  }
+  const productVersion = `${packageJson.version || baseInfo.version}`.replace(/-(ce|ee)$/, '')
+  const artifactName =
+    resolveRuiYanArtifactName({ platform, architecture, productVersion }) ||
+    resolveLegacyArtifactName({ platform, architecture, productVersion, isLegacy })
 
-  const artifactName = productConfig.artifactPrefix
-
-  /** win32 */
-  const win32Config = context.electronPlatformName === 'win32' ? context.packager.config.win : null
+  const win32Config = platform === 'win32' ? context.packager.config.win : null
   if (win32Config) {
-    win32Config.extraFiles = [
-      {
-        from: 'bins/flag.windows.txt',
-        to: 'bins/flag.windows.txt',
-      },
-      {
-        from: engineArtifact.sourceArchive,
-        to: 'bins/yak.zip',
-      },
-      {
-        from: 'LICENSE.md',
-        to: 'LICENSE.md',
-      },
-    ]
-    win32Config.artifactName = `${artifactName}-${productVersion}-windows${isLegacy ? '-legacy' : ''}-amd64.${'${ext}'}`
+    win32Config.extraFiles = appendEngine(
+      [
+        { from: 'bins/flag.windows.txt', to: 'bins/flag.windows.txt' },
+        { from: 'LICENSE.md', to: 'LICENSE.md' },
+      ],
+      engineArtifact,
+    )
+    win32Config.artifactName = artifactName
     context.packager.config.win = win32Config
   }
 
-  /**linux */
-  /** 1:x64 3:arm64 */
-  const linuxConfig = context.electronPlatformName === 'linux' ? context.packager.config.linux : null
+  const linuxConfig = platform === 'linux' ? context.packager.config.linux : null
   if (linuxConfig) {
-    const linuxExtraFiles = [
-      {
-        from: 'bins/flag.linux.txt',
-        to: 'bins/flag.linux.txt',
-      },
-      {
-        from: 'LICENSE.md',
-        to: 'LICENSE.md',
-      },
-    ]
-    switch (arch) {
-      case 'arm64':
-        linuxConfig.artifactName = `${artifactName}-${productVersion}-linux${
-          isLegacy ? '-legacy' : ''
-        }-arm64.${'${ext}'}`
-        linuxConfig.extraFiles = [
-          ...linuxExtraFiles,
-          {
-            from: engineArtifact.sourceArchive,
-            to: 'bins/yak.zip',
-          },
-        ]
-        break
-      case 'x64':
-        linuxConfig.artifactName = `${artifactName}-${productVersion}-linux${
-          isLegacy ? '-legacy' : ''
-        }-amd64.${'${ext}'}`
-        linuxConfig.extraFiles = [
-          ...linuxExtraFiles,
-          {
-            from: engineArtifact.sourceArchive,
-            to: 'bins/yak.zip',
-          },
-        ]
-        break
-
-      default:
-        break
-    }
+    linuxConfig.extraFiles = appendEngine(
+      [
+        { from: 'bins/flag.linux.txt', to: 'bins/flag.linux.txt' },
+        { from: 'LICENSE.md', to: 'LICENSE.md' },
+      ],
+      engineArtifact,
+    )
+    linuxConfig.artifactName = artifactName
     context.packager.config.linux = linuxConfig
   }
 
-  /**mac */
-  /** 1:x64 3:arm64 */
-  const macConfig = context.electronPlatformName === 'darwin' ? context.packager.config.mac : null
+  const macConfig = platform === 'darwin' ? context.packager.config.mac : null
   if (macConfig) {
-    const darwinExtraFiles = [
-      {
-        from: 'bins/flag.darwin.txt',
-        to: 'bins/flag.darwin.txt',
-      },
-    ]
-    macConfig.artifactName = `${artifactName}-${productVersion}-darwin${
-      isLegacy ? '-legacy' : ''
-    }-${'${arch}'}.${'${ext}'}`
-    switch (arch) {
-      case 'arm64':
-        macConfig.extraFiles = [
-          ...darwinExtraFiles,
-          {
-            from: engineArtifact.sourceArchive,
-            to: 'bins/yak.zip',
-          },
-        ]
-        break
-      case 'x64':
-        macConfig.extraFiles = [
-          ...darwinExtraFiles,
-          {
-            from: engineArtifact.sourceArchive,
-            to: 'bins/yak.zip',
-          },
-        ]
-        break
-
-      default:
-        break
-    }
+    macConfig.extraFiles = appendEngine([{ from: 'bins/flag.darwin.txt', to: 'bins/flag.darwin.txt' }], engineArtifact)
+    macConfig.artifactName = artifactName
     context.packager.config.mac = macConfig
   }
 }
+
+module.exports = beforePack
+module.exports.resolveExpectedArchiveSha256 = resolveExpectedArchiveSha256
+module.exports.resolveRuiYanArtifactName = resolveRuiYanArtifactName

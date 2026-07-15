@@ -4,6 +4,7 @@ const { resolveBuildSha, resolveEdition } = require('../product/build')
 const platform = process.env.PLATFORM
 const buildSha = resolveBuildSha()
 const edition = resolveEdition(platform)
+const includeEngine = process.env.INCLUDE_ENGINE !== 'false'
 
 const configOption = {
   appId: productConfig.appId,
@@ -26,7 +27,6 @@ const configOption = {
     { from: 'bins/scripts/start-engine.zip', to: 'bins/scripts/start-engine.zip' },
     { from: 'bins/scripts/google-chrome-plugin.zip', to: 'bins/scripts/google-chrome-plugin.zip' },
     { from: 'bins/flag.txt', to: 'bins/flag.txt' },
-    { from: 'bins/engine-version.txt', to: 'bins/engine-version.txt' },
     {
       from: 'bins/resources',
       to: 'bins/resources',
@@ -144,6 +144,10 @@ const configOption = {
     releaseName: '${version}',
     releaseNotes: `查看发布记录：${productConfig.repositoryUrl}/releases`,
   },
+}
+
+if (includeEngine) {
+  configOption.extraFiles.push({ from: 'bins/engine-version.txt', to: 'bins/engine-version.txt' })
 }
 
 const isLegacy = process.env.THE_LEGACY == 'true'

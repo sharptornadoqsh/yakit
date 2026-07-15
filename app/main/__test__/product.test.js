@@ -17,6 +17,7 @@ describe('睿眼产品配置', () => {
       'executableName',
       'linuxExecutableName',
       'artifactPrefix',
+      'artifactContainerPrefix',
       'defaultDataDirectory',
       'updateChannel',
       'supportName',
