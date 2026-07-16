@@ -2,7 +2,7 @@
 
 ## 一、交付结论
 
-`.github/workflows/multi-platform-build.yml` 已改造为 `RuiYan Multi-Platform Package`。网页输入只保留目标平台、社区版、企业版或企业版免许可证、是否预置引擎、引擎版本、是否签名和产物保留天数。四个平台分别在原生执行环境中构建，每个被选任务只上传对应的一个安装文件，网页下载不再封装为 ZIP。
+`.github/workflows/multi-platform-build.yml` 已改造为 `RuiYan Multi-Platform Package`。网页输入只保留目标平台、社区版、企业版或企业版免许可证、是否预置引擎、引擎版本、是否签名和产物保留天数。四个平台共五个架构任务分别在原生执行环境中构建，每个被选任务只上传对应的一个安装文件，网页下载不再封装为 ZIP。
 
 默认路径生成无签名内部验证安装文件，不读取签名凭据。企业版调用 `yarn build-renders-enterprise` 并保留现有许可证校验；企业版免许可证调用仓库既有 `yarn build-renders-enterprise-no-license`，两类安装文件使用不同名称。
 
@@ -12,7 +12,7 @@
 
 | 参数 | 默认值 | 可选值或约束 |
 | --- | --- | --- |
-| `target` | `macos-both` | `macos-x64`、`macos-arm64`、`macos-both`、`windows-x64`、`linux-x64`、`all` |
+| `target` | `macos-both` | `macos-x64`、`macos-arm64`、`macos-both`、`windows-x64`、`linux-x64`、`linux-arm64`、`all` |
 | `edition` | `community` | `community`、`enterprise`、`enterprise-no-license` |
 | `include_engine` | `false` | 布尔值 |
 | `engine_version` | 空 | 仅允许版本所需字符，空值读取兼容清单 |
@@ -39,12 +39,13 @@
 | `build-macos-arm64` | 苹果系统 | `arm64` | `macos-15` | `DMG` |
 | `build-windows-x64` | 微软系统 | `x64` | `windows-2022` | `NSIS EXE` |
 | `build-linux-x64` | 开源系统 | `x64` | `ubuntu-22.04` | `AppImage` |
+| `build-linux-arm64` | 开源系统 | `arm64` | `ubuntu-22.04-arm` | `AppImage` |
 
-不提供微软系统苹果芯片架构、开源系统苹果芯片架构、旧系统模式或跨系统模拟层构建。
+不提供微软系统苹果芯片架构、旧系统模式或跨系统模拟层构建。
 
 ## 五、打包命令与文件名称
 
-`package.json` 提供十二条无签名命令和六条苹果系统签名命令。三种类别分别采用独立的睿眼环境，所有命令显式指定平台、架构和 `--publish never`，不会创建正式发布。
+`package.json` 提供十五条无签名命令和六条苹果系统签名命令。三种类别分别采用独立的睿眼环境，所有命令显式指定平台、架构和 `--publish never`，不会创建正式发布。
 
 版本只读取根 `package.json`。安装文件名称为：
 
@@ -53,23 +54,26 @@ RuiYan-Pentest-Community-<version>-darwin-x64.dmg
 RuiYan-Pentest-Community-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Community-<version>-windows-x64.exe
 RuiYan-Pentest-Community-<version>-linux-x64.AppImage
+RuiYan-Pentest-Community-<version>-linux-arm64.AppImage
 RuiYan-Pentest-Enterprise-<version>-darwin-x64.dmg
 RuiYan-Pentest-Enterprise-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Enterprise-<version>-windows-x64.exe
 RuiYan-Pentest-Enterprise-<version>-linux-x64.AppImage
+RuiYan-Pentest-Enterprise-<version>-linux-arm64.AppImage
 RuiYan-Pentest-Enterprise-No-License-<version>-darwin-x64.dmg
 RuiYan-Pentest-Enterprise-No-License-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Enterprise-No-License-<version>-windows-x64.exe
 RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
+RuiYan-Pentest-Enterprise-No-License-<version>-linux-arm64.AppImage
 ```
 
 ## 六、引擎预置与摘要
 
 `packageScript/script/prepare-renyan-engine.js` 负责确定版本、限定版本字符、按平台选择工件、通过加密传输下载引擎与摘要、比较真实摘要、保持内部文件名并生成打包钩子可复验的归档记录。
 
-关闭预置引擎时，打包配置不加入引擎版本文件，打包钩子不读取预置工件。开启时，最终版本写入 `bins/engine-version.txt` 和构建清单。项目推荐版本 `1.4.8-beta3` 的四个目标摘要地址均已取得有效响应。
+关闭预置引擎时，打包配置不加入引擎版本文件，打包钩子不读取预置工件。开启时，最终版本写入 `bins/engine-version.txt` 和构建清单。项目推荐版本 `1.4.8-beta3` 的五个目标摘要地址均已取得有效响应。
 
-四个任务分别声明 `x64`、`arm64`、`x64` 与 `x64` 目标架构，打包钩子优先采用该声明选择预置工件。本地直接调用打包命令时仍按打包器传入的架构编号解析。
+五个任务分别声明自身的 `x64` 或 `arm64` 目标架构，平台打包命令使用对应的 `--x64` 或 `--arm64` 参数。打包器配置只声明 `dmg`、`AppImage` 或 `nsis` 目标类型，不再为苹果系统和 Linux 重复声明多架构集合。打包钩子优先采用任务声明选择预置工件，本地直接调用时使用打包器传入的架构编号。
 
 ## 七、构建元数据与直接安装文件
 
@@ -94,15 +98,15 @@ RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
 ## 十、验证与未执行事项
 
 - 本地脚本语法、配置结构与工作流语法解析已经通过。
-- 定向测试两个文件、十八项用例通过。
+- 安装文件与产品定向测试两个文件、十九项用例通过。
 - 当前打包器版本与本地命令帮助确认平台和架构参数可用。
-- 四个推荐引擎摘要地址均返回有效摘要。
+- 五个推荐引擎摘要地址均返回有效响应。
 - `actionlint` 未安装，因此采用仓库现有解析库和定向契约测试。
 - 没有在微软系统主机生成苹果磁盘映像。
 - 没有执行全量测试、全量规则检查、全量类型检查、浏览器测试或性能测试。
-- 本次变更没有触发 GitHub Actions，也没有创建发布、标签或合并请求。用户手动触发的任务 `29392044377` 基于变更前的 `b812e3b`，不作为新增免许可证类别的远端验证。
+- 用户手动触发的任务 `29457787711` 基于 `23d1a3e16`。微软系统任务成功；两个苹果系统任务都额外构建了另一种架构并复用任务文件名；Linux x64 任务额外构建 arm64 后因 AppImage 路径不存在而失败。当前配置已经移除苹果系统和 Linux 的多架构目标列表，真实托管产物仍需使用包含该修订的新提交重新构建。
 
-新增免许可证类别的首次远端运行仍需验证托管执行环境中的完整依赖安装、签名账号权限、苹果公证、微软密钥库访问和四类最终安装文件。默认的免许可证企业版、微软系统、无引擎、无签名参数可用于首次定向验证。
+免许可证类别已经取得微软系统与苹果系统任务记录，但旧苹果系统文件存在架构被后一次构建替换的风险，Linux 文件没有生成。新提交仍需验证两个苹果系统架构、Linux x64 与 Linux arm64 的最终单架构产物；签名账号权限、苹果公证和微软密钥库访问继续依赖仓库外部凭据。
 
 ## 十一、已知事项
 
@@ -113,6 +117,6 @@ RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
 - 三份锁文件未修改，工作流采用冻结锁文件安装方式。
 - 旧提交 `b812e3b` 生成的安装文件缺少 `product/build.js`，不能作为修复后的发布文件；必须使用包含启动修复的新提交重新构建。
 - 源码目录设置 `ELECTRON_IS_DEV=0` 前必须执行对应的双渲染器构建；缺少 `app/renderer/pages/main/index.html` 会产生空白窗口。未打包的生产资源路径现在以仓库根目录为基准，避免错误定位到仓库上两级目录。
-- 任务 `29396021957` 实际记录 `INCLUDE_ENGINE=true`，与网页表单当前未勾选状态无关；该次任务还暴露了苹果臂架构与开源系统英特尔架构在打包钩子中选择相反工件的问题，固定任务架构声明已经修正该路径。
+- 任务 `29396021957` 暴露的引擎工件选择问题已经由固定任务架构声明修订；任务 `29457787711` 进一步证明平台配置中的多架构列表仍会触发第二种架构。当前源码已移除该列表，旧任务的苹果系统与 Linux 文件不得用于发布。
 
 网页与命令行操作见 `GITHUB_ACTIONS_PACKAGE.md`。

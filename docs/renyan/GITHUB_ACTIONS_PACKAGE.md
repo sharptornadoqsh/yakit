@@ -4,7 +4,7 @@
 
 工作流文件为 `.github/workflows/multi-platform-build.yml`，页面名称为 `RuiYan Multi-Platform Package`。工作流只允许从 `qsh` 分支构建社区版、企业版或企业版免许可证客户端，不包含轻量企业版、代码审计版、代码审计企业版和智能代理版。
 
-四类安装文件分别在原生执行环境中生成：
+五类安装文件分别在原生执行环境中生成：
 
 | 目标 | 安装文件 | 执行环境 | 超时 |
 | --- | --- | --- | ---: |
@@ -12,8 +12,9 @@
 | `macos-arm64` | 苹果芯片架构苹果系统安装文件 | `macos-15` | 九十分钟 |
 | `windows-x64` | 六十四位微软系统安装文件 | `windows-2022` | 六十分钟 |
 | `linux-x64` | 六十四位开源系统安装文件 | `ubuntu-22.04` | 六十分钟 |
+| `linux-arm64` | 苹果芯片架构开源系统安装文件 | `ubuntu-22.04-arm` | 六十分钟 |
 
-`macos-both` 同时执行两个苹果系统任务，`all` 同时执行全部四个任务。本阶段不提供微软系统或开源系统的苹果芯片架构构建。
+`macos-both` 同时执行两个苹果系统任务，`all` 同时执行全部五个任务。本阶段不提供微软系统的苹果芯片架构构建。
 
 ## 二、网页运行步骤
 
@@ -40,7 +41,7 @@
 
 | 参数 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `target` | 选择 | `macos-both` | 选择一个平台、两个苹果系统架构或全部平台 |
+| `target` | 选择 | `macos-both` | 选择一个平台架构、两个苹果系统架构或全部平台架构 |
 | `edition` | 选择 | `community` | 选择社区版、企业版或企业版免许可证 |
 | `include_engine` | 布尔 | `false` | 是否预置目标平台和架构的 Yak 引擎 |
 | `engine_version` | 字符串 | 空 | 启用预置引擎时指定版本；空值读取兼容清单推荐版本 |
@@ -109,6 +110,20 @@ gh workflow run multi-platform-build.yml \
   -f retention_days=14
 ```
 
+企业版免许可证开源系统苹果芯片架构命令：
+
+```bash
+gh workflow run multi-platform-build.yml \
+  --repo sharptornadoqsh/yakit \
+  --ref qsh \
+  -f target=linux-arm64 \
+  -f edition=enterprise-no-license \
+  -f include_engine=false \
+  -f engine_version="" \
+  -f sign_installers=false \
+  -f retention_days=14
+```
+
 这些命令会创建远端工作流运行。当前改造过程没有执行上述命令，也没有自动创建发布、标签或合并请求。
 
 ## 六、预置引擎
@@ -121,15 +136,15 @@ gh workflow run multi-platform-build.yml \
 
 1. 从 `engine_version` 或 `product/engine-compatibility.json` 确定版本。
 2. 只接受字母、数字、点、横杠和下划线，拒绝 `latest` 和其他不明确值。
-3. 按任务选择 `yak_darwin_amd64`、`yak_darwin_arm64`、`yak_windows_amd64.exe` 或 `yak_linux_amd64`。
+3. 按任务选择 `yak_darwin_amd64`、`yak_darwin_arm64`、`yak_windows_amd64.exe`、`yak_linux_amd64` 或 `yak_linux_arm64`。
 4. 通过固定的 HTTPS 地址分别下载引擎与摘要文件。
 5. 在归档前比较真实文件摘要，摘要不一致时终止任务。
 6. 保持压缩包内部的既有引擎文件名，并按打包钩子规则放入安装文件。
 7. 在 `build-manifest.json` 中记录最终版本。
 
-项目当前推荐引擎版本为 `1.4.8-beta3`。该版本四个目标工件的摘要地址已取得有效响应；工作流仍会在每次启用预置引擎时重新下载并验证摘要。
+项目当前推荐引擎版本为 `1.4.8-beta3`。该版本五个目标工件的摘要地址已取得有效响应；工作流仍会在每次启用预置引擎时重新下载并验证摘要。
 
-每个原生任务还会显式声明安装文件目标架构。打包钩子优先使用该声明选择兼容清单工件，避免苹果臂架构误取英特尔压缩包，或开源系统英特尔架构误取臂架构压缩包。直接在本地调用打包命令时，钩子继续使用打包器传入的架构编号。
+每个原生任务会显式声明安装文件目标架构，平台命令同时使用对应的 `--x64` 或 `--arm64` 参数。打包器配置只声明安装文件类型，不再为苹果系统和 Linux 设置 `arch: ['x64', 'arm64']`。因此单架构命令只创建目标架构，打包钩子使用同一架构选择兼容清单工件和文件名；直接在本地调用时，钩子继续使用打包器传入的架构编号。
 
 ## 七、签名
 
@@ -163,14 +178,17 @@ RuiYan-Pentest-Community-<version>-darwin-x64.dmg
 RuiYan-Pentest-Community-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Community-<version>-windows-x64.exe
 RuiYan-Pentest-Community-<version>-linux-x64.AppImage
+RuiYan-Pentest-Community-<version>-linux-arm64.AppImage
 RuiYan-Pentest-Enterprise-<version>-darwin-x64.dmg
 RuiYan-Pentest-Enterprise-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Enterprise-<version>-windows-x64.exe
 RuiYan-Pentest-Enterprise-<version>-linux-x64.AppImage
+RuiYan-Pentest-Enterprise-<version>-linux-arm64.AppImage
 RuiYan-Pentest-Enterprise-No-License-<version>-darwin-x64.dmg
 RuiYan-Pentest-Enterprise-No-License-<version>-darwin-arm64.dmg
 RuiYan-Pentest-Enterprise-No-License-<version>-windows-x64.exe
 RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
+RuiYan-Pentest-Enterprise-No-License-<version>-linux-arm64.AppImage
 ```
 
 每个任务只上传一个安装文件，并设置 `archive: false`。Actions 页面使用真实安装文件名作为产物名，点击后直接返回该文件，不再生成外层 ZIP。构建清单和摘要仍在任务工作目录生成，但不作为单独下载项上传。
@@ -183,9 +201,11 @@ RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
 
 ## 十、Action 运行时
 
-`qsh` 工作流使用 `actions/checkout@v7`、`actions/setup-node@v6` 和 `actions/upload-artifact@v7`，三者均采用 Node.js 24。`upload-artifact@v7` 的非归档模式只接受一个文件，因此四个原生任务分别上传对应架构的单个安装文件。旧工作流中的 v4 与第三方 Action 可能显示 Node.js 20 弃用警告；该警告不同于签名凭据缺失错误。
+`qsh` 工作流使用 `actions/checkout@v7`、`actions/setup-node@v6` 和 `actions/upload-artifact@v7`，三者均采用 Node.js 24。`upload-artifact@v7` 的非归档模式只接受一个文件，因此五个原生任务分别上传对应架构的单个安装文件。旧工作流中的 v4 与第三方 Action 可能显示 Node.js 20 弃用警告；该警告不同于签名凭据缺失错误。
 
-任务 `29396021957` 中，微软系统任务完成，苹果臂架构与开源系统任务在打包钩子中分别选错引擎架构，苹果英特尔任务随后被取消。该问题已经通过固定任务架构声明修正。该任务的 `sign_installers` 为 `false`，所以开源系统日志中的失败不属于签名故障。
+任务 `29396021957` 中，微软系统任务完成，苹果臂架构与开源系统任务在打包钩子中分别选错引擎架构，苹果英特尔任务随后被取消。固定任务架构声明修订了引擎工件选择；该任务的 `sign_installers` 为 `false`，所以开源系统日志中的失败不属于签名故障。
+
+任务 `29457787711` 中，微软系统与两个苹果系统任务显示成功，Linux x64 任务失败。日志证明苹果系统与 Linux 配置仍依次触发 `x64` 和 `arm64`，而打包钩子使用任务声明生成同一个架构文件名；Linux 在第二次构建时报告 AppImage 路径不存在，两个苹果系统文件则存在被另一架构替换的风险。当前配置已移除苹果系统和 Linux 的多架构列表，旧任务中的三个文件不得作为发布产物，必须使用包含修订的新提交重新构建。
 
 旧提交 `b812e3b` 的安装文件没有包含 `product/build.js`，启动时会在主进程报告模块缺失。使用修复后的 `qsh` 提交重新构建即可，旧安装文件不应继续发布。
 

@@ -15,6 +15,7 @@ const supportedAssets = {
   yak_darwin_arm64: { platform: 'darwin', architecture: 'arm64' },
   'yak_windows_amd64.exe': { platform: 'win32', architecture: 'x64' },
   yak_linux_amd64: { platform: 'linux', architecture: 'x64' },
+  yak_linux_arm64: { platform: 'linux', architecture: 'arm64' },
 }
 
 const normalizePath = (value) => value.replace(/\\/g, '/')

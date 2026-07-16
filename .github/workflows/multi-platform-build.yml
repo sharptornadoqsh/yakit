@@ -14,6 +14,7 @@ on:
           - macos-both
           - windows-x64
           - linux-x64
+          - linux-arm64
           - all
       edition:
         description: 选择社区版、企业版或企业版免许可证客户端
@@ -584,6 +585,112 @@ jobs:
         run: node packageScript/script/create-renyan-build-metadata.js
 
       - name: 上传 RuiYan Linux x64 产物
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.metadata.outputs.artifact_path }}
+          archive: false
+          if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+
+  build-linux-arm64:
+    name: RuiYan Linux arm64 Package
+    if: ${{ inputs.target == 'linux-arm64' || inputs.target == 'all' }}
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 60
+    env:
+      CI: ''
+      NODE_OPTIONS: --max_old_space_size=4096
+      INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      RENYAN_PACKAGE_ARCHITECTURE: arm64
+    steps:
+      - name: 验证 RuiYan 构建分支与签名能力
+        shell: bash
+        env:
+          PACKAGE_SIGNED: ${{ inputs.sign_installers }}
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "qsh" ]; then
+            echo "只允许从 qsh 分支构建睿眼安装文件" >&2
+            exit 1
+          fi
+          if [ "${PACKAGE_SIGNED}" = "true" ]; then
+            echo "当前仓库没有 Linux 安装文件签名机制，请关闭安装文件签名" >&2
+            exit 1
+          fi
+
+      - name: 检出 RuiYan 源码
+        uses: actions/checkout@v7
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.12.0
+          cache: yarn
+          cache-dependency-path: |
+            yarn.lock
+            app/renderer/src/main/yarn.lock
+            app/renderer/engine-link-startup/yarn.lock
+
+      - name: 安装固定依赖
+        shell: bash
+        run: |
+          yarn install --frozen-lockfile
+          yarn install-render --frozen-lockfile
+          yarn install-link-render --frozen-lockfile
+
+      - name: 准备固定浏览器扩展
+        shell: bash
+        run: |
+          mkdir -p bins/scripts
+          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
+          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
+
+      - name: 构建 RuiYan 渲染器
+        shell: bash
+        env:
+          PACKAGE_EDITION: ${{ inputs.edition }}
+        run: |
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn build-renders-enterprise-no-license
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+            yarn build-renders-enterprise
+          else
+            yarn build-renders
+          fi
+
+      - name: 准备并校验 Linux arm64 引擎
+        if: ${{ inputs.include_engine }}
+        id: engine
+        shell: bash
+        env:
+          REQUESTED_ENGINE_VERSION: ${{ inputs.engine_version }}
+          ENGINE_ASSET: yak_linux_arm64
+          DEFER_ENGINE_ARCHIVE: 'false'
+        run: node packageScript/script/prepare-renyan-engine.js prepare
+
+      - name: 生成 RuiYan Linux arm64 无签名安装文件
+        shell: bash
+        env:
+          PACKAGE_EDITION: ${{ inputs.edition }}
+        run: |
+          if [ "${PACKAGE_EDITION}" = "enterprise-no-license" ]; then
+            yarn pack-renyan-linux-arm64-enterprise-no-license-unsigned
+          elif [ "${PACKAGE_EDITION}" = "enterprise" ]; then
+            yarn pack-renyan-linux-arm64-enterprise-unsigned
+          else
+            yarn pack-renyan-linux-arm64-unsigned
+          fi
+
+      - name: 生成 RuiYan 构建清单与摘要
+        id: metadata
+        shell: bash
+        env:
+          PACKAGE_EDITION: ${{ inputs.edition }}
+          PACKAGE_TARGET: linux-arm64
+          PACKAGE_SIGNED: 'false'
+          INCLUDE_ENGINE: ${{ inputs.include_engine }}
+        run: node packageScript/script/create-renyan-build-metadata.js
+
+      - name: 上传 RuiYan Linux arm64 产物
         uses: actions/upload-artifact@v7
         with:
           path: ${{ steps.metadata.outputs.artifact_path }}

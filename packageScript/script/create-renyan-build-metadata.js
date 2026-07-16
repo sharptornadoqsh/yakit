@@ -12,6 +12,7 @@ const targetDefinitions = {
   'macos-arm64': { platform: 'darwin', architecture: 'arm64', extension: 'dmg', containerPlatform: 'macOS' },
   'windows-x64': { platform: 'windows', architecture: 'x64', extension: 'exe', containerPlatform: 'Windows' },
   'linux-x64': { platform: 'linux', architecture: 'x64', extension: 'AppImage', containerPlatform: 'Linux' },
+  'linux-arm64': { platform: 'linux', architecture: 'arm64', extension: 'AppImage', containerPlatform: 'Linux' },
 }
 const editionLabels = {
   community: 'Community',

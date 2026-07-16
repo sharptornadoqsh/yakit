@@ -96,7 +96,7 @@ const configOption = {
     gatekeeperAssess: false,
     entitlements: 'packageScript/plist/entitlements.mac.plist',
     entitlementsInherit: 'packageScript/plist/entitlements.mac.plist',
-    target: [{ target: 'dmg', arch: ['x64', 'arm64'] }],
+    target: ['dmg'],
     executableName: productConfig.executableName,
     icon: 'app/assets/renyan-icon.icns',
     extendInfo: {
@@ -105,7 +105,7 @@ const configOption = {
     },
   },
   linux: {
-    target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
+    target: ['AppImage'],
     executableName: productConfig.linuxExecutableName,
     icon: 'product/brand/icons',
     category: 'Development',
