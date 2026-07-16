@@ -2,42 +2,47 @@
 // --------------------- start-----------------------
 .web-fuzzer {
   @extend .display-flex-center;
+  flex-direction: column;
   flex: 1;
   overflow: hidden;
   .web-fuzzer-tab {
-    border-right: 1px solid var(--Colors-Use-Neutral-Border);
-    background: var(--Colors-Use-Neutral-Bg-Hover);
-    width: 24px;
-    height: 100%;
+    display: flex;
+    flex-shrink: 0;
+    width: 100%;
+    min-height: 39px;
+    border-bottom: 1px solid #cbdadc;
+    background: #f1f6f6;
     svg {
       width: 16px;
       height: 16px;
       color: var(--Colors-Use-Neutral-Text-3-Secondary);
     }
     &-item {
-      @extend .display-column-center;
-      padding: 12px 4px;
-      align-items: flex-start;
-      gap: 4px;
+      display: flex;
+      align-items: center;
+      padding: 7px 12px;
+      gap: 6px;
       color: var(--Colors-Use-Neutral-Text-1-Title);
       cursor: pointer;
-      border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
+      border-right: 1px solid #d6e2e3;
+      border-bottom: 2px solid transparent;
       &:hover {
         background-color: var(--Colors-Use-Neutral-Border);
       }
     }
     &-item-active {
-      color: var(--Colors-Use-Main-On-Primary);
-      background-color: var(--Colors-Use-Main-Primary);
+      color: #087f83;
+      background-color: #e7f7f5;
+      border-bottom-color: #0caf9f;
       &:hover {
-        background-color: var(--Colors-Use-Main-Hover);
-        color: var(--Colors-Use-Main-On-Primary);
+        background-color: #dff3f1;
+        color: #087f83;
         svg {
-          color: var(--Colors-Use-Main-On-Primary);
+          color: #087f83;
         }
       }
       svg {
-        color: var(--Colors-Use-Main-On-Primary);
+        color: #087f83;
       }
     }
     &-item-active-sequence {
@@ -65,9 +70,7 @@
       font-weight: 600;
       line-height: 16px;
       font-size: 12px;
-      writing-mode: vertical-rl;
-      // text-orientation: sideways-right;
-      // transform: rotate(180deg);
+      white-space: nowrap;
     }
   }
   .web-fuzzer-tab-content {

@@ -183,6 +183,7 @@ import { RemoteSoftModeGV } from '@/enums/softMode'
 import { debugToPrintLogs } from '@/utils/logCollection'
 import { RenyanPageHeader } from '@/components/layout/RenyanPageHeader'
 import { RenyanWorkspaceSidebar } from '../renyanMenu/RenyanNavigation'
+import { isRuiYanTargetRoute, RuiYanPage } from '@/components/renyanUI'
 import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 
 const BatchAddNewGroup = React.lazy(() => import('./BatchAddNewGroup'))
@@ -3423,10 +3424,13 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
     }
   }, [])
   const currentWorkspacePage = pageCache.find((item) => item.routeKey === currentTabKey) || pageCache[0]
+  const useRuiYanWorkspace = isRuiYanTargetRoute(currentWorkspacePage?.route)
 
   return (
     <Content className={styles['renyan-workspace-shell']}>
-      <RenyanWorkspaceSidebar currentRoute={currentWorkspacePage?.route} onMenuSelect={openMultipleMenuPage} />
+      {!useRuiYanWorkspace && (
+        <RenyanWorkspaceSidebar currentRoute={currentWorkspacePage?.route} onMenuSelect={openMultipleMenuPage} />
+      )}
       <div className={styles['renyan-workspace-main']}>
         <YakitSpin spinning={loading}>
           <TabContent
@@ -3562,9 +3566,14 @@ const TabContent: React.FC<TabContentProps> = React.memo((props) => {
       firstTabMenuBodyHeight: height,
     })
   })
+  const activePage = pageCache.find((item) => item.routeKey === currentTabKey)
 
   return (
-    <div className={styles['tab-menu']}>
+    <div
+      className={classNames(styles['tab-menu'], {
+        [styles['tab-menu-renyan']]: isRuiYanTargetRoute(activePage?.route),
+      })}
+    >
       <ReactResizeDetector
         onResize={(_, height) => {
           if (!height) return
@@ -3610,6 +3619,46 @@ const TabChildren: React.FC<TabChildrenProps> = React.memo((props) => {
   return (
     <>
       {pageCache.map((pageItem, index) => {
+        const useRuiYanWorkspace = isRuiYanTargetRoute(pageItem.route)
+        const pageHeader = currentTabKey === pageItem.routeKey && (
+          <RenyanPageHeader
+            route={pageItem.route}
+            fallbackTitle={pageItem.verbose}
+            onNavigateHome={() => openMultipleMenuPage({ route: YakitRoute.NewHome })}
+          />
+        )
+        const pageContent = (
+          <div
+            className={classNames(styles['workspace-page-content'], {
+              [styles['workspace-page-content-no-padding']]:
+                !pageItem.singleNode || NoPaddingRoute.includes(pageItem.route),
+            })}
+          >
+            {pageItem.singleNode ? (
+              pageRenderList.get(pageItem.routeKey) && (
+                <React.Suspense fallback={<RenyanState type="loading" />}>
+                  <PageItem
+                    routeKey={pageItem.route}
+                    yakScriptId={pageItem.route === YakitRoute.Plugin_OP ? pageItem.pluginId : undefined}
+                    params={pageItem.pageParams}
+                  />
+                </React.Suspense>
+              )
+            ) : (
+              <SubTabList
+                softMode={softMode}
+                pageCache={pageCache}
+                currentTabKey={currentTabKey}
+                openMultipleMenuPage={openMultipleMenuPage}
+                pageItem={pageItem}
+                index={index}
+                onSetPageCache={onSetPageCache}
+                onRestoreHistory={onRestoreHistory}
+                onSaveHistory={onSaveHistory}
+              />
+            )}
+          </div>
+        )
         return (
           <div
             key={pageItem.routeKey}
@@ -3620,43 +3669,17 @@ const TabChildren: React.FC<TabChildrenProps> = React.memo((props) => {
             className={styles['page-body']}
             id={'main-operator-page-body-' + pageItem.routeKey}
           >
-            {currentTabKey === pageItem.routeKey && (
-              <RenyanPageHeader
-                route={pageItem.route}
-                fallbackTitle={pageItem.verbose}
-                onNavigateHome={() => openMultipleMenuPage({ route: YakitRoute.NewHome })}
-              />
+            {useRuiYanWorkspace ? (
+              <RuiYanPage route={pageItem.route} onNavigate={(route) => openMultipleMenuPage({ route })}>
+                {pageHeader}
+                {pageContent}
+              </RuiYanPage>
+            ) : (
+              <>
+                {pageHeader}
+                {pageContent}
+              </>
             )}
-            <div
-              className={classNames(styles['workspace-page-content'], {
-                [styles['workspace-page-content-no-padding']]:
-                  !pageItem.singleNode || NoPaddingRoute.includes(pageItem.route),
-              })}
-            >
-              {pageItem.singleNode ? (
-                pageRenderList.get(pageItem.routeKey) && (
-                  <React.Suspense fallback={<RenyanState type="loading" />}>
-                    <PageItem
-                      routeKey={pageItem.route}
-                      yakScriptId={pageItem.route === YakitRoute.Plugin_OP ? pageItem.pluginId : undefined}
-                      params={pageItem.pageParams}
-                    />
-                  </React.Suspense>
-                )
-              ) : (
-                <SubTabList
-                  softMode={softMode}
-                  pageCache={pageCache}
-                  currentTabKey={currentTabKey}
-                  openMultipleMenuPage={openMultipleMenuPage}
-                  pageItem={pageItem}
-                  index={index}
-                  onSetPageCache={onSetPageCache}
-                  onRestoreHistory={onRestoreHistory}
-                  onSaveHistory={onSaveHistory}
-                />
-              )}
-            </div>
           </div>
         )
       })}

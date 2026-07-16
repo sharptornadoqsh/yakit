@@ -46,9 +46,14 @@
   height: 100%;
   display: flex;
   flex-direction: row;
+  gap: 8px;
+  padding: 8px;
+  background: #eef4f4;
   .new-codec-drag-list {
     height: 100%;
-    border-right: 1px solid var(--Colors-Use-Neutral-Border);
+    border: 1px solid #c6d8da;
+    border-radius: 3px;
+    background: var(--Colors-Use-Basic-Background);
     display: flex;
     flex-direction: column;
     transition:
@@ -212,6 +217,10 @@
     height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #c6d8da;
+    border-radius: 3px;
+    background: var(--Colors-Use-Basic-Background);
     .header {
       padding: 6px 12px;
       display: flex;
@@ -318,7 +327,9 @@
   .new-codec-editor-box {
     flex: 1;
     overflow: hidden;
-    border-left: 1px solid var(--Colors-Use-Neutral-Border);
+    border: 1px solid #b9d0d2;
+    border-radius: 3px;
+    background: var(--Colors-Use-Basic-Background);
     .editor-box {
       display: flex;
       flex-direction: column;

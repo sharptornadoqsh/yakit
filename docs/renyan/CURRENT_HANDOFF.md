@@ -1,122 +1,45 @@
-# 睿眼多平台安装文件工作流移交
+# 睿眼二级、三级页面视觉重构移交
 
-## 一、交付结论
+## 当前结论
 
-`.github/workflows/multi-platform-build.yml` 已改造为 `RuiYan Multi-Platform Package`。网页输入只保留目标平台、社区版、企业版或企业版免许可证、是否预置引擎、引擎版本、是否签名和产物保留天数。四个平台共五个架构任务分别在原生执行环境中构建，每个被选任务只上传对应的一个安装文件，网页下载不再封装为 ZIP。
+本次工作依据 `图片.docx` 的十四张页面截图与 `功能要求.xls` 的冻结功能清单，对睿眼自动化渗透系统十三个目标路由完成差异化视觉重构。截图中的代理插件配置作为交互式代理的页面状态处理，因此页面路由总数为十三个。
 
-默认路径生成无签名内部验证安装文件，不读取签名凭据。企业版调用 `yarn build-renders-enterprise` 并保留现有许可证校验；企业版免许可证调用仓库既有 `yarn build-renders-enterprise-no-license`，两类安装文件使用不同名称。
+改造范围限定于目标页面、直接依赖、睿眼公共视觉组件、状态资源和本文档。未改写业务请求参数、状态存储、事件总线、进程间通信、远程过程调用、引擎调用及脚本调用。
 
-前端可见英文短名称、可执行文件名与用户数据目录统一为 `RuiYan-Pentest`。Linux 可执行文件名使用 `ruiyan-pentest`；内部代码符号、应用标识和资源路径保留既有兼容名称。
+## 页面范围
 
-## 二、最终输入
+| 模块 | 页面 |
+| --- | --- |
+| 流量分析 | 交互式代理、历史流量、报文重放、报文差异对比 |
+| 安全检测 | 通用漏洞检测、专项漏洞检测、弱口令检测 |
+| 工具箱 | 编解码、插件中心、插件编辑器 |
+| 结果中心 | 风险中心、扫描历史 |
+| 系统管理 | 安全设置 |
 
-| 参数 | 默认值 | 可选值或约束 |
-| --- | --- | --- |
-| `target` | `macos-both` | `macos-x64`、`macos-arm64`、`macos-both`、`windows-x64`、`linux-x64`、`linux-arm64`、`all` |
-| `edition` | `community` | `community`、`enterprise`、`enterprise-no-license` |
-| `include_engine` | `false` | 布尔值 |
-| `engine_version` | 空 | 仅允许版本所需字符，空值读取兼容清单 |
-| `sign_installers` | `false` | 布尔值 |
-| `retention_days` | `14` | `7`、`14`、`30` |
+页面采用冷青、青绿色与石墨色视觉体系。交互式代理增加真实监听状态带；历史流量形成查询与详情分区；报文重放改为横向命令标签；差异对比形成双栏工作台；两类漏洞检测与弱口令检测分别采用检测编排、分类选择和协议任务结构；编解码保持算子、处理链和输入输出三栏；插件中心保持资源列表与详情；插件编辑器形成信息、代码与调试工作区；风险中心、扫描历史和安全设置分别采用风险筛选、项目任务与设置卡片结构。
 
-已移除旧的 `platform`、`legacy`、`version`、`noBuiltInYakVersion`、`devTool` 和 `sign` 输入。轻量企业版、代码审计版、代码审计企业版和智能代理版不再出现在该工作流中。
+## 公共组件与资源
 
-## 三、类别映射与许可证
+- `components/renyanUI/RuiYanVisualContext.tsx`：维护目标路由、页面编号、布局类型、能力标签和状态资源映射。
+- `components/renyanUI/RuiYanPage.tsx`：提供模块侧轨、真实路由导航、能力状态带与内容工作区。
+- `components/renyanUI/RuiYanModuleIcon.tsx`：提供十三个路由对应的代码内嵌几何图形。
+- `assets/renyan/`：提供流量、请求、扫描、插件、风险、错误和离线状态插图。
+- `RenyanPageHeader`、`YakitEmpty`、`RenyanState`：在目标路由上下文内采用新的页面身份与状态资源，其他路由保持原表现。
 
-| 网页类别 | 渲染器命令 | 打包环境 | 许可证状态 |
-| --- | --- | --- | --- |
-| `community` | `yarn build-renders` | 睿眼社区版无签名或签名环境 | 不启用企业类别变量 |
-| `enterprise` | `yarn build-renders-enterprise` | 睿眼企业版无签名或签名环境，并设置 `PLATFORM=yakitEE` | 保留原有校验 |
-| `enterprise-no-license` | `yarn build-renders-enterprise-no-license` | 睿眼企业版免许可证无签名或签名环境，并设置 `PLATFORM=yakitEE` | 构建期设置 `REACT_APP_REQUIRE_ENTERPRISE_LICENSE=false` |
+## 功能保持
 
-普通企业版与免许可证企业版使用不同输入值，选择免许可证类别不会改变 `enterprise` 的既有行为。
+- 主导航、任务页签、页面关闭和页面切换仍使用原有路由与页签处理函数。
+- 查询、筛选、检测、暂停、继续、停止、保存、同步、导出和详情查看仍调用原处理函数。
+- 进程间通信、远程过程调用、引擎调用、脚本调用、事件总线订阅与状态存储未改写。
+- 差异对比原有换行能力保留；新增上一处、下一处、交换和清空操作均直接调用编辑器实例与原文本状态。
+- 页面空态、错误态和离线态只替换目标路由内的视觉资源，不改变状态判定与重试处理。
 
-## 四、平台、架构与执行环境
+## 本地自检
 
-| 任务 | 平台 | 架构 | 执行环境 | 安装格式 |
-| --- | --- | --- | --- | --- |
-| `build-macos-x64` | 苹果系统 | `x64` | `macos-15-intel` | `DMG` |
-| `build-macos-arm64` | 苹果系统 | `arm64` | `macos-15` | `DMG` |
-| `build-windows-x64` | 微软系统 | `x64` | `windows-2022` | `NSIS EXE` |
-| `build-linux-x64` | 开源系统 | `x64` | `ubuntu-22.04` | `AppImage` |
-| `build-linux-arm64` | 开源系统 | `arm64` | `ubuntu-22.04-arm` | `AppImage` |
+- Prettier 对全部变更的 TypeScript、TSX 与样式文件完成解析和格式化。
+- 定向 ESLint 检查覆盖全部变更的 TypeScript 与 TSX 文件，结果为零错误；现存告警属于依赖数组、等值比较和空对象模式类别，本次未扩大范围处理这些规则债务。
+- `git diff --check` 已通过，提交前仍需再次检查最终差异。
 
-不提供微软系统苹果芯片架构、旧系统模式或跨系统模拟层构建。
+## 未开展事项
 
-## 五、打包命令与文件名称
-
-`package.json` 提供十五条无签名命令和六条苹果系统签名命令。三种类别分别采用独立的睿眼环境，所有命令显式指定平台、架构和 `--publish never`，不会创建正式发布。
-
-版本只读取根 `package.json`。安装文件名称为：
-
-```text
-RuiYan-Pentest-Community-<version>-darwin-x64.dmg
-RuiYan-Pentest-Community-<version>-darwin-arm64.dmg
-RuiYan-Pentest-Community-<version>-windows-x64.exe
-RuiYan-Pentest-Community-<version>-linux-x64.AppImage
-RuiYan-Pentest-Community-<version>-linux-arm64.AppImage
-RuiYan-Pentest-Enterprise-<version>-darwin-x64.dmg
-RuiYan-Pentest-Enterprise-<version>-darwin-arm64.dmg
-RuiYan-Pentest-Enterprise-<version>-windows-x64.exe
-RuiYan-Pentest-Enterprise-<version>-linux-x64.AppImage
-RuiYan-Pentest-Enterprise-<version>-linux-arm64.AppImage
-RuiYan-Pentest-Enterprise-No-License-<version>-darwin-x64.dmg
-RuiYan-Pentest-Enterprise-No-License-<version>-darwin-arm64.dmg
-RuiYan-Pentest-Enterprise-No-License-<version>-windows-x64.exe
-RuiYan-Pentest-Enterprise-No-License-<version>-linux-x64.AppImage
-RuiYan-Pentest-Enterprise-No-License-<version>-linux-arm64.AppImage
-```
-
-## 六、引擎预置与摘要
-
-`packageScript/script/prepare-renyan-engine.js` 负责确定版本、限定版本字符、按平台选择工件、通过加密传输下载引擎与摘要、比较真实摘要、保持内部文件名并生成打包钩子可复验的归档记录。
-
-关闭预置引擎时，打包配置不加入引擎版本文件，打包钩子不读取预置工件。开启时，最终版本写入 `bins/engine-version.txt` 和构建清单。项目推荐版本 `1.4.8-beta3` 的五个目标摘要地址均已取得有效响应。
-
-五个任务分别声明自身的 `x64` 或 `arm64` 目标架构，平台打包命令使用对应的 `--x64` 或 `--arm64` 参数。打包器配置只声明 `dmg`、`AppImage` 或 `nsis` 目标类型，不再为苹果系统和 Linux 重复声明多架构集合。打包钩子优先采用任务声明选择预置工件，本地直接调用时使用打包器传入的架构编号。
-
-## 七、构建元数据与直接安装文件
-
-`packageScript/script/create-renyan-build-metadata.js` 根据集中品牌配置、根版本和目标定义检查真实安装文件，生成 `release/build-manifest.json` 与 `release/SHA256SUMS.txt`。
-
-清单包含产品名称、短名称、品牌前缀、版本、类别、分支、提交、目标、平台、架构、签名状态、预置引擎状态、引擎版本、运行时版本、打包器版本、工作流运行编号和构建时间。清单与摘要仍在任务工作目录生成，用于确认安装文件身份。
-
-上传步骤使用 `actions/upload-artifact@v7` 的 `archive: false`，输入只包含元数据步骤解析出的安装文件路径。Actions 页面中的产物名称等于安装文件名，点击后直接得到 `.exe`、`.dmg` 或 `.AppImage`。
-
-## 八、签名机制
-
-苹果系统签名仅在用户启用签名时读取账号、应用专用密码、团队、证书正文和证书密码五项密钥，并调用现有公证钩子。微软系统复用 `.github/actions/sign-windows/action.yml`，签名工具固定为 `7.0.1`，密钥库六项凭据只在签名任务中读取。
-
-当前仓库没有开源系统安装文件签名机制，因此开源系统任务会拒绝签名选择。任何签名凭据缺失都会使对应任务失败，不会产生被标记为签名文件的无签名产物。
-
-## 九、图标与图片
-
-`app/assets/renyan-icon.icns`、`app/assets/renyan-icon.ico` 和 `product/brand/icons` 均存在且可读取，全尺寸品牌图标经视觉检查为睿眼图形。用户无需上传图片，GitHub Actions 页面截图不会写入仓库、安装文件或磁盘映像背景。
-
-苹果磁盘映像继续采用打包器默认布局，不引用旧产品背景图。
-
-## 十、验证与未执行事项
-
-- 本地脚本语法、配置结构与工作流语法解析已经通过。
-- 安装文件与产品定向测试两个文件、十九项用例通过。
-- 当前打包器版本与本地命令帮助确认平台和架构参数可用。
-- 五个推荐引擎摘要地址均返回有效响应。
-- `actionlint` 未安装，因此采用仓库现有解析库和定向契约测试。
-- 没有在微软系统主机生成苹果磁盘映像。
-- 没有执行全量测试、全量规则检查、全量类型检查、浏览器测试或性能测试。
-- 用户手动触发的任务 `29457787711` 基于 `23d1a3e16`。微软系统任务成功；两个苹果系统任务都额外构建了另一种架构并复用任务文件名；Linux x64 任务额外构建 arm64 后因 AppImage 路径不存在而失败。当前配置已经移除苹果系统和 Linux 的多架构目标列表，真实托管产物仍需使用包含该修订的新提交重新构建。
-
-免许可证类别已经取得微软系统与苹果系统任务记录，但旧苹果系统文件存在架构被后一次构建替换的风险，Linux 文件没有生成。新提交仍需验证两个苹果系统架构、Linux x64 与 Linux arm64 的最终单架构产物；签名账号权限、苹果公证和微软密钥库访问继续依赖仓库外部凭据。
-
-## 十一、已知事项
-
-- 工作流页面载入 `master` 定义时仍可能显示旧输入；必须在 `Use workflow from` 中选择 `qsh`。
-- 开源系统签名未配置，启用签名会得到明确失败。
-- 苹果和微软签名依赖仓库外部凭据，本地静态验证不能证明凭据有效。
-- `bins/scripts/google-chrome-plugin.zip` 只存在于本地且不受版本控制；工作流按固定版本 `0.0.7` 下载并校验固定 SHA256，避免托管安装文件缺少扩展资源。
-- 三份锁文件未修改，工作流采用冻结锁文件安装方式。
-- 旧提交 `b812e3b` 生成的安装文件缺少 `product/build.js`，不能作为修复后的发布文件；必须使用包含启动修复的新提交重新构建。
-- 源码目录设置 `ELECTRON_IS_DEV=0` 前必须执行对应的双渲染器构建；缺少 `app/renderer/pages/main/index.html` 会产生空白窗口。未打包的生产资源路径现在以仓库根目录为基准，避免错误定位到仓库上两级目录。
-- 任务 `29396021957` 暴露的引擎工件选择问题已经由固定任务架构声明修订；任务 `29457787711` 进一步证明平台配置中的多架构列表仍会触发第二种架构。当前源码已移除该列表，旧任务的苹果系统与 Linux 文件不得用于发布。
-
-网页与命令行操作见 `GITHUB_ACTIONS_PACKAGE.md`。
+依照任务约束，本次未启动桌面应用，未开展浏览器交互、构建、全量类型检查或全量测试，因此没有运行时截图与产物验证。后续如进入运行验证阶段，应按十三个路由逐页检查常规、空态、错误态、离线态、窄窗口和长内容场景，并重点确认分栏拖动、页签切换、表格滚动及弹窗挂载区域。

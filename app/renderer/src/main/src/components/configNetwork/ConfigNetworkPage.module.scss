@@ -1,3 +1,21 @@
+.config-network-page {
+  height: 100%;
+  padding: 8px;
+  overflow: auto;
+  background: #eef4f4;
+
+  :global(.ant-card) {
+    border: 1px solid #bfd4d6;
+    border-radius: 3px;
+    background: var(--Colors-Use-Basic-Background);
+    box-shadow: 0 8px 20px rgba(35, 68, 74, 0.06);
+  }
+
+  :global(.ant-card-body) {
+    padding: 14px 18px;
+  }
+}
+
 .certificate-box {
   margin-top: 10px;
   display: flex;

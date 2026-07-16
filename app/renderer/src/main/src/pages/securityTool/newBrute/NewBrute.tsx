@@ -45,14 +45,20 @@ export const NewBrute: React.FC<NewBruteProps> = React.memo((props) => {
 
   return (
     <div className={styles['brute-wrapper']}>
-      <BruteTypeTreeList hidden={hidden} bruteType={bruteType} setBruteType={setBruteType} />
-      <BruteExecute
-        hidden={hidden}
-        setHidden={setHidden}
-        bruteType={bruteType}
-        setBruteType={setBruteType}
-        pageId={id}
-      />
+      <aside className={classNames(styles['protocol-pane'], { [styles['protocol-pane-hidden']]: hidden })}>
+        <span className={styles['pane-kicker']}>协议选择</span>
+        <BruteTypeTreeList hidden={hidden} bruteType={bruteType} setBruteType={setBruteType} />
+      </aside>
+      <section className={styles['task-pane']}>
+        <span className={styles['pane-kicker']}>任务配置与结果</span>
+        <BruteExecute
+          hidden={hidden}
+          setHidden={setHidden}
+          bruteType={bruteType}
+          setBruteType={setBruteType}
+          pageId={id}
+        />
+      </section>
     </div>
   )
 })

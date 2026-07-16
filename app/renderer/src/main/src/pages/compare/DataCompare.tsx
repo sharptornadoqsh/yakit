@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef, useImperativeHandle, useLayoutEffect, useMemo } from 'react'
-import { Button, Space } from 'antd'
 import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api'
-import { AutoCard } from '../../components/AutoCard'
 import { LineConversionIcon } from '../../assets/icons'
 import styles from './DataCompare.module.scss'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
@@ -28,6 +26,14 @@ interface DataCompareProps {
   leftData?: string
   rightData?: string
 }
+
+interface CodeComparisonRef {
+  onChangeLineConversion: () => void
+  onNavigate: (direction: 'previous' | 'next') => void
+  onSwap: () => void
+  onClear: () => void
+}
+
 export const DataCompare: React.FC<DataCompareProps> = (props) => {
   const { leftData, rightData } = props
   const [noWrap, setNoWrap] = useState<boolean>(false)
@@ -36,35 +42,51 @@ export const DataCompare: React.FC<DataCompareProps> = (props) => {
   const [right, setRight] = useState<string>(rightData || '')
   const { t } = useI18nNamespaces(['comparer'])
 
-  const codeComparisonRef = useRef<any>(null)
+  const codeComparisonRef = useRef<CodeComparisonRef>(null)
   return (
-    <AutoCard
-      title={t('DataCompare.comparer')}
-      bodyStyle={{ padding: 0 }}
-      bordered={false}
-      extra={
-        <Space>
-          <Button
-            size={'small'}
-            type={!noWrap ? 'primary' : 'link'}
+    <div className={styles['data-compare-page']}>
+      <div className={styles['compare-command-bar']}>
+        <div className={styles['compare-heading']}>
+          <span>DIFF / 04</span>
+          <strong>{t('DataCompare.comparer')}</strong>
+          <small>文本差异</small>
+        </div>
+        <div className={styles['compare-actions']}>
+          <YakitButton type="text2" size="small" onClick={() => codeComparisonRef.current?.onNavigate('previous')}>
+            上一处
+          </YakitButton>
+          <YakitButton type="text2" size="small" onClick={() => codeComparisonRef.current?.onNavigate('next')}>
+            下一处
+          </YakitButton>
+          <span className={styles['command-divider']} />
+          <YakitButton type="secondary2" size="small" onClick={() => codeComparisonRef.current?.onSwap()}>
+            交换
+          </YakitButton>
+          <YakitButton type="secondary2" size="small" onClick={() => codeComparisonRef.current?.onClear()}>
+            清空
+          </YakitButton>
+          <YakitButton
+            type={noWrap ? 'secondary2' : 'primary'}
+            size="small"
             icon={<LineConversionIcon />}
-            onClick={() => {
-              codeComparisonRef.current?.onChangeLineConversion()
-            }}
-          />
-        </Space>
-      }
-    >
-      <CodeComparison
-        ref={codeComparisonRef}
-        noWrap={noWrap}
-        setNoWrap={setNoWrap}
-        leftCode={left}
-        setLeftCode={setLeft}
-        rightCode={right}
-        setRightCode={setRight}
-      />
-    </AutoCard>
+            onClick={() => codeComparisonRef.current?.onChangeLineConversion()}
+          >
+            换行
+          </YakitButton>
+        </div>
+      </div>
+      <div className={styles['compare-editor']}>
+        <CodeComparison
+          ref={codeComparisonRef}
+          noWrap={noWrap}
+          setNoWrap={setNoWrap}
+          leftCode={left}
+          setLeftCode={setLeft}
+          rightCode={right}
+          setRightCode={setRight}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -132,6 +154,7 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
   const diffDivRef = useRef(null)
   const monaco = monacoEditor.editor
   const diffEditorRef = useRef<monacoEditor.editor.IStandaloneDiffEditor>()
+  const diffIndexRef = useRef(-1)
   const [language, setLanguage] = useState<string>('')
   // 从store获取对比数据
   const { token, dataMap } = useHttpFlowStore()
@@ -203,16 +226,38 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
     }
   })
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      // 减少父组件获取的DOM元素属性,只暴露给父组件需要用到的方法
-      onChangeLineConversion: (newVal) => {
-        changeLineConversion()
-      },
-    }),
-    [leftCode, rightCode, noWrap],
-  )
+  useImperativeHandle(ref, () => ({
+    // 减少父组件获取的DOM元素属性,只暴露给父组件需要用到的方法
+    onChangeLineConversion: () => {
+      changeLineConversion()
+    },
+    onNavigate: (direction: 'previous' | 'next') => {
+      const changes = diffEditorRef.current?.getLineChanges() || []
+      if (changes.length === 0 || !diffEditorRef.current) return
+      const offset = direction === 'next' ? 1 : -1
+      diffIndexRef.current = (diffIndexRef.current + offset + changes.length) % changes.length
+      const lineNumber = changes[diffIndexRef.current].modifiedStartLineNumber
+      const editor = diffEditorRef.current.getModifiedEditor()
+      editor.setPosition({ lineNumber, column: 1 })
+      editor.revealLineInCenter(lineNumber)
+      editor.focus()
+    },
+    onSwap: () => {
+      const currentModel = diffEditorRef.current?.getModel()
+      const currentLeft = currentModel?.original.getValue() ?? leftCode
+      const currentRight = currentModel?.modified.getValue() ?? rightCode
+      setLeftCode?.(currentRight)
+      setRightCode?.(currentLeft)
+      diffIndexRef.current = -1
+      setModelEditor({ content: currentRight, language }, { content: currentLeft, language }, language)
+    },
+    onClear: () => {
+      setLeftCode?.('')
+      setRightCode?.('')
+      diffIndexRef.current = -1
+      setModelEditor({ content: '', language }, { content: '', language }, language)
+    },
+  }))
 
   //监听theme设置monaco主题
   useLayoutEffect(() => {

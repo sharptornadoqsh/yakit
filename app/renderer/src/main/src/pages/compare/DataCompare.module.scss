@@ -1,3 +1,75 @@
+.data-compare-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+  gap: 8px;
+  background: #eef4f4;
+}
+
+.compare-command-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid #c6d9da;
+  border-radius: 3px;
+  background: var(--Colors-Use-Basic-Background);
+}
+
+.compare-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  > span {
+    color: #087f83;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 9px;
+    letter-spacing: 0.8px;
+  }
+
+  > strong {
+    color: #1c3c42;
+    font-size: 13px;
+  }
+
+  > small {
+    padding: 2px 7px;
+    border: 1px solid #bdd6d5;
+    border-radius: 9px;
+    color: #527176;
+    background: #f2faf9;
+    font-size: 9px;
+  }
+}
+
+.compare-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.command-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: #cfdddf;
+}
+
+.compare-editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #b9ced1;
+  border-radius: 3px;
+  background: var(--Colors-Use-Basic-Background);
+  box-shadow: 0 6px 18px rgba(42, 71, 77, 0.06);
+}
+
 .data-compare-modal {
   height: 716px;
   display: flex;

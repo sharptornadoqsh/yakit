@@ -260,6 +260,7 @@ export const PluginBatchExecutor: React.FC<PluginBatchExecutorProps> = React.mem
     <div className={styles['plugin-batch-wrapper']}>
       <div className={styles['plugin-tab-wrap']}>
         <YakitSideTab
+          type="horizontal"
           yakitTabs={PluginBatchExecutorTab}
           activeKey={activeKey}
           onActiveKey={onActiveKey}

@@ -30,6 +30,31 @@
   }
 }
 
+.state-icon-artwork {
+  width: 112px;
+  height: 76px;
+  object-fit: contain;
+}
+
+.state-artwork .state-icon {
+  flex-basis: 112px;
+  width: 112px;
+  height: 76px;
+  border: 0;
+  background: transparent;
+}
+
+.state-compact .state-icon-artwork {
+  width: 72px;
+  height: 48px;
+}
+
+.state-artwork.state-compact .state-icon {
+  flex-basis: 72px;
+  width: 72px;
+  height: 48px;
+}
+
 .state-content {
   display: flex;
   flex: 1;

@@ -35,14 +35,19 @@
   @extend %flex-row;
   height: 100%;
   width: 100%;
+  gap: 8px;
+  padding: 8px;
   overflow: hidden;
+  background: #eef4f4;
 }
 .risk-query {
   @extend %flex-column;
   width: 300px;
   flex-shrink: 0;
   max-width: 300px;
-  border-right: 1px solid var(--Colors-Use-Neutral-Border);
+  border: 1px solid #c7d9db;
+  border-radius: 3px;
+  background: var(--Colors-Use-Basic-Background);
   overflow: hidden;
   height: 100%;
   opacity: 1;

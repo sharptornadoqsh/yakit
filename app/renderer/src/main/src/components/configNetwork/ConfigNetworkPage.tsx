@@ -776,7 +776,7 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
 
   return (
     <>
-      <div ref={configRef}>
+      <div ref={configRef} className={styles['config-network-page']}>
         <AutoCard style={{ height: 'auto' }}>
           <AutoSpin spinning={loading} tip={t('ConfigNetworkPage.loading')}>
             {params && (

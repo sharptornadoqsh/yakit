@@ -85,7 +85,10 @@ const PluginHub: React.FC<PluginHubProps> = memo((props) => {
 
   return (
     <div ref={wrapper} id={wrapperId} className={styles['yakit-plugin-hub']}>
-      <div className={classNames(styles['list'], { [styles['out-list']]: hiddenDetail || !isDetail })}>
+      <section
+        className={classNames(styles['list'], { [styles['out-list']]: hiddenDetail || !isDetail })}
+        data-pane="plugin-catalog"
+      >
         <PluginHubList
           rootElementId={wrapperId}
           active={active}
@@ -95,10 +98,10 @@ const PluginHub: React.FC<PluginHubProps> = memo((props) => {
           setHiddenDetailPage={setHiddenDetail}
           setAutoOpenDetailTab={setAutoOpenDetailTab}
         />
-      </div>
+      </section>
 
       {isDetail && (
-        <div className={classNames(styles['detail'], { [styles['hidden']]: hiddenDetail })}>
+        <aside className={classNames(styles['detail'], { [styles['hidden']]: hiddenDetail })} data-pane="plugin-detail">
           <PluginHubDetail
             ref={detailRef}
             rootElementId={wrapperId}
@@ -107,7 +110,7 @@ const PluginHub: React.FC<PluginHubProps> = memo((props) => {
             autoOpenDetailTab={autoOpenDetailTab}
             setAutoOpenDetailTab={setAutoOpenDetailTab}
           />
-        </div>
+        </aside>
       )}
 
       {/* mitm 新增 cli 参数，需要提示用户自动更新一遍本地插件内容 */}

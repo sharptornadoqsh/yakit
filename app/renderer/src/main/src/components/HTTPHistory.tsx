@@ -298,6 +298,7 @@ const HTTPHistoryInner: React.FC<HTTPHistoryProp> = (props) => {
         firstNode={() => (
           <div className={styles['hTTPHistory-left']}>
             <YakitSideTab
+              type="horizontal"
               key={i18n.language}
               t={t}
               yakitTabs={HistoryTab}

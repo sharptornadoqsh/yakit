@@ -6,6 +6,8 @@ import { findRenyanMenuPath } from '@/routes/renyanMenu'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import styles from './RenyanPageHeader.module.scss'
+import { RuiYanModuleIcon } from '@/components/renyanUI/RuiYanModuleIcon'
+import { useRuiYanVisual } from '@/components/renyanUI/RuiYanVisualContext'
 
 interface RenyanPageHeaderProps {
   route: YakitRoute | string
@@ -16,6 +18,8 @@ interface RenyanPageHeaderProps {
 export const RenyanPageHeader: React.FC<RenyanPageHeaderProps> = React.memo((props) => {
   const { route, fallbackTitle, onNavigateHome } = props
   const { t } = useI18nNamespaces(['layout', 'yakitRoute'])
+  const ruiYanVisual = useRuiYanVisual()
+  const visual = ruiYanVisual?.visual
   const path = useMemo(() => findRenyanMenuPath(route), [route])
   const routeInfo = YakitRouteToPageInfo[route as YakitRoute]
 
@@ -43,7 +47,12 @@ export const RenyanPageHeader: React.FC<RenyanPageHeaderProps> = React.memo((pro
   }, [title])
 
   return (
-    <div className={styles['page-header']} data-shell-region="page-header" data-route={route}>
+    <div
+      className={styles['page-header']}
+      data-shell-region="page-header"
+      data-route={route}
+      data-ruiyan-page={visual ? 'true' : undefined}
+    >
       <div className={styles['page-heading']}>
         <div className={styles['breadcrumb']} data-shell-region="breadcrumb">
           <span>{productConfig.displayName}</span>
@@ -57,6 +66,15 @@ export const RenyanPageHeader: React.FC<RenyanPageHeaderProps> = React.memo((pro
           )}
         </div>
         <div className={styles['title-row']}>
+          {visual && (
+            <span className={styles['route-identity']}>
+              <RuiYanModuleIcon route={route} />
+              <span>
+                <small>{visual.serial}</small>
+                <strong>{visual.modeLabel}</strong>
+              </span>
+            </span>
+          )}
           <h1>{title}</h1>
         </div>
         {description && <p className={styles['page-description']}>{description}</p>}

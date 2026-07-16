@@ -10,6 +10,79 @@
   background: linear-gradient(90deg, var(--Colors-Use-Main-Bg), transparent 36%), var(--Colors-Use-Basic-Background);
 }
 
+.page-header[data-ruiyan-page='true'] {
+  min-height: 70px;
+  padding: 8px 14px;
+  border-bottom-color: #b9d0d2;
+  background: linear-gradient(90deg, rgba(12, 175, 159, 0.1), transparent 45%), var(--Colors-Use-Basic-Background);
+
+  .breadcrumb {
+    color: #688187;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    letter-spacing: 0.3px;
+  }
+
+  .title-row {
+    align-items: center;
+    gap: 12px;
+
+    h1 {
+      position: relative;
+      padding-left: 12px;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+
+      &::before {
+        position: absolute;
+        top: 4px;
+        bottom: 4px;
+        left: 0;
+        width: 2px;
+        background: #0caf9f;
+        content: '';
+      }
+    }
+  }
+
+  .workspace-state > span {
+    border-radius: 0;
+    background: #0caf9f;
+  }
+}
+
+.route-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 106px;
+  color: #087d82;
+
+  > svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  > span {
+    display: flex;
+    flex-direction: column;
+  }
+
+  small {
+    color: #799096;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 8px;
+    line-height: 11px;
+    letter-spacing: 0.8px;
+  }
+
+  strong {
+    color: #28484e;
+    font-size: 10px;
+    line-height: 14px;
+    white-space: nowrap;
+  }
+}
+
 .page-heading {
   display: flex;
   flex-direction: column;

@@ -238,6 +238,7 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
     <div className={styles['yak-poc-wrapper']} ref={pluginGroupRef}>
       <div className={styles['yakpoc-tab-wrap']}>
         <YakitSideTab
+          type="horizontal"
           key={i18n.language}
           yakitTabs={YakPoCTab}
           activeKey={type}
@@ -247,45 +248,47 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
           t={t}
         />
       </div>
-      <div
-        className={classNames(styles['left-wrapper'], {
-          [styles['left-wrapper-hidden']]: hidden,
-        })}
-      >
-        <div className={styles['left-header-search']}>
-          <div className={styles['header-type-wrapper']}>
-            <span className={styles['header-text']}>{t('YakPoC.selectPlugin')}</span>
+      <div className={styles['yak-poc-body']}>
+        <div
+          className={classNames(styles['left-wrapper'], {
+            [styles['left-wrapper-hidden']]: hidden,
+          })}
+        >
+          <div className={styles['left-header-search']}>
+            <div className={styles['header-type-wrapper']}>
+              <span className={styles['header-text']}>{t('YakPoC.selectPlugin')}</span>
+            </div>
           </div>
+          <PluginGroupByKeyWord
+            pageId={pageId}
+            inViewport={inViewport}
+            hidden={type === 'group'}
+            defGroupKeywords={pageInfo.defGroupKeywords || ''}
+            selectGroupListByKeyWord={pageInfo.selectGroupListByKeyWord || []}
+            setSelectGroupListByKeyWord={onSetSelectGroupListByKeyWord}
+            setResponseToSelect={setKeyWordResponseToSelect}
+          />
+          <PluginGroupGrid
+            inViewport={inViewport}
+            hidden={type === 'keyword'}
+            selectGroupList={pageInfo.selectGroup || []}
+            setSelectGroupList={onSetSelectGroupList}
+            setResponseToSelect={setResponseToSelect}
+          />
         </div>
-        <PluginGroupByKeyWord
+        <YakPoCExecuteContent
+          hidden={hidden}
+          setHidden={setHidden}
+          selectGroupList={selectGroupListAll}
+          executeStatus={executeStatus}
+          setExecuteStatus={setExecuteStatus}
+          onClearAll={onClearAll}
           pageId={pageId}
-          inViewport={inViewport}
-          hidden={type === 'group'}
-          defGroupKeywords={pageInfo.defGroupKeywords || ''}
-          selectGroupListByKeyWord={pageInfo.selectGroupListByKeyWord || []}
-          setSelectGroupListByKeyWord={onSetSelectGroupListByKeyWord}
-          setResponseToSelect={setKeyWordResponseToSelect}
-        />
-        <PluginGroupGrid
-          inViewport={inViewport}
-          hidden={type === 'keyword'}
-          selectGroupList={pageInfo.selectGroup || []}
-          setSelectGroupList={onSetSelectGroupList}
-          setResponseToSelect={setResponseToSelect}
+          pageInfo={pageInfo}
+          onInitInputValueAfter={onInitInputValueAfter}
+          type={type}
         />
       </div>
-      <YakPoCExecuteContent
-        hidden={hidden}
-        setHidden={setHidden}
-        selectGroupList={selectGroupListAll}
-        executeStatus={executeStatus}
-        setExecuteStatus={setExecuteStatus}
-        onClearAll={onClearAll}
-        pageId={pageId}
-        pageInfo={pageInfo}
-        onInitInputValueAfter={onInitInputValueAfter}
-        type={type}
-      />
     </div>
   )
 })

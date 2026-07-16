@@ -19,6 +19,7 @@ import {
 import { usePageInfo } from '@/store/pageInfo'
 import { shallow } from 'zustand/shallow'
 import styles from './RenyanNavigation.module.scss'
+import { isRuiYanTargetRoute } from '@/components/renyanUI/RuiYanVisualContext'
 
 interface RenyanRouteSelection {
   route: YakitRoute
@@ -174,7 +175,7 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
           {expanded ? <OutlineChevrondoubleleftIcon /> : <OutlineChevrondoublerightIcon />}
         </button>
       </div>
-      {expanded && (
+      {expanded && !isRuiYanTargetRoute(currentRoute) && (
         <div className={styles['secondary-row']} data-shell-region="secondary-navigation">
           <div className={styles['section-label']}>{getTitle(activeGroup)}</div>
           <div className={styles['secondary-navigation']}>

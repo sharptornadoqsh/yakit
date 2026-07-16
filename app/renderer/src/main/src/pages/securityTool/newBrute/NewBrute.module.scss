@@ -3,7 +3,45 @@
 .brute-wrapper {
   display: flex;
   flex: 1;
+  gap: 8px;
+  padding: 8px;
   overflow: hidden;
+  background: #eef4f4;
+}
+
+.protocol-pane,
+.task-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #cbdadc;
+  border-radius: 3px;
+  background: var(--Colors-Use-Basic-Background);
+}
+
+.protocol-pane {
+  flex: 0 0 238px;
+}
+
+.protocol-pane-hidden {
+  display: none;
+}
+
+.task-pane {
+  flex: 1;
+}
+
+.pane-kicker {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-bottom: 1px solid #d5e1e3;
+  color: #42636a;
+  background: #f3f8f8;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 .divider-style {
@@ -16,8 +54,7 @@
   gap: 12px;
   flex: 1;
   overflow: hidden;
-  max-width: 300px;
-  border-right: 1px solid var(--Colors-Use-Neutral-Border);
+  max-width: none;
   padding: 12px;
   :global {
     .ant-tree-switcher {

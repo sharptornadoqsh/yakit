@@ -393,7 +393,7 @@ const YakRunnerScanHistory: React.FC<YakRunnerScanHistoryProp> = (props) => {
 
   const ResizeBoxProps = useCreation(() => {
     let p = {
-      firstRatio: '380px',
+      firstRatio: '32%',
     }
     return p
   }, [])
@@ -404,7 +404,7 @@ const YakRunnerScanHistory: React.FC<YakRunnerScanHistoryProp> = (props) => {
       </div>
       <div className={styles['YakRunnerScanHistory-main']}>
         <YakitResizeBox
-          firstMinSize={'380px'}
+          firstMinSize={'280px'}
           firstNode={<CompileHistoryList pageInfo={pageInfo} clickItem={clickItem} setClickItem={setClickItem} />}
           secondNode={
             <TableVirtualResize<SyntaxFlowScanTask>

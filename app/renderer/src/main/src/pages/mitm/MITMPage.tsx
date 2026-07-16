@@ -517,9 +517,15 @@ export const MITMPage: React.FC<MITMPageProp> = (props) => {
       <div
         className={style['mitm-page']}
         ref={mitmPageRef}
+        data-proxy-status={status}
         style={status === 'idle' ? { padding: 0 } : { padding: '8px 16px 0px 0px' }}
       >
-        {onRenderMITM()}
+        <div className={style['mitm-console-strip']}>
+          <span className={style['mitm-status-indicator']} />
+          <strong>{status === 'idle' ? '代理待命' : '代理运行中'}</strong>
+          <small>{`${host}:${port}`}</small>
+        </div>
+        <div className={style['mitm-console-content']}>{onRenderMITM()}</div>
       </div>
       <MITMRule
         status={status}

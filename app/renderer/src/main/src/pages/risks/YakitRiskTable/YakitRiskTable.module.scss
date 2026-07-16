@@ -43,6 +43,9 @@ $keyColor: map-keys($tagColor);
   width: 100%;
   overflow: hidden;
   padding: 12px;
+  border: 1px solid #c7d9db;
+  border-radius: 3px;
+  background: var(--Colors-Use-Basic-Background);
   .table-severity-tag {
     margin-right: 0;
   }
