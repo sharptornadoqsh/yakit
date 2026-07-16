@@ -18,7 +18,7 @@ import emiter from '@/utils/eventBus/eventBus'
 import { YakitAutoCompleteRefProps } from '../yakitUI/YakitAutoComplete/YakitAutoCompleteType'
 import { getRemoteConfigBaseUrlGV, getRemoteHttpSettingGV, isEnpriTrace } from '@/utils/envfile'
 import { apiSystemConfig, useUploadInfoByEnpriTrace } from '../layout/utils'
-import { JSONParseLog } from '@/utils/tool'
+import { JSONParseLog, shouldWarnAboutRemoteHttpUrl } from '@/utils/tool'
 import { yakitAuth, yakitCodec, yakitProfile, yakitUILayout } from '@/services/electronBridge'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import useAIGlobalConfig from '@/pages/ai-re-act/hooks/useAIGlobalConfig'
@@ -299,11 +299,21 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
           />
         </Form.Item>
         <Form.Item noStyle shouldUpdate={(previous, current) => previous.BaseUrl !== current.BaseUrl}>
-          {({ getFieldValue }) =>
-            `${getFieldValue('BaseUrl') || ''}`.trim().toLowerCase().startsWith('http://') ? (
-              <YakitAlert type="warning" showIcon description={t('ConfigPrivateDomain.httpTransportWarning')} />
-            ) : null
-          }
+          {({ getFieldValue }) => {
+            const baseUrl = `${getFieldValue('BaseUrl') || ''}`.trim()
+            if (!baseUrl.toLowerCase().startsWith('http://')) return null
+            if (!pageMode) {
+              return <YakitAlert type="warning" showIcon description={t('ConfigPrivateDomain.httpTransportWarning')} />
+            }
+            if (!shouldWarnAboutRemoteHttpUrl(baseUrl)) return null
+
+            return (
+              <div className="http-transport-hint" role="status">
+                <InformationCircleIcon className="http-transport-hint-icon" />
+                <span>{t('ConfigPrivateDomain.remoteHttpTransportHint')}</span>
+              </div>
+            )
+          }}
         </Form.Item>
         {!enterpriseLogin && (
           <Form.Item

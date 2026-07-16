@@ -141,6 +141,7 @@
     "privateDomainSetFailed": "Failed to configure service address: {{error}}",
     "passwordRules": "Password must be 8-20 characters and include uppercase and lowercase letters, numbers, and special characters",
     "httpTransportWarning": "This service address uses HTTP, which can expose login credentials and tokens. Internet-facing deployments must use HTTPS.",
+    "remoteHttpTransportHint": "Remote HTTP connections are unencrypted. HTTPS is recommended.",
     "privateDomainHasSpace": "Service address contains spaces",
     "enterValidPrivateDomain": "Please enter a valid service address",
     "enterpriseLogin": "Service Login",

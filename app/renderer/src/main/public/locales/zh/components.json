@@ -141,6 +141,7 @@
     "privateDomainSetFailed": "服务地址配置失败：{{error}}",
     "passwordRules": "密码为8-20位，且必须包含大小写字母、数字及特殊字符",
     "httpTransportWarning": "当前服务地址使用 HTTP，登录凭据和令牌可能被窃听；面向互联网部署必须使用 HTTPS。",
+    "remoteHttpTransportHint": "远程 HTTP 连接未加密，建议使用 HTTPS。",
     "privateDomainHasSpace": "服务地址存在空格",
     "enterValidPrivateDomain": "请输入有效的服务地址",
     "enterpriseLogin": "服务登录",

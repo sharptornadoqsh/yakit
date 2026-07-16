@@ -119,6 +119,27 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--Colors-Use-Main-Primary) 13%, transparent) !important;
   }
 
+  .http-transport-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: -12px 2px 18px;
+    color: var(--Colors-Use-Neutral-Text-3-Secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .http-transport-hint-icon {
+    flex: 0 0 auto;
+    margin-top: 2px;
+
+    svg {
+      width: 14px;
+      height: 14px;
+      color: color-mix(in srgb, var(--Colors-Use-Warning-Primary) 68%, var(--Colors-Use-Neutral-Text-3-Secondary));
+    }
+  }
+
   .form-item-submit {
     margin-top: 8px;
     margin-bottom: 0;

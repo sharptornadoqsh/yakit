@@ -50,6 +50,22 @@ export const isValidURL = (url: string) => {
   return urlRegex.test(url)
 }
 
+export const shouldWarnAboutRemoteHttpUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(`${value || ''}`.trim())
+    if (parsed.protocol !== 'http:') return false
+
+    const hostname = parsed.hostname
+      .toLowerCase()
+      .replace(/^\[|\]$/g, '')
+      .replace(/\.$/, '')
+    const isLoopback = hostname === 'localhost' || hostname === '::1' || /^127(?:\.\d{1,3}){3}$/.test(hostname)
+    return !isLoopback
+  } catch {
+    return false
+  }
+}
+
 /**将 CSS 变量名转换为对应的值 */
 export const getCssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
