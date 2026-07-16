@@ -32,10 +32,11 @@ const { engineLogOutputFileAndUI } = require('../logFile')
 const {
   atomicInstallEngine,
   downloadAndVerifyArtifact,
-  extractArchiveEntry,
+  extractAndVerifyEngineArchive,
   getCompatibilityEntry,
   normalizeSha256,
   recoverInterruptedEngineInstall,
+  selectBundledEngineArchivePath,
   verifyFileSha256,
 } = require('../engineLifecycle')
 
@@ -249,13 +250,19 @@ const writeEngineShaMetadata = async (version) => {
 }
 
 const getBundledEngineInfo = () => {
-  const archivePath = loadExtraFilePath(path.join('bins', 'yak.zip'))
   const compatibility = getCompatibilityEntry()
+  const packagedArchivePath = loadExtraFilePath(
+    compatibility?.artifact?.packagedArchive || path.join('bins', 'yak.zip'),
+  )
+  const sourceArchivePath = compatibility?.artifact?.sourceArchive
+    ? loadExtraFilePath(compatibility.artifact.sourceArchive)
+    : ''
+  const archivePath = selectBundledEngineArchivePath({ packagedArchivePath, sourceArchivePath })
   const archiveSha256 = normalizeSha256(compatibility?.artifact?.archiveSha256)
   const engineSha256 = normalizeSha256(compatibility?.artifact?.engineSha256)
   return {
     exists: fs.existsSync(archivePath),
-    trusted: Boolean(archiveSha256 && engineSha256),
+    trusted: Boolean(engineSha256 && compatibility?.artifact?.archiveEntry),
     archivePath,
     archiveSha256,
     engineSha256,
@@ -268,23 +275,32 @@ const getBundledEngineInfo = () => {
 const restoreVerifiedBundledEngine = async (win) => {
   const bundled = getBundledEngineInfo()
   if (!bundled.exists) throw new Error('未找到预置引擎压缩包')
-  if (!bundled.trusted || !bundled.artifact?.archiveEntry) {
+  if (!bundled.trusted) {
     throw new Error('当前平台的预置引擎摘要尚未验证')
   }
 
   const extractedPath = path.join(getYaklangEngineDir(), 'yak.bundled.download')
   try {
     emitEngineLifecycleStage(win, 'verifying', '正在验证预置引擎压缩包')
-    await verifyFileSha256(bundled.archivePath, bundled.archiveSha256)
     try {
       fs.unlinkSync(extractedPath)
     } catch (error) {
       if (error.code !== 'ENOENT') throw error
     }
 
-    emitEngineLifecycleStage(win, 'extracting-bundled', `正在提取预置引擎 ${bundled.version}`)
-    await extractArchiveEntry(bundled.archivePath, bundled.artifact.archiveEntry, extractedPath)
-    await verifyFileSha256(extractedPath, bundled.engineSha256)
+    await extractAndVerifyEngineArchive({
+      archivePath: bundled.archivePath,
+      archiveSha256: bundled.archiveSha256,
+      entryName: bundled.artifact.archiveEntry,
+      destination: extractedPath,
+      engineSha256: bundled.engineSha256,
+      onArchiveInspected: (verification) => {
+        if (!verification.valid && verification.expected) {
+          emitEngineLifecycleStage(win, 'verifying', '预置引擎压缩包摘要已变化，正在验证内部引擎文件')
+        }
+        emitEngineLifecycleStage(win, 'extracting-bundled', `正在提取预置引擎 ${bundled.version}`)
+      },
+    })
     emitEngineLifecycleStage(win, 'installing', `正在安装预置引擎 ${bundled.version}`)
     const result = await atomicInstallEngine({
       sourcePath: extractedPath,

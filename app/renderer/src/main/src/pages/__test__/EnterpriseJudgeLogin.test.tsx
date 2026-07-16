@@ -51,6 +51,10 @@ vi.mock('@/components/layout/utils', () => ({
 vi.mock('@/utils/tool', () => ({ JSONParseLog: vi.fn() }))
 vi.mock('@/constants/hardware', () => ({ SystemInfo: { isDev: false } }))
 vi.mock('@/config/product', () => ({ productConfig: { displayName: '睿眼自动化渗透系统' } }))
+vi.mock('@/assets/icon/outline', () => ({
+  OutlineMoonIcon: () => null,
+  OutlineSunIcon: () => null,
+}))
 vi.mock('@/hook/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: testState.setTheme }),
 }))

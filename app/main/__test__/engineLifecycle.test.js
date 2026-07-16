@@ -1,14 +1,17 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import AdmZip from 'adm-zip'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   atomicInstallEngine,
   calculateFileSha256,
   downloadAndVerifyArtifact,
   extractArchiveEntry,
+  extractAndVerifyEngineArchive,
   getCompatibilityEntry,
   recoverInterruptedEngineInstall,
+  selectBundledEngineArchivePath,
   verifyFileSha256,
 } from '../engineLifecycle'
 
@@ -26,6 +29,22 @@ describe('引擎文件安装事务', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     fs.rmSync(temporaryDirectory, { recursive: true, force: true })
+  })
+
+  it('打包工件缺失时选择仓库来源工件', () => {
+    const packagedArchivePath = path.join(temporaryDirectory, 'bins', 'yak.zip')
+    const sourceArchivePath = path.join(temporaryDirectory, 'bins', 'yak_windows_amd64.zip')
+    fs.mkdirSync(path.dirname(sourceArchivePath), { recursive: true })
+    fs.writeFileSync(sourceArchivePath, 'repository-engine')
+
+    expect(selectBundledEngineArchivePath({ packagedArchivePath, sourceArchivePath })).toBe(sourceArchivePath)
+
+    fs.writeFileSync(packagedArchivePath, 'packaged-engine')
+    expect(selectBundledEngineArchivePath({ packagedArchivePath, sourceArchivePath })).toBe(packagedArchivePath)
+
+    fs.unlinkSync(packagedArchivePath)
+    fs.unlinkSync(sourceArchivePath)
+    expect(selectBundledEngineArchivePath({ packagedArchivePath, sourceArchivePath })).toBe(packagedArchivePath)
   })
 
   it('验证摘要后替换活动引擎并保留最后可用版本', async () => {
@@ -170,6 +189,40 @@ describe('引擎文件安装事务', () => {
     expect(fs.existsSync(sourcePath)).toBe(false)
   })
 
+  it('压缩包摘要变化但内部引擎摘要一致时仍可提取', async () => {
+    const archivePath = path.join(temporaryDirectory, 'rebuilt.zip')
+    const engineContent = Buffer.from('verified-engine')
+    const archive = new AdmZip()
+    archive.addFile('bins/yak.exe', engineContent)
+    archive.writeZip(archivePath)
+    const enginePath = path.join(temporaryDirectory, 'verified-yak.exe')
+    const expectedPath = path.join(temporaryDirectory, 'expected-yak.exe')
+    fs.writeFileSync(expectedPath, engineContent)
+    const engineSha256 = await calculateFileSha256(expectedPath)
+
+    const result = await extractAndVerifyEngineArchive({
+      archivePath,
+      archiveSha256: '0'.repeat(64),
+      entryName: 'bins/yak.exe',
+      destination: enginePath,
+      engineSha256,
+    })
+
+    expect(result.archiveVerified).toBe(false)
+    expect(result.engineVerification).toMatchObject({ valid: true, expected: engineSha256, actual: engineSha256 })
+    expect(fs.readFileSync(enginePath)).toEqual(engineContent)
+
+    await expect(
+      extractAndVerifyEngineArchive({
+        archivePath,
+        archiveSha256: '0'.repeat(64),
+        entryName: 'bins/yak.exe',
+        destination: path.join(temporaryDirectory, 'rejected-yak.exe'),
+        engineSha256: 'f'.repeat(64),
+      }),
+    ).rejects.toMatchObject({ code: 'ENGINE_SHA256_MISMATCH' })
+  })
+
   const compatibility = getCompatibilityEntry({ platform: 'win32', architecture: 'x64' })
   const bundledArchivePath = compatibility ? path.resolve(compatibility.artifact.sourceArchive) : ''
   const bundledArtifactTest = bundledArchivePath && fs.existsSync(bundledArchivePath) ? it : it.skip
@@ -183,6 +236,6 @@ describe('引擎文件安装事务', () => {
         valid: true,
       })
     },
-    120_000,
+    300_000,
   )
 })

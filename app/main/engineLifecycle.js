@@ -55,6 +55,11 @@ const safeUnlink = (filePath) => {
   }
 }
 
+const selectBundledEngineArchivePath = ({ packagedArchivePath, sourceArchivePath }) => {
+  const candidates = [packagedArchivePath, sourceArchivePath].filter(Boolean)
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0] || ''
+}
+
 const writeInstallMarker = (markerPath, marker) => {
   const temporaryMarkerPath = `${markerPath}.tmp`
   fs.writeFileSync(temporaryMarkerPath, JSON.stringify(marker), 'utf8')
@@ -230,6 +235,37 @@ const extractArchiveEntry = (archivePath, entryName, destination) =>
     archive.on('error', finish)
   })
 
+/** 压缩容器可能因打包工具和元数据变化；最终接受条件由内部引擎摘要决定。 */
+const extractAndVerifyEngineArchive = async ({
+  archivePath,
+  archiveSha256,
+  entryName,
+  destination,
+  engineSha256,
+  onArchiveInspected,
+}) => {
+  if (!fs.existsSync(archivePath)) {
+    throw createEngineError('ENGINE_FILE_MISSING', '预置引擎压缩包不存在', { filePath: archivePath })
+  }
+
+  const expectedArchiveSha256 = normalizeSha256(archiveSha256)
+  const actualArchiveSha256 = expectedArchiveSha256 ? await calculateFileSha256(archivePath) : ''
+  const archiveVerification = {
+    valid: Boolean(expectedArchiveSha256 && actualArchiveSha256 === expectedArchiveSha256),
+    expected: expectedArchiveSha256,
+    actual: actualArchiveSha256,
+  }
+  if (onArchiveInspected) onArchiveInspected(archiveVerification)
+
+  await extractArchiveEntry(archivePath, entryName, destination)
+  const engineVerification = await verifyFileSha256(destination, engineSha256)
+  return {
+    archiveVerified: archiveVerification.valid,
+    archiveVerification,
+    engineVerification,
+  }
+}
+
 const getCompatibilityEntry = ({
   clientVersion = packageJson.version,
   platform = process.platform,
@@ -255,8 +291,10 @@ module.exports = {
   compatibilityManifest,
   downloadAndVerifyArtifact,
   extractArchiveEntry,
+  extractAndVerifyEngineArchive,
   getCompatibilityEntry,
   normalizeSha256,
   recoverInterruptedEngineInstall,
+  selectBundledEngineArchivePath,
   verifyFileSha256,
 }

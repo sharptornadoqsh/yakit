@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import { describe, expect, it } from 'vitest'
 import {
   ENGINE_LIFECYCLE_STATES,
@@ -115,6 +117,24 @@ describe('引擎启动决策', () => {
         bundled: { exists: false },
       }),
     ).toEqual({ state: 'missing', action: 'await-user' })
+  })
+
+  it('启动缺失与预置恢复失败时不自动进入网络下载', () => {
+    const startupSource = fs.readFileSync(
+      path.resolve('app/renderer/engine-link-startup/src/pages/StartupPage/index.tsx'),
+      'utf8',
+    )
+    const localDecisionStart = startupSource.indexOf("if (decision.action === 'extract-bundled')")
+    const localDecisionEnd = startupSource.indexOf('// #endregion', localDecisionStart)
+    const initializeStart = startupSource.indexOf('const initializeEngine')
+    const initializeEnd = startupSource.indexOf('// 回收数据库空间', initializeStart)
+    const networkOperationStart = startupSource.indexOf("case 'installNetWork':")
+    const networkOperationEnd = startupSource.indexOf("case 'error':", networkOperationStart)
+
+    expect(startupSource.slice(localDecisionStart, localDecisionEnd)).not.toContain('setYaklangDownload(true)')
+    expect(startupSource.slice(initializeStart, initializeEnd)).not.toContain('setYaklangDownload(true)')
+    expect(startupSource.slice(networkOperationStart, networkOperationEnd)).not.toContain('setYaklangDownload(true)')
+    expect(startupSource.slice(networkOperationStart, networkOperationEnd)).toContain('handleLinkLocalMode()')
   })
 })
 

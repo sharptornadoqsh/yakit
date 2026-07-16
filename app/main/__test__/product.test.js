@@ -137,6 +137,20 @@ describe('睿眼产品配置', () => {
     expect(auxWindowSource).toContain("getQueryParam('title') || productConfig.displayName")
   })
 
+  it('首次本地引擎启动等待覆盖慢速数据库初始化', () => {
+    const source = fs.readFileSync(path.resolve('app/main/handlers/newEngineStatus.js'), 'utf8')
+
+    expect(source).toContain('const LOCAL_ENGINE_START_TIMEOUT_MS = 180_000')
+    expect(source).toContain('}, LOCAL_ENGINE_START_TIMEOUT_MS)')
+    expect(source).toContain('${LOCAL_ENGINE_START_TIMEOUT_MS / 1000}s')
+  })
+
+  it('普通模式缺少旧系统标记时不记录文件缺失错误', () => {
+    const source = fs.readFileSync(path.resolve('app/main/handlers/utils/network.js'), 'utf8')
+
+    expect(source.match(/if \(error\.code !== 'ENOENT'\) console\.log\('error', error\)/g)).toHaveLength(3)
+  })
+
   it('关于窗口包含版本、类别与法律文档入口', () => {
     const aboutHtml = fs.readFileSync(path.resolve('app/main/about.html'), 'utf8')
     expect(aboutHtml).toContain('客户端版本')

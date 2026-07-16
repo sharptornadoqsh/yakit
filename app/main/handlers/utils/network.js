@@ -131,7 +131,7 @@ const getCheckTextUrl = async (version) => {
   try {
     system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', 'yakit-system-mode.txt'))).toString('utf8')
   } catch (error) {
-    console.log('error', error)
+    if (error.code !== 'ENOENT') console.log('error', error)
   }
   const suffix = system_mode === 'legacy'
 
@@ -241,7 +241,7 @@ const getYakEngineDownloadUrl = async (version) => {
       system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', 'yakit-system-mode.txt'))).toString('utf8')
     }
   } catch (error) {
-    console.log('error', error)
+    if (error.code !== 'ENOENT') console.log('error', error)
   }
   const suffix = system_mode === 'legacy'
   switch (process.platform) {
@@ -271,7 +271,7 @@ const getSuffix = () => {
   try {
     system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', 'yakit-system-mode.txt'))).toString('utf8')
   } catch (error) {
-    console.log('error', error)
+    if (error.code !== 'ENOENT') console.log('error', error)
   }
   const suffix = system_mode === 'legacy' ? '-legacy' : ''
   return suffix

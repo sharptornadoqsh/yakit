@@ -8,6 +8,7 @@ const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
 const runningTasks = new Map()
 
 const ECHO_TEST_MSG = 'Hello Yakit!'
+const LOCAL_ENGINE_START_TIMEOUT_MS = 180_000
 
 /** 各版本下的数据库环境变量 */
 const DefaultDBFileEnv = {
@@ -619,8 +620,6 @@ module.exports = {
           const taskKey = 'start_' + checkId
           let cleaned = false
           let pollIntervalId = null
-          const timeoutMs = 60000 // 增加到 60 秒，配合轮询检测
-
           /** 轮询检测引擎连接状态 */
           const startConnectionPolling = () => {
             engineLogOutputFileAndUI(win, `开始轮询检测引擎连接状态 (每 2 秒一次)...`)
@@ -696,9 +695,9 @@ module.exports = {
           const timeoutId = setTimeout(() => {
             if (checkId !== currentStartId || successDetected || killed) return
             killFun(true)
-            engineLogOutputFileAndUI(win, `----- 启动本地引擎超时 (60s) -----`)
+            engineLogOutputFileAndUI(win, `----- 启动本地引擎超时 (${LOCAL_ENGINE_START_TIMEOUT_MS / 1000}s) -----`)
             reject({ status: 'timeout', message: '启动本地引擎超时' })
-          }, timeoutMs)
+          }, LOCAL_ENGINE_START_TIMEOUT_MS)
 
           /** 成功回调，确保只触发一次 */
           const onSuccess = (msg1, msg2) => {

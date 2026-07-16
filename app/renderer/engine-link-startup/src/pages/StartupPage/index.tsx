@@ -360,8 +360,8 @@ export const StartupPage: React.FC = () => {
     }
 
     transitionEngineLifecycle('missing', '未找到本地引擎或已验证的预置工件')
+    setCheckLog(['未找到仓库预置引擎，请检查兼容清单与 bins 目录'])
     safeSetYakitStatus('installNetWork')
-    setYaklangDownload(true)
   })
   // #endregion
 
@@ -484,8 +484,7 @@ export const StartupPage: React.FC = () => {
         transitionEngineLifecycle('recoverable-error', '预置引擎恢复失败，原有可用版本未被删除', {
           error: `${error}`,
         })
-        safeSetYakitStatus(isInitLocalLink.current ? 'installNetWork' : 'skipAgreement_InstallNetWork')
-        setYaklangDownload(true)
+        safeSetYakitStatus('skipAgreement_Install')
       } finally {
         setRestartLoading(false)
       }
@@ -658,7 +657,7 @@ export const StartupPage: React.FC = () => {
       (yakitStatus === 'installNetWork' || yakitStatus === 'skipAgreement_InstallNetWork') &&
       engineLifecycle.state !== 'recoverable-error'
     ) {
-      transitionEngineLifecycle('missing', '请选择在线安装、手工安装或远程引擎')
+      transitionEngineLifecycle('missing', '未找到可用的本地或仓库预置引擎')
     }
   }, [yakitStatus])
 
@@ -824,14 +823,10 @@ export const StartupPage: React.FC = () => {
   const handleOperations = useMemoizedFn((type: YakitStatusType | YaklangEngineMode, extra?: TypeCallbackExtra) => {
     switch (type) {
       case 'skipAgreement_InstallNetWork': // 小风车重置引擎失败
-        setCheckLog([`解压失败：${extra?.message || '未知原因'}，请点击下载引擎继续使用...`])
+        setCheckLog([`预置引擎恢复失败：${extra?.message || '未知原因'}，请检查仓库工件后重试`])
         onDisconnect()
         onSetEngineMode(undefined)
-        if (isInitLocalLink.current) {
-          safeSetYakitStatus('installNetWork')
-        } else {
-          safeSetYakitStatus('skipAgreement_InstallNetWork')
-        }
+        safeSetYakitStatus('skipAgreement_Install')
         break
       case 'break': // 主动中断连接 或 小风车断开引擎
         safeSetYakitStatus('break')
@@ -854,9 +849,11 @@ export const StartupPage: React.FC = () => {
         return
       case 'installNetWork':
         onDisconnect()
-        onSetEngineMode(undefined)
-        safeSetYakitStatus('skipAgreement_InstallNetWork')
-        setYaklangDownload(true)
+        isEngineInstalled.current = false
+        safeSetYakitStatus('install')
+        setTimeout(() => {
+          handleLinkLocalMode()
+        }, 500)
         return
       case 'error':
         if (stopErrorStatusRef.current) return
