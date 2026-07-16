@@ -122,6 +122,7 @@
     "cli": "node scripts/cli.js",
     "electron-render": "env-cmd -e noBrouser,devTool -f ./.env-cmdrc react-app-rewired start",
     "electron-render-enterprise": "env-cmd -e noBrouser,devTool,enterprise -f ./.env-cmdrc react-app-rewired start",
+    "electron-render-enterprise-no-license": "env-cmd -e noBrouser,devTool,enterprise,enterpriseNoLicense -f ./.env-cmdrc react-app-rewired start",
     "electron-render-simple-enterprise": "env-cmd -e noBrouser,devTool,simpleEE -f ./.env-cmdrc react-app-rewired start",
     "electron-render-irify": "env-cmd -e noBrouser,devTool,irify -f ./.env-cmdrc react-app-rewired start",
     "electron-render-irify-enterprise": "env-cmd -e noBrouser,devTool,irifyEnterprise -f ./.env-cmdrc react-app-rewired start",
