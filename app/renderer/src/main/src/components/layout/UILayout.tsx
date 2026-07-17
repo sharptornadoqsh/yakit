@@ -6,6 +6,7 @@ import { FuncDomain } from './FuncDomain'
 import { TemporaryProjectPop, WinUIOp } from './WinUIOp'
 import { GlobalState } from './GlobalState'
 import { YakitGlobalHost } from './YakitGlobalHost'
+import { RenyanWindowChrome } from './RenyanWindowChrome'
 import {
   EngineWatchDogCallbackType,
   YakitSettingCallbackType,
@@ -110,6 +111,7 @@ import { getValueByType, ParamsToGroupByGroupName } from '@/pages/plugins/editDe
 import { YakExecutorParam } from '@/pages/invoker/YakExecutorParams'
 import { PluginHasParamsModal } from '../pluginHasParamsDrawer/PluginHasParamsDrawer'
 import { YakitRoute } from '@/enums/yakitRoute'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
 import { grpcFetchLocalPluginDetail } from '@/pages/pluginHub/utils/grpc'
 import { resolveEngineUpdateStatus, shouldCheckEngineUpdate } from './engineUpdate'
 import type { EngineUpdateStatus } from './engineUpdate'
@@ -1748,8 +1750,21 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
             onFailed={onFailed}
             failedCallback={onWatchDogCallback}
           />
-          <div id="yakit-header" className={styles['ui-layout-header']}>
-            {system === 'Darwin' ? (
+          <div
+            id="yakit-header"
+            className={classNames(styles['ui-layout-header'], {
+              [styles['renyan-ui-layout-header']]: RENYAN_SHELL_ENABLED,
+            })}
+          >
+            {RENYAN_SHELL_ENABLED ? (
+              <RenyanWindowChrome
+                system={system}
+                currentProjectId={currentProject?.Id ? currentProject.Id + '' : ''}
+                pageChildrenShow={pageShowHome}
+                draggable={drop}
+                onToggleWindowSize={maxScreen}
+              />
+            ) : system === 'Darwin' ? (
               <div className={classNames(styles['header-body'], styles['mac-header-body'])}>
                 {/* 遮住底部边框线 */}
                 <div

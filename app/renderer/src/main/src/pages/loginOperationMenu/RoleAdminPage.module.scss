@@ -1,16 +1,80 @@
 .roleAdminPage {
-  height: calc(100% - 30px);
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+  background: transparent;
+
+  .role-panel {
+    height: 100%;
+    border-radius: var(--ruiyan-radius-lg);
+  }
+
+  .role-panel-body {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .role-workspace {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .role-detail {
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .role-detail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .role-detail-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    > div {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 2px;
+
+      strong {
+        color: var(--ruiyan-color-text);
+        font-size: 14px;
+      }
+
+      small {
+        color: var(--ruiyan-color-text-secondary);
+        font-size: 10px;
+      }
+    }
+  }
+
+  .permission-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
   .edit-icon {
     svg {
-      color: var(--Colors-Use-Neutral-Text-1-Title);
+      color: var(--ruiyan-color-text);
     }
   }
   .del-icon {
     svg {
-      color: var(--Colors-Use-Error-Primary);
+      color: var(--ruiyan-color-danger);
     }
   }
 }
 .icon-question {
-  color: var(--Colors-Use-Neutral-Disable);
+  color: var(--ruiyan-color-text-tertiary);
 }

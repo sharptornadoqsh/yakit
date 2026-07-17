@@ -30,6 +30,11 @@
       -webkit-user-select: none;
       user-select: none;
 
+      &.renyan-ui-layout-header {
+        height: 32px;
+        background: var(--ruiyan-color-nav, #0b1220);
+      }
+
       .short-divider-wrapper {
         width: 1px;
         height: 100%;
@@ -95,6 +100,18 @@
           height: 100%;
           display: flex;
           align-items: center;
+        }
+
+        &.renyan-window-chrome {
+          --Colors-Use-Neutral-Border: rgb(148 163 184 / 14%);
+          --Colors-Use-Neutral-Text-1-Title: #cbd5e1;
+          --Colors-Use-Main-Primary: #00c2a8;
+          background: linear-gradient(90deg, var(--ruiyan-color-nav, #0b1220), #111a2e);
+          border-bottom-color: rgb(148 163 184 / 14%);
+
+          .header-title {
+            min-width: 0;
+          }
         }
 
         .yakit-mode-icon {

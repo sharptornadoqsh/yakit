@@ -182,7 +182,6 @@ import { SoftMode, useSoftMode, YakitModeEnum } from '@/store/softMode'
 import { RemoteSoftModeGV } from '@/enums/softMode'
 import { debugToPrintLogs } from '@/utils/logCollection'
 import { RenyanPageHeader } from '@/components/layout/RenyanPageHeader'
-import { RenyanWorkspaceSidebar } from '../renyanMenu/RenyanNavigation'
 import { isRuiYanTargetRoute, RuiYanPage } from '@/components/renyanUI'
 import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 
@@ -3423,14 +3422,8 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
       emiter.off('onSaveHistoryDataHttpFuzzer', onSaveHTTPFuzzer)
     }
   }, [])
-  const currentWorkspacePage = pageCache.find((item) => item.routeKey === currentTabKey) || pageCache[0]
-  const useRuiYanWorkspace = isRuiYanTargetRoute(currentWorkspacePage?.route)
-
   return (
     <Content className={styles['renyan-workspace-shell']}>
-      {!useRuiYanWorkspace && (
-        <RenyanWorkspaceSidebar currentRoute={currentWorkspacePage?.route} onMenuSelect={openMultipleMenuPage} />
-      )}
       <div className={styles['renyan-workspace-main']}>
         <YakitSpin spinning={loading}>
           <TabContent
@@ -3670,7 +3663,7 @@ const TabChildren: React.FC<TabChildrenProps> = React.memo((props) => {
             id={'main-operator-page-body-' + pageItem.routeKey}
           >
             {useRuiYanWorkspace ? (
-              <RuiYanPage route={pageItem.route} onNavigate={(route) => openMultipleMenuPage({ route })}>
+              <RuiYanPage route={pageItem.route}>
                 {pageHeader}
                 {pageContent}
               </RuiYanPage>

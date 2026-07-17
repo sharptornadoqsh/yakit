@@ -24,15 +24,44 @@ describe('睿眼菜单模型', () => {
     })
   })
 
-  it('按目标顺序生成七个一级菜单', () => {
+  it('按目标顺序生成十个一级菜单', () => {
     expect(buildRenyanMenu().map((item) => item.key)).toEqual([
       'workbench',
-      'traffic-analysis',
-      'security-testing',
-      'toolbox',
-      'project-collaboration',
-      'result-center',
-      'system-management',
+      'interactive-proxy',
+      'traffic-center',
+      'vulnerability-detection',
+      'brute-force',
+      'packet-tools',
+      'plugin-center',
+      'team-collaboration',
+      'project-security',
+      'system-settings',
+    ])
+  })
+
+  it('按产品信息架构生成规定的二级区域', () => {
+    const groups = Object.fromEntries(
+      buildRenyanMenu().map((group) => [group.key, group.children.map((item) => item.title)]),
+    )
+
+    expect(groups['workbench']).toEqual(['安全概览', '最近任务', '团队动态', '风险趋势'])
+    expect(groups['interactive-proxy']).toEqual(['代理控制台', '劫持会话', '拦截规则', '证书与代理设置'])
+    expect(groups['traffic-center']).toEqual(['历史流量', '请求详情', '响应详情', '流量筛选'])
+    expect(groups['vulnerability-detection']).toEqual(['通用检测', '专项检测', '检测任务', '风险结果'])
+    expect(groups['brute-force']).toEqual(['爆破任务', '字典管理', '命中结果', '执行日志'])
+    expect(groups['packet-tools']).toEqual(['报文重放', '报文差异', '编解码', '操作历史'])
+    expect(groups['plugin-center']).toEqual(['插件仓库', '已安装插件', '本地插件', '插件开发', '插件日志', '插件配置'])
+    expect(groups['team-collaboration']).toEqual(['服务连接', '用户管理', '角色权限', '组织管理', '团队动态'])
+    expect(groups['project-security']).toEqual(['项目管理', '安全概览', '风险与漏洞', '扫描结果', '项目导入导出'])
+    expect(groups['system-settings']).toEqual([
+      '引擎与更新',
+      '网络与 DNS',
+      'TLS 客户端',
+      '安全设置',
+      '密码策略',
+      '第三方应用',
+      '日志和诊断',
+      '关于',
     ])
   })
 
@@ -63,19 +92,17 @@ describe('睿眼菜单模型', () => {
     })
   })
 
-  it('团队工作区和成员角色显示为待交付状态', () => {
+  it('用户与角色入口映射到真实页面', () => {
     const items = flattenRenyanMenu(buildRenyanMenu())
-    const teamItems = items.filter((item) => ['team-workspace', 'member-roles'].includes(item.key))
+    const teamItems = items.filter((item) => ['account-administration', 'role-administration'].includes(item.key))
     expect(teamItems).toHaveLength(2)
-    teamItems.forEach((item) => {
-      expect(item.deliveryStatus).toBe('planned')
-      expect(isRenyanMenuItemNavigable(item)).toBe(false)
-    })
+    expect(teamItems.map((item) => item.route)).toEqual([YakitRoute.AccountAdminPage, YakitRoute.RoleAdminPage])
+    teamItems.forEach((item) => expect(isRenyanMenuItemNavigable(item)).toBe(true))
   })
 
   it('能力过滤不会保留空的一级菜单', () => {
-    const menu = buildRenyanMenu({ capabilities: ['workbench', 'trafficAnalysis'] })
-    expect(menu.map((item) => item.key)).toEqual(['workbench', 'traffic-analysis'])
+    const menu = buildRenyanMenu({ capabilities: ['workbench', 'trafficCenter'] })
+    expect(menu.map((item) => item.key)).toEqual(['workbench', 'traffic-center'])
   })
 
   it('所有配置路由均保持为现有枚举值', () => {
@@ -88,14 +115,14 @@ describe('睿眼菜单模型', () => {
 
   it('通过独立显示映射重命名旧路由', () => {
     const labels = buildRenyanRouteLabelMap()
-    expect(labels.get(YakitRoute.MITMHacker)).toBe('交互代理')
+    expect(labels.get(YakitRoute.MITMHacker)).toBe('代理控制台')
     expect(labels.get(YakitRoute.HTTPFuzzer)).toBe('报文重放')
     expect(labels.get(YakitRoute.DB_HTTPHistory)).toBe('历史流量')
-    expect(labels.get(YakitRoute.BatchExecutorPage)).toBe('漏洞检测')
-    expect(labels.get(YakitRoute.Mod_Brute)).toBe('爆破测试')
+    expect(labels.get(YakitRoute.BatchExecutorPage)).toBe('通用检测')
+    expect(labels.get(YakitRoute.Mod_Brute)).toBe('爆破任务')
     expect(labels.get(YakitRoute.DB_Risk)).toBe('风险与漏洞')
-    expect(renyanRouteDisplayMap[YakitRoute.Codec]).toBe('编解码工具')
-    expect(renyanRouteDisplayMap[YakitRoute.DataCompare]).toBe('报文差异对比')
+    expect(renyanRouteDisplayMap[YakitRoute.Codec]).toBe('编解码')
+    expect(renyanRouteDisplayMap[YakitRoute.DataCompare]).toBe('报文差异')
   })
 
   it('可靠性序号二十五不建立菜单节点', () => {

@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef, useImperativeHandle, useLayoutEffect, useMemo } from 'react'
 import * as monacoEditor from 'monaco-editor/esm/vs/editor/editor.api'
-import { LineConversionIcon } from '../../assets/icons'
 import styles from './DataCompare.module.scss'
-import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
+import { RuiYanButton, RuiYanIcon, RuiYanToolbar } from '@/components/renyanUI'
 import { RemoveIcon } from '@/assets/newIcon'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useHttpFlowStore } from '@/store/httpFlow'
@@ -13,7 +12,7 @@ import { useEditorFontSize, fontSizeOptions } from '@/store/editorFontSize'
 import { useUpdateEffect, useMemoizedFn } from 'ahooks'
 import { showByRightContext } from '@/components/yakitUI/YakitMenu/showByRightContext'
 import { YakitMenuItemType } from '@/components/yakitUI/YakitMenu/YakitMenu'
-import { yakitNotify } from '@/utils/notification'
+import { buildCompareSummary, formatCompareBytes, type CompareMode } from './compareMetrics'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -40,50 +39,117 @@ export const DataCompare: React.FC<DataCompareProps> = (props) => {
 
   const [left, setLeft] = useState<string>(leftData || '')
   const [right, setRight] = useState<string>(rightData || '')
+  const [mode, setMode] = useState<CompareMode>('text')
+  const [editorVersion, setEditorVersion] = useState(0)
   const { t } = useI18nNamespaces(['comparer'])
 
   const codeComparisonRef = useRef<CodeComparisonRef>(null)
+  const displayLeft = useMemo(() => (mode === 'bytes' ? formatCompareBytes(left) : left), [left, mode])
+  const displayRight = useMemo(() => (mode === 'bytes' ? formatCompareBytes(right) : right), [mode, right])
+  const summary = useMemo(() => buildCompareSummary(left, right, mode), [left, mode, right])
+
+  const changeMode = (nextMode: CompareMode) => {
+    if (nextMode === mode) return
+    setMode(nextMode)
+    setEditorVersion((version) => version + 1)
+  }
+
+  const swapContent = () => {
+    if (mode === 'text') {
+      codeComparisonRef.current?.onSwap()
+      return
+    }
+    setLeft(right)
+    setRight(left)
+    setEditorVersion((version) => version + 1)
+  }
+
+  const clearContent = () => {
+    if (mode === 'text') {
+      codeComparisonRef.current?.onClear()
+      return
+    }
+    setLeft('')
+    setRight('')
+    setEditorVersion((version) => version + 1)
+  }
+
   return (
     <div className={styles['data-compare-page']}>
-      <div className={styles['compare-command-bar']}>
-        <div className={styles['compare-heading']}>
-          <span>DIFF / 04</span>
-          <strong>{t('DataCompare.comparer')}</strong>
-          <small>文本差异</small>
-        </div>
-        <div className={styles['compare-actions']}>
-          <YakitButton type="text2" size="small" onClick={() => codeComparisonRef.current?.onNavigate('previous')}>
-            上一处
-          </YakitButton>
-          <YakitButton type="text2" size="small" onClick={() => codeComparisonRef.current?.onNavigate('next')}>
-            下一处
-          </YakitButton>
-          <span className={styles['command-divider']} />
-          <YakitButton type="secondary2" size="small" onClick={() => codeComparisonRef.current?.onSwap()}>
-            交换
-          </YakitButton>
-          <YakitButton type="secondary2" size="small" onClick={() => codeComparisonRef.current?.onClear()}>
-            清空
-          </YakitButton>
-          <YakitButton
-            type={noWrap ? 'secondary2' : 'primary'}
-            size="small"
-            icon={<LineConversionIcon />}
-            onClick={() => codeComparisonRef.current?.onChangeLineConversion()}
-          >
-            换行
-          </YakitButton>
-        </div>
-      </div>
+      <RuiYanToolbar
+        className={styles['compare-command-bar']}
+        leading={
+          <div className={styles['compare-heading']}>
+            <span>DIFF / 04</span>
+            <strong>{t('DataCompare.comparer')}</strong>
+            <small>{mode === 'text' ? '文本差异' : '字节差异'}</small>
+            <small>
+              左 {summary.leftLength} / 右 {summary.rightLength} {summary.unit}
+            </small>
+            <small>差异位置 {summary.differenceCount}</small>
+          </div>
+        }
+        actions={
+          <>
+            <div className={styles['compare-mode-switch']} role="group" aria-label="差异模式">
+              <RuiYanButton
+                variant={mode === 'text' ? 'primary' : 'ghost'}
+                size="small"
+                onClick={() => changeMode('text')}
+              >
+                文本
+              </RuiYanButton>
+              <RuiYanButton
+                variant={mode === 'bytes' ? 'primary' : 'ghost'}
+                size="small"
+                onClick={() => changeMode('bytes')}
+              >
+                字节
+              </RuiYanButton>
+            </div>
+            <span className={styles['command-divider']} />
+            <RuiYanButton
+              variant="ghost"
+              size="small"
+              onClick={() => codeComparisonRef.current?.onNavigate('previous')}
+            >
+              上一处
+            </RuiYanButton>
+            <RuiYanButton variant="ghost" size="small" onClick={() => codeComparisonRef.current?.onNavigate('next')}>
+              下一处
+            </RuiYanButton>
+            <span className={styles['command-divider']} />
+            <RuiYanButton size="small" onClick={swapContent}>
+              交换
+            </RuiYanButton>
+            <RuiYanButton size="small" onClick={clearContent}>
+              清空
+            </RuiYanButton>
+            <RuiYanButton
+              variant={noWrap ? 'secondary' : 'primary'}
+              size="small"
+              icon={<RuiYanIcon name="packet" />}
+              onClick={() => codeComparisonRef.current?.onChangeLineConversion()}
+            >
+              换行
+            </RuiYanButton>
+          </>
+        }
+      />
       <div className={styles['compare-editor']}>
         <CodeComparison
+          key={`${mode}-${editorVersion}`}
           ref={codeComparisonRef}
           noWrap={noWrap}
           setNoWrap={setNoWrap}
-          leftCode={left}
-          setLeftCode={setLeft}
-          rightCode={right}
-          setRightCode={setRight}
+          leftCode={displayLeft}
+          setLeftCode={mode === 'text' ? setLeft : undefined}
+          rightCode={displayRight}
+          setRightCode={mode === 'text' ? setRight : undefined}
+          originalEditable={mode === 'text'}
+          readOnly={mode === 'bytes'}
+          initialLanguage={mode === 'bytes' ? 'plaintext' : 'yak'}
+          useStoredCompareData={mode === 'text' && editorVersion === 0}
         />
       </div>
     </div>
@@ -145,10 +211,23 @@ interface CodeComparisonProps {
   originalEditable?: boolean
   readOnly?: boolean
   fontSize?: number
+  initialLanguage?: string
+  useStoredCompareData?: boolean
 }
 
 export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((props, ref) => {
-  const { noWrap, setNoWrap, leftCode, setLeftCode, rightCode, setRightCode, originalEditable = true, readOnly } = props
+  const {
+    noWrap,
+    setNoWrap,
+    leftCode,
+    setLeftCode,
+    rightCode,
+    setRightCode,
+    originalEditable = true,
+    readOnly,
+    initialLanguage = 'yak',
+    useStoredCompareData = true,
+  } = props
   const { t } = useI18nNamespaces(['yakitUi'])
   const { fontSize, initFontSize, setFontSize } = useEditorFontSize()
   const diffDivRef = useRef(null)
@@ -159,6 +238,17 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
   // 从store获取对比数据
   const { token, dataMap } = useHttpFlowStore()
   const { theme } = useTheme()
+
+  const disposeDiffEditor = () => {
+    const editor = diffEditorRef.current
+    if (!editor) return
+    const model = editor.getModel()
+    editor.setModel(null)
+    editor.dispose()
+    model?.original.dispose()
+    model?.modified.dispose()
+    diffEditorRef.current = undefined
+  }
 
   // 构建右键菜单数据
   const rightContextMenu = useMemo<YakitMenuItemType[]>(
@@ -269,26 +359,14 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
   }, [])
 
   const changeLineConversion = () => {
-    if (!diffDivRef || !diffDivRef.current) return
     if (!diffEditorRef.current) return
-    const diff = diffDivRef.current as unknown as HTMLDivElement
-    diffEditorRef.current.dispose()
-
-    const isWrap = !noWrap
-    diffEditorRef.current = monaco.createDiffEditor(diff, {
-      enableSplitViewResizing: false,
-      originalEditable,
-      automaticLayout: true,
-      wordWrap: isWrap ? 'off' : 'on',
-      readOnly,
-      fontSize,
-      contextmenu: false,
-    })
-
-    if (setNoWrap) setNoWrap(!noWrap)
-    setModelEditor({ content: leftCode, language: language }, { content: rightCode, language: language }, language)
+    const nextNoWrap = !noWrap
+    diffEditorRef.current.updateOptions({ wordWrap: nextNoWrap ? 'off' : 'on' })
+    setNoWrap?.(nextNoWrap)
   }
   const setModelEditor = (left?: textModelProps, right?: textModelProps, language = 'yak') => {
+    if (!diffEditorRef.current) return
+    const previousModel = diffEditorRef.current.getModel()
     const leftModel = monaco.createModel(left ? left.content : '', left ? left.language : language)
     leftModel.onDidChangeContent((e) => {
       if (setLeftCode) setLeftCode(leftModel.getValue())
@@ -298,15 +376,16 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
       rightModel.onDidChangeContent((e) => {
         setRightCode(rightModel.getValue())
       })
-    if (!diffEditorRef.current) return
     diffEditorRef.current.setModel({
       original: leftModel,
       modified: rightModel,
     })
+    previousModel?.original.dispose()
+    previousModel?.modified.dispose()
   }
   useEffect(() => {
     //如果存在先销毁以前的组件
-    if (diffEditorRef.current) diffEditorRef.current.dispose()
+    disposeDiffEditor()
     //替换 invoke("create-compare-token")
     const getCreateCompareTokenRes = () => {
       if (token) {
@@ -337,7 +416,7 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
       contextmenu: false,
     })
 
-    if (!!res.info) {
+    if (useStoredCompareData && !!res.info) {
       const { info } = res
       if (info.type === 1) {
         const { left } = info
@@ -358,29 +437,37 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
         }
       }
     } else {
-      setLanguage('yak')
+      setLanguage(initialLanguage)
       if (setLeftCode) setLeftCode(leftCode)
       if (setRightCode) setRightCode(rightCode)
       setModelEditor(
         {
           content: leftCode,
-          language,
+          language: initialLanguage,
         },
         {
           content: rightCode,
-          language,
+          language: initialLanguage,
         },
+        initialLanguage,
       )
     }
 
-    ipcRenderer.on(`${res.token}-data`, (e, tokenDataRes) => {
+    const dataChannel = `${res.token}-data`
+    const handleTokenData = (e, tokenDataRes) => {
       const { left, right } = tokenDataRes.info
 
       setModelEditor(left, right, language || left?.language || right?.language)
 
       if (tokenDataRes.info.type === 1) if (setLeftCode) setLeftCode(left.content)
       if (tokenDataRes.info.type === 2) if (setRightCode) setRightCode(right.content)
-    })
+    }
+    if (useStoredCompareData) ipcRenderer.on(dataChannel, handleTokenData)
+
+    return () => {
+      if (useStoredCompareData) ipcRenderer.removeListener(dataChannel, handleTokenData)
+      disposeDiffEditor()
+    }
   }, [])
 
   useUpdateEffect(() => {

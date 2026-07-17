@@ -29,14 +29,19 @@ import moment from 'moment'
 import { useCampare } from '@/hook/useCompare/useCompare'
 import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { unReadable } from '../dynamicControl/DynamicControl'
-import YakitCascader from '@/components/yakitUI/YakitCascader/YakitCascader'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
-import { DefaultOptionType } from 'antd/lib/cascader'
 import styles from './AccountAdminPage.module.scss'
 import { setClipboardText } from '@/utils/clipboard'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useStore } from '@/store'
-import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
+import {
+  RuiYanDetailPanel,
+  RuiYanEmptyState,
+  RuiYanErrorState,
+  RuiYanPanel,
+  RuiYanSplitPane,
+  RuiYanStatusBadge,
+} from '@/components/renyanUI'
 interface QueryAccountAdminRequest {
   departmentId?: number
   keywords: string
@@ -76,6 +81,7 @@ export const AccountAdminPage: React.FC<AccountAdminPageProp> = (props) => {
 
   const [treeCount, setTreeCount] = useState<TreeCount>()
   const [treeReduceCount, setTreeReduceCount] = useState<TreeReduceCount>({ reduce: true, obj: {} })
+  const [selectedAccount, setSelectedAccount] = useState<API.UrmUserList>()
 
   const onSelectDepartmentId = useMemoizedFn((departmentId) => {
     setTableQuery((prevQuery) => ({
@@ -85,64 +91,107 @@ export const AccountAdminPage: React.FC<AccountAdminPageProp> = (props) => {
   })
 
   if (!userInfo.isLogin || userInfo.role !== 'admin') {
-    return <RenyanState type="noPermission" />
+    return <RuiYanErrorState title="无管理权限" description="当前账号不具备用户与组织管理权限。" />
   }
 
   return (
     <div className={styles['accountAdminPage']}>
-      <YakitCard
-        className={styles['card']}
-        headStyle={{
-          height: 32,
-          minHeight: 32,
-          boxSizing: 'content-box',
-          paddingLeft: 0,
-          paddingRight: 0,
-        }}
-        bodyStyle={{ padding: 0, width: '100%', height: 'calc(100% - 32px)' }}
-        title={
+      <RuiYanPanel
+        className={styles['admin-panel']}
+        bodyClassName={styles['admin-panel-body']}
+        title="用户管理"
+        extra={
           <div className={styles['card-title']}>
             <YakitInput.Search
               style={{ width: 180 }}
               placeholder={t('AccountAdminPage.searchUserPlaceholder')}
               onSearch={(value) => {
                 setSelectTitle(undefined)
+                setSelectedAccount(undefined)
                 setTableQuery((prevQuery) => ({ ...prevQuery, departmentId: undefined, keywords: value }))
               }}
             ></YakitInput.Search>
           </div>
         }
-        extra={<div className={styles['card-extra']}></div>}
       >
-        <YakitResizeBox
-          isVer={false}
-          lineDirection="left"
-          firstNode={
-            <OrganizationAdmin
-              selectDepartmentId={tableQuery.departmentId === 0 ? -1 : tableQuery.departmentId}
-              onSelectDepartmentId={onSelectDepartmentId}
-              onSetSelectTitle={setSelectTitle}
-              treeCount={treeCount}
-              treeReduceCount={treeReduceCount}
+        <RuiYanSplitPane
+          className={styles['account-workspace']}
+          firstSize="72%"
+          first={
+            <YakitResizeBox
+              isVer={false}
+              lineDirection="left"
+              firstNode={
+                <OrganizationAdmin
+                  selectDepartmentId={tableQuery.departmentId === 0 ? -1 : tableQuery.departmentId}
+                  onSelectDepartmentId={onSelectDepartmentId}
+                  onSetSelectTitle={setSelectTitle}
+                  treeCount={treeCount}
+                  treeReduceCount={treeReduceCount}
+                />
+              }
+              firstRatio="30%"
+              firstMinSize="400px"
+              firstNodeStyle={{ padding: 0 }}
+              secondNode={
+                <AccountList
+                  selectTitle={selectTitle}
+                  onSetSelectTitle={setSelectTitle}
+                  query={tableQuery}
+                  onSetQuery={setTableQuery}
+                  onSetTreeCount={setTreeCount}
+                  onSetTreeReduceCount={setTreeReduceCount}
+                  onSelectAccount={setSelectedAccount}
+                />
+              }
+              secondRatio="70%"
+              secondMinSize="500px"
             />
           }
-          firstRatio="30%"
-          firstMinSize="400px"
-          firstNodeStyle={{ padding: 0 }}
-          secondNode={
-            <AccountList
-              selectTitle={selectTitle}
-              onSetSelectTitle={setSelectTitle}
-              query={tableQuery}
-              onSetQuery={setTableQuery}
-              onSetTreeCount={setTreeCount}
-              onSetTreeReduceCount={setTreeReduceCount}
-            />
+          second={
+            <RuiYanDetailPanel className={styles['account-detail']} title="用户详情">
+              {selectedAccount ? (
+                <div className={styles['account-detail-content']}>
+                  <div className={styles['account-detail-identity']}>
+                    <Avatar src={selectedAccount.head_img}>
+                      {selectedAccount.user_name.slice(0, 1).toUpperCase()}
+                    </Avatar>
+                    <div>
+                      <strong>{selectedAccount.nickName || selectedAccount.user_name}</strong>
+                      <small>{selectedAccount.user_name}</small>
+                    </div>
+                    <RuiYanStatusBadge tone="info">{selectedAccount.role_name || '默认角色'}</RuiYanStatusBadge>
+                  </div>
+                  <dl className={styles['account-detail-list']}>
+                    <div>
+                      <dt>用户标识</dt>
+                      <dd>{selectedAccount.uid}</dd>
+                    </div>
+                    <div>
+                      <dt>所属组织</dt>
+                      <dd>
+                        {[selectedAccount.department_parent_name, selectedAccount.department_name]
+                          .filter(Boolean)
+                          .join(' / ') || '未分配'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>来源平台</dt>
+                      <dd>{selectedAccount.from_platform || '未报告'}</dd>
+                    </div>
+                    <div>
+                      <dt>创建时间</dt>
+                      <dd>{moment.unix(selectedAccount.created_at).format('YYYY-MM-DD HH:mm')}</dd>
+                    </div>
+                  </dl>
+                </div>
+              ) : (
+                <RuiYanEmptyState compact title="选择用户查看详情" description="详情仅展示服务返回的真实账号字段。" />
+              )}
+            </RuiYanDetailPanel>
           }
-          secondRatio="70%"
-          secondMinSize="500px"
-        ></YakitResizeBox>
-      </YakitCard>
+        />
+      </RuiYanPanel>
     </div>
   )
 }
@@ -792,10 +841,11 @@ interface AccountListProps {
   onSetQuery: (query: QueryAccountAdminRequest) => void
   onSetTreeCount: (treeCount: TreeCount) => void
   onSetTreeReduceCount: (treeReduceCount: TreeReduceCount) => void
+  onSelectAccount: (account: API.UrmUserList) => void
 }
 const AccountList: React.FC<AccountListProps> = (props) => {
   const { t } = useI18nNamespaces(['admin', 'yakitUi'])
-  const { selectTitle, onSetSelectTitle, onSetTreeCount, onSetTreeReduceCount } = props
+  const { selectTitle, onSetSelectTitle, onSetTreeCount, onSetTreeReduceCount, onSelectAccount } = props
   const [creatCountVisible, setCreatCountVisible] = useState<boolean>(false)
   const editInfoRef = useRef<API.UrmUserList>()
   const [isRefresh, setIsRefresh] = useState<boolean>(false)
@@ -1209,6 +1259,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
         renderKey="uid"
         columns={columns}
         useUpAndDown
+        onRowClick={onSelectAccount}
         pagination={{
           total: response.pagemeta.total,
           limit: response.pagemeta.limit,

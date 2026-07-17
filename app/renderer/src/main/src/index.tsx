@@ -8,6 +8,7 @@ import { DndProvider } from 'react-dnd'
 // import {createRoot} from "react-dom/client"
 import './yakitUI.scss'
 import './theme/yakit.scss'
+import './theme/renyan.scss'
 import './yakitLib.scss'
 import './assets/global.scss'
 import './theme/scrollbar.scss'

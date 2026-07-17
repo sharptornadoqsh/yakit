@@ -1,4 +1,3 @@
-import React from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { YakitRoute } from '@/enums/yakitRoute'
@@ -13,6 +12,13 @@ vi.mock('@/store/pageInfo', () => ({
     selector({ currentPageTabRouteKey: testState.currentRoute }),
 }))
 
+vi.mock('@/store', () => ({
+  useStore: (selector: (state: { userInfo: Record<string, unknown> }) => unknown) =>
+    selector({
+      userInfo: { isLogin: false, role: '', companyName: null, githubName: null, wechatName: null, qqName: null },
+    }),
+}))
+
 vi.mock('@/i18n/useI18nNamespaces', () => ({
   useI18nNamespaces: () => ({
     t: (key: string) => key,
@@ -22,16 +28,6 @@ vi.mock('@/i18n/useI18nNamespaces', () => ({
 
 vi.mock('@/utils/eventBus/eventBus', () => ({
   default: { emit: vi.fn() },
-}))
-
-vi.mock('@/assets/icon/outline', () => ({
-  OutlineChevrondoubleleftIcon: () => React.createElement('span'),
-  OutlineChevrondoublerightIcon: () => React.createElement('span'),
-  OutlineChevrondownIcon: () => React.createElement('span'),
-}))
-
-vi.mock('../RenyanNavigation.module.scss', () => ({
-  default: new Proxy({}, { get: (_target, property) => String(property) }),
 }))
 
 describe('睿眼顶部导航', () => {
@@ -44,18 +40,18 @@ describe('睿眼顶部导航', () => {
       <RenyanNavigation defaultExpand={true} onMenuSelect={vi.fn()} setRouteToLabel={vi.fn()} />,
     )
 
-    const workbench = screen.getByRole('button', { name: '01 工作台' })
-    const systemManagement = screen.getByRole('button', { name: '07 系统管理' })
-    const trafficAnalysis = screen.getByRole('button', { name: '02 流量分析' })
+    const workbench = screen.getByRole('button', { name: '工作台' })
+    const systemManagement = screen.getByRole('button', { name: '系统设置' })
+    const trafficAnalysis = screen.getByRole('button', { name: '流量中心' })
 
-    expect(workbench).toHaveClass('primary-button-active')
+    expect(workbench).toHaveAttribute('aria-current', 'page')
     fireEvent.click(systemManagement)
-    expect(systemManagement).toHaveClass('primary-button-active')
+    expect(systemManagement).toHaveAttribute('aria-current', 'page')
 
     testState.currentRoute = YakitRoute.DB_HTTPHistory
     rerender(<RenyanNavigation defaultExpand={true} onMenuSelect={vi.fn()} setRouteToLabel={vi.fn()} />)
 
-    expect(trafficAnalysis).toHaveClass('primary-button-active')
-    expect(systemManagement).not.toHaveClass('primary-button-active')
+    expect(trafficAnalysis).toHaveAttribute('aria-current', 'page')
+    expect(systemManagement).not.toHaveAttribute('aria-current')
   })
 })

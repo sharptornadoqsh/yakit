@@ -1,11 +1,9 @@
 import React, { memo, useEffect, useMemo } from 'react'
-import { YakitSideTab } from '@/components/yakitSideTab/YakitSideTab'
-import { YakitTabsProps } from '@/components/yakitSideTab/YakitSideTabType'
-import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { configManagementTabType, useConfigManagementTab } from '@/store'
 import { YakitRoute } from '@/enums/yakitRoute'
 import emiter from '@/utils/eventBus/eventBus'
+import { RuiYanLoadingState, RuiYanPanel, RuiYanTabs, type RuiYanTabItem } from '@/components/renyanUI'
 import styles from './ConfigManagement.module.scss'
 
 const NewPayload = React.lazy(() =>
@@ -20,19 +18,34 @@ const ConfigManagement: React.FC = memo(() => {
   const { t, i18n } = useI18nNamespaces(['yakitUi', 'yakitRoute', 'layout'])
   const { configManagementActiveTab, setConfigManagementActiveTab } = useConfigManagementTab()
 
-  const yakitTabs: YakitTabsProps[] = useMemo(() => {
+  const tabs: RuiYanTabItem[] = useMemo(() => {
     return [
       {
         label: t('YakitRoute.Payload'),
-        value: 'payload',
+        key: 'payload',
+        content: (
+          <React.Suspense fallback={<RuiYanLoadingState title="字典资源读取中" />}>
+            <NewPayload />
+          </React.Suspense>
+        ),
       },
       {
         label: t('Layout.ExtraMenu.proxyManagement'),
-        value: 'proxy',
+        key: 'proxy',
+        content: (
+          <React.Suspense fallback={<RuiYanLoadingState title="代理配置读取中" />}>
+            <ProxyRulesConfig />
+          </React.Suspense>
+        ),
       },
       {
         label: t('Layout.ExtraMenu.hotPatchManagement'),
-        value: 'hotPatch',
+        key: 'hotPatch',
+        content: (
+          <React.Suspense fallback={<RuiYanLoadingState title="热加载配置读取中" />}>
+            <HotPatchManagement />
+          </React.Suspense>
+        ),
       },
     ]
   }, [i18n.language])
@@ -60,41 +73,20 @@ const ConfigManagement: React.FC = memo(() => {
     )
   }, [configManagementActiveTab, getCurrentTabLabel])
 
-  const content = useMemo(() => {
-    switch (configManagementActiveTab) {
-      case 'payload':
-        return (
-          <React.Suspense fallback={<>loading...</>}>
-            <NewPayload />
-          </React.Suspense>
-        )
-      case 'proxy':
-        return (
-          <React.Suspense fallback={<>loading...</>}>
-            <ProxyRulesConfig />
-          </React.Suspense>
-        )
-      case 'hotPatch':
-        return (
-          <React.Suspense fallback={<>loading...</>}>
-            <HotPatchManagement />
-          </React.Suspense>
-        )
-      default:
-        return null
-    }
-  }, [configManagementActiveTab])
-
   return (
-    <YakitSideTab
-      activeShow={true}
-      yakitTabs={yakitTabs}
-      activeKey={configManagementActiveTab}
-      onActiveKey={(key) => setConfigManagementActiveTab(key as configManagementTabType)}
-      t={t}
-    >
-      <div className={styles['config-management-content']}>{content}</div>
-    </YakitSideTab>
+    <div className={styles['config-management-page']}>
+      <RuiYanPanel
+        title="字典与代理配置"
+        className={styles['config-management-panel']}
+        bodyClassName={styles['config-management-content']}
+      >
+        <RuiYanTabs
+          items={tabs}
+          activeKey={configManagementActiveTab}
+          onChange={(key) => setConfigManagementActiveTab(key as configManagementTabType)}
+        />
+      </RuiYanPanel>
+    </div>
   )
 })
 

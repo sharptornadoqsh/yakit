@@ -1,0 +1,298 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import classNames from 'classnames'
+import { isRenyanMenuItemNavigable, type RenyanMenuItem } from '@/routes/renyanMenu'
+import productIcon from '@/assets/renyan-icon.svg'
+import { RuiYanIcon, type RuiYanIconName } from './RuiYanIcons'
+import styles from './RuiYanUI.module.scss'
+
+export interface RuiYanAppShellProps {
+  navigation: React.ReactNode
+  children: React.ReactNode
+}
+
+export const RuiYanAppShell: React.FC<RuiYanAppShellProps> = ({ navigation, children }) => (
+  <div className={classNames('ruiyan-app-shell', styles['app-shell'])}>
+    {navigation}
+    <main className={styles['app-main']}>{children}</main>
+  </div>
+)
+
+export interface RuiYanSearchItem {
+  key: string
+  title: string
+  group: string
+}
+
+export interface RuiYanCommand {
+  key: string
+  label: string
+  icon: RuiYanIconName
+  onClick: () => void
+}
+
+export interface RuiYanTopCommandBarProps {
+  productName?: string
+  productCaption?: string
+  searchItems: readonly RuiYanSearchItem[]
+  onSearchSelect: (key: string) => void
+  commands: readonly RuiYanCommand[]
+  userName: string
+  teamName: string
+  onNotifications: () => void
+  onProfile: () => void
+  hasUnreadNotifications?: boolean
+}
+
+export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
+  productName = '睿眼自动化渗透系统',
+  productCaption = 'RUIYAN SECURITY CONSOLE',
+  searchItems,
+  onSearchSelect,
+  commands,
+  userName,
+  teamName,
+  onNotifications,
+  onProfile,
+  hasUnreadNotifications = false,
+}) => {
+  const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const results = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase()
+    if (!normalized) return searchItems.slice(0, 8)
+    return searchItems
+      .filter((item) => `${item.title} ${item.group}`.toLocaleLowerCase().includes(normalized))
+      .slice(0, 10)
+  }, [query, searchItems])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
+        event.preventDefault()
+        inputRef.current?.focus()
+        setSearchOpen(true)
+      }
+    }
+    document.addEventListener('keydown', handleShortcut)
+    return () => document.removeEventListener('keydown', handleShortcut)
+  }, [])
+
+  const selectResult = (key: string) => {
+    onSearchSelect(key)
+    setSearchOpen(false)
+    setQuery('')
+  }
+
+  return (
+    <header className={styles['top-bar']}>
+      <div className={styles.brand} aria-label={productName}>
+        <span className={styles['brand-mark']}>
+          <img src={productIcon} alt="" />
+        </span>
+        <span className={styles['brand-text']}>
+          <strong>{productName}</strong>
+          <span>{productCaption}</span>
+        </span>
+      </div>
+      <div className={styles['top-search']}>
+        <RuiYanIcon name="search" />
+        <input
+          ref={inputRef}
+          value={query}
+          role="combobox"
+          placeholder="搜索功能、任务或设置"
+          aria-label="全局功能搜索"
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-expanded={searchOpen}
+          aria-controls="ruiyan-global-search-results"
+          onFocus={() => setSearchOpen(true)}
+          onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+          onChange={(event) => {
+            setQuery(event.target.value)
+            setSearchOpen(true)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setSearchOpen(false)
+            if (event.key === 'Enter' && results[0]) selectResult(results[0].key)
+          }}
+        />
+        <span className={styles.shortcut}>Ctrl K</span>
+        {searchOpen ? (
+          <div id="ruiyan-global-search-results" className={styles['search-results']} role="listbox">
+            {results.length > 0 ? (
+              results.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={styles['search-result']}
+                  role="option"
+                  aria-selected="false"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => selectResult(item.key)}
+                >
+                  <RuiYanIcon name="search" />
+                  {item.title}
+                  <span>{item.group}</span>
+                </button>
+              ))
+            ) : (
+              <div className={styles['search-empty']}>未找到匹配功能</div>
+            )}
+          </div>
+        ) : null}
+      </div>
+      <div className={styles['top-actions']}>
+        {commands.map((command) => (
+          <button key={command.key} type="button" className={styles['command-button']} onClick={command.onClick}>
+            <RuiYanIcon name={command.icon} />
+            <span>{command.label}</span>
+          </button>
+        ))}
+        <button type="button" className={styles['top-icon-button']} aria-label="消息通知" onClick={onNotifications}>
+          <RuiYanIcon name="bell" />
+          {hasUnreadNotifications ? <span className={styles['notification-dot']} /> : null}
+        </button>
+        <button type="button" className={styles['profile-button']} onClick={onProfile}>
+          <span className={styles.avatar}>
+            <RuiYanIcon name="user" />
+          </span>
+          <span className={styles['profile-text']}>
+            <strong>{userName}</strong>
+            <span>{teamName}</span>
+          </span>
+        </button>
+      </div>
+    </header>
+  )
+}
+
+const groupIcons: Record<string, RuiYanIconName> = {
+  workbench: 'workbench',
+  'interactive-proxy': 'proxy',
+  'traffic-center': 'traffic',
+  'vulnerability-detection': 'vulnerability',
+  'brute-force': 'brute',
+  'packet-tools': 'packet',
+  'plugin-center': 'plugin',
+  'team-collaboration': 'team',
+  'project-security': 'project',
+  'system-settings': 'settings',
+}
+
+export const getRuiYanGroupIcon = (key: string): RuiYanIconName => groupIcons[key] || 'panel'
+
+export interface RuiYanPrimaryNavProps {
+  groups: readonly RenyanMenuItem[]
+  activeGroupKey: string
+  onSelect: (item: RenyanMenuItem) => void
+}
+
+export const RuiYanPrimaryNav: React.FC<RuiYanPrimaryNavProps> = ({ groups, activeGroupKey, onSelect }) => (
+  <nav className={styles['primary-nav']} aria-label="主导航">
+    <div className={styles['primary-list']}>
+      {groups.map((group) => (
+        <button
+          key={group.key}
+          type="button"
+          className={classNames(styles['primary-item'], group.key === activeGroupKey && styles['primary-active'])}
+          aria-current={group.key === activeGroupKey ? 'page' : undefined}
+          title={group.title}
+          onClick={() => onSelect(group)}
+        >
+          <RuiYanIcon name={getRuiYanGroupIcon(group.key)} />
+          <span>{group.title}</span>
+        </button>
+      ))}
+    </div>
+    <div className={styles['primary-footer']}>RUIYAN</div>
+  </nav>
+)
+
+export interface RuiYanSecondaryNavProps {
+  group: RenyanMenuItem
+  activeKeys: readonly string[]
+  onSelect: (item: RenyanMenuItem) => void
+  defaultCollapsed?: boolean
+}
+
+const getItemIcon = (item: RenyanMenuItem): RuiYanIconName => {
+  if (item.route) return getRuiYanGroupIcon(item.group)
+  if (item.action) return item.action === 'diagnostics' ? 'traffic' : 'settings'
+  return 'panel'
+}
+
+export const RuiYanSecondaryNav: React.FC<RuiYanSecondaryNavProps> = ({
+  group,
+  activeKeys,
+  onSelect,
+  defaultCollapsed = false,
+}) => {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
+
+  useEffect(() => setCollapsed(defaultCollapsed), [defaultCollapsed])
+
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>('.ruiyan-app-shell')
+    shell?.style.setProperty('--ruiyan-secondary-width', collapsed ? '64px' : '224px')
+    return () => {
+      shell?.style.removeProperty('--ruiyan-secondary-width')
+    }
+  }, [collapsed])
+
+  const renderItem = (item: RenyanMenuItem, tertiary = false) => {
+    const navigable = isRenyanMenuItemNavigable(item)
+    const active = activeKeys.includes(item.key)
+    const badge = item.deliveryStatus === 'planned' ? '规划' : !item.route && !item.action ? '页内' : undefined
+    return (
+      <React.Fragment key={item.key}>
+        <button
+          type="button"
+          className={classNames(
+            styles['secondary-item'],
+            tertiary && styles['tertiary-item'],
+            active && styles['secondary-active'],
+          )}
+          disabled={!navigable}
+          aria-current={active ? 'page' : undefined}
+          title={collapsed ? item.title : undefined}
+          onClick={() => navigable && onSelect(item)}
+        >
+          {!tertiary ? <RuiYanIcon name={getItemIcon(item)} /> : null}
+          <span className={styles['secondary-label']}>{item.title}</span>
+          {badge ? <span className={styles['secondary-badge']}>{badge}</span> : null}
+        </button>
+        {!collapsed && item.children.length > 0 ? (
+          <div className={styles['tertiary-list']}>{item.children.map((child) => renderItem(child, true))}</div>
+        ) : null}
+      </React.Fragment>
+    )
+  }
+
+  return (
+    <aside className={classNames(styles['secondary-nav'], collapsed && styles['secondary-collapsed'])}>
+      <header className={styles['secondary-header']}>
+        <div className={styles['secondary-heading']}>
+          <span>{String(group.order).padStart(2, '0')} / MODULE</span>
+          <strong>{group.title}</strong>
+        </div>
+        <button
+          type="button"
+          className={styles['collapse-button']}
+          aria-label={collapsed ? '展开二级导航' : '收起二级导航'}
+          onClick={() => setCollapsed((value) => !value)}
+        >
+          <RuiYanIcon name="chevron" />
+        </button>
+      </header>
+      <div className={styles['secondary-scroll']}>
+        <div className={styles['secondary-list']}>
+          {group.route || group.action ? renderItem(group) : null}
+          {group.children.map((item) => renderItem(item))}
+        </div>
+      </div>
+      <footer className={styles['secondary-footer']}>本地运行环境</footer>
+    </aside>
+  )
+}

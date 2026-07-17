@@ -1265,7 +1265,8 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
             </div>
           </div>
 
-          <div
+          <button
+            type="button"
             className={classNames(styles['btn-wrapper'], styles['new-temporary-project-wrapper'])}
             onClick={async () => {
               if (await getTemporaryProjectId()) {
@@ -1284,9 +1285,10 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 <PlusBoldSvgIcon />
               </div>
             </div>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             className={classNames(styles['btn-wrapper'], styles['new-project-wrapper'])}
             onClick={() => operateFunc('newProject')}
           >
@@ -1299,9 +1301,10 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 <PlusBoldSvgIcon />
               </div>
             </div>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             className={classNames(styles['btn-wrapper'], styles['new-folder-wrapper'])}
             onClick={() => operateFunc('newFolder')}
           >
@@ -1314,10 +1317,11 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 <PlusBoldSvgIcon />
               </div>
             </div>
-          </div>
+          </button>
 
           {/* { engineMode !== "remote" && ( */}
-          <div
+          <button
+            type="button"
             className={classNames(styles['btn-wrapper'], styles['import-wrapper'])}
             onClick={() => operateFunc('import')}
           >
@@ -1330,7 +1334,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 <ImportSvgIcon />
               </div>
             </div>
-          </div>
+          </button>
           {/* )} */}
         </div>
 

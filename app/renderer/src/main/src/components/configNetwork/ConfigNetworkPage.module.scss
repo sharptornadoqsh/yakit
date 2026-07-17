@@ -1,14 +1,14 @@
 .config-network-page {
   height: 100%;
-  padding: 8px;
+  padding: 12px;
   overflow: auto;
-  background: #eef4f4;
+  background: transparent;
 
   :global(.ant-card) {
-    border: 1px solid #bfd4d6;
-    border-radius: 3px;
-    background: var(--Colors-Use-Basic-Background);
-    box-shadow: 0 8px 20px rgba(35, 68, 74, 0.06);
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-lg);
+    background: var(--ruiyan-color-surface);
+    box-shadow: var(--ruiyan-shadow-sm);
   }
 
   :global(.ant-card-body) {

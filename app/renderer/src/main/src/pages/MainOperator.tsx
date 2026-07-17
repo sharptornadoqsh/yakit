@@ -1,5 +1,5 @@
 import React, { ReactNode, useEffect, useRef, useState } from 'react'
-import { Avatar, Layout, Modal, Upload } from 'antd'
+import { Avatar, Layout, Upload } from 'antd'
 import { CameraOutlined } from '@ant-design/icons'
 import { failed, success, yakitFailed } from '../utils/notification'
 import {
@@ -24,7 +24,6 @@ import {
   globalUserLogin,
   isCommunityEdition,
   isCommunityIRify,
-  isCommunityYakit,
   isEnpriTrace,
   isEnpriTraceAgent,
   isEnterpriseOrSimpleEdition,
@@ -58,6 +57,7 @@ import { onGetRemoteValuesBase } from '@/components/yakitUI/utils'
 import { grpcSetGlobalProxyRulesConfig } from '@/apiUtils/grpc'
 import { MITMConsts } from './mitm/MITMConsts'
 import { checkProxyVersion } from '@/utils/proxyConfigUtil'
+import { RuiYanAppShell } from '@/components/renyanUI'
 
 import './main.scss'
 import './GlobalClass.scss'
@@ -67,8 +67,6 @@ import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { IRifyUpdateProjectManagerModal } from './YakRunnerProjectManager/YakRunnerProjectManager'
 import { parseUrl } from '@/hook/useProxy'
 import { JSONParseLog } from '@/utils/tool'
-import { apiGetGlobalNetworkConfig } from './spaceEngine/utils'
-import { setAIModal } from './ai-agent/aiModelList/AIModelList'
 import { Trans } from 'react-i18next'
 import aiChatMessageStore from './ai-agent/store/aiChatMessageStore'
 
@@ -655,35 +653,37 @@ const Main: React.FC<MainProp> = React.memo((props) => {
 
             <div
               style={{
-                display: isShowCustomizeMenu ? 'none' : 'flex',
-                flexDirection: 'column',
+                display: isShowCustomizeMenu ? 'none' : 'block',
                 height: '100%',
               }}
             >
-              {isCommunityEdition() ? (
-                <>
-                  <PublicMenu
-                    defaultExpand={defaultExpand}
-                    onMenuSelect={openMenu}
-                    setRouteToLabel={(val) => {
-                      val.forEach((value, key) => {
-                        routeKeyToLabel.current.set(key, value)
-                      })
-                    }}
-                  />
-                </>
-              ) : (
-                <HeardMenu
-                  defaultExpand={defaultExpand}
-                  onRouteMenuSelect={openMenu}
-                  setRouteToLabel={(val) => {
-                    val.forEach((value, key) => {
-                      routeKeyToLabel.current.set(key, value)
-                    })
-                  }}
-                />
-              )}
-              <MainOperatorContent routeKeyToLabel={routeKeyToLabel.current} />
+              <RuiYanAppShell
+                navigation={
+                  isCommunityEdition() ? (
+                    <PublicMenu
+                      defaultExpand={defaultExpand}
+                      onMenuSelect={openMenu}
+                      setRouteToLabel={(val) => {
+                        val.forEach((value, key) => {
+                          routeKeyToLabel.current.set(key, value)
+                        })
+                      }}
+                    />
+                  ) : (
+                    <HeardMenu
+                      defaultExpand={defaultExpand}
+                      onRouteMenuSelect={openMenu}
+                      setRouteToLabel={(val) => {
+                        val.forEach((value, key) => {
+                          routeKeyToLabel.current.set(key, value)
+                        })
+                      }}
+                    />
+                  )
+                }
+              >
+                <MainOperatorContent routeKeyToLabel={routeKeyToLabel.current} />
+              </RuiYanAppShell>
             </div>
           </AutoSpin>
 

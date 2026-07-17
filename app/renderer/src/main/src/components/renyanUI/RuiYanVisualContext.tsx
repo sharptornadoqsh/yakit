@@ -9,6 +9,7 @@ import errorState from '@/assets/renyan/error-state.svg'
 import offlineState from '@/assets/renyan/offline-state.svg'
 
 export type RuiYanLayout =
+  | 'security-dashboard'
   | 'proxy-console'
   | 'query-detail'
   | 'request-response'
@@ -21,6 +22,9 @@ export type RuiYanLayout =
   | 'risk-center'
   | 'scan-results'
   | 'settings-center'
+  | 'configuration-center'
+  | 'team-administration'
+  | 'role-administration'
 
 export interface RuiYanRouteVisual {
   serial: string
@@ -31,6 +35,13 @@ export interface RuiYanRouteVisual {
 }
 
 const routeVisuals: Partial<Record<YakitRoute, RuiYanRouteVisual>> = {
+  [YakitRoute.NewHome]: {
+    serial: 'WRK-01',
+    modeLabel: '安全工作台',
+    signals: ['项目态势', '最近任务', '风险统计'],
+    layout: 'security-dashboard',
+    emptyAsset: emptyRisk,
+  },
   [YakitRoute.MITMHacker]: {
     serial: 'TRA-01',
     modeLabel: '代理控制台',
@@ -55,7 +66,7 @@ const routeVisuals: Partial<Record<YakitRoute, RuiYanRouteVisual>> = {
   [YakitRoute.DataCompare]: {
     serial: 'TRA-04',
     modeLabel: '差异工作台',
-    signals: ['双栏文本', '变更定位', '内容交换'],
+    signals: ['文本与字节', '变更定位', '内容交换'],
     layout: 'diff-studio',
     emptyAsset: emptyRequest,
   },
@@ -121,6 +132,27 @@ const routeVisuals: Partial<Record<YakitRoute, RuiYanRouteVisual>> = {
     signals: ['网络策略', '证书配置', '运行参数'],
     layout: 'settings-center',
     emptyAsset: emptyRequest,
+  },
+  [YakitRoute.ConfigManagement]: {
+    serial: 'BRT-02',
+    modeLabel: '资源配置',
+    signals: ['字典资源', '代理配置', '热加载'],
+    layout: 'configuration-center',
+    emptyAsset: emptyRequest,
+  },
+  [YakitRoute.AccountAdminPage]: {
+    serial: 'COL-01',
+    modeLabel: '用户与组织',
+    signals: ['组织架构', '用户列表', '账号状态'],
+    layout: 'team-administration',
+    emptyAsset: emptyPlugin,
+  },
+  [YakitRoute.RoleAdminPage]: {
+    serial: 'COL-02',
+    modeLabel: '角色权限',
+    signals: ['角色列表', '权限范围', '成员关系'],
+    layout: 'role-administration',
+    emptyAsset: emptyPlugin,
   },
 }
 
