@@ -14,14 +14,7 @@ import {
   flattenRenyanMenu,
   isRenyanMenuItemNavigable,
 } from '@/routes/renyanMenu'
-import {
-  RuiYanPrimaryNav,
-  RuiYanSecondaryNav,
-  RuiYanTopCommandBar,
-  showRuiYanModal,
-  type RuiYanCommand,
-} from '@/components/renyanUI'
-import SetPassword from '@/pages/SetPassword'
+import { RuiYanPrimaryNav, RuiYanSecondaryNav, RuiYanTopCommandBar, type RuiYanCommand } from '@/components/renyanUI'
 
 interface RenyanRouteSelection {
   route: YakitRoute
@@ -151,21 +144,6 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
   const userName = userInfo.githubName || userInfo.wechatName || userInfo.qqName || userInfo.companyName || '本地用户'
   const teamName = userInfo.companyName || '本地工作区'
 
-  const openProfile = () => {
-    if (!userInfo.isLogin) {
-      emiter.emit('onUIOpSettingMenuSelect', RENYAN_SHELL_EVENTS.openLogin)
-      return
-    }
-    let modal: ReturnType<typeof showRuiYanModal>
-    modal = showRuiYanModal({
-      title: '账户与密码',
-      description: `${userName} · ${teamName}`,
-      width: 480,
-      closeOnBackdrop: false,
-      content: <SetPassword userInfo={userInfo} onCancel={() => modal.destroy()} />,
-    })
-  }
-
   const commands: readonly RuiYanCommand[] = [
     {
       key: 'new-task',
@@ -201,7 +179,7 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
         userName={userName}
         teamName={teamName}
         onNotifications={() => emiter.emit('openAllMessageNotification')}
-        onProfile={openProfile}
+        onProfile={() => onMenuSelect({ route: YakitRoute.AccountAdminPage })}
       />
       <RuiYanPrimaryNav groups={menu} activeGroupKey={activeGroup.key} onSelect={selectGroup} />
       <RuiYanSecondaryNav group={activeGroup} activeKeys={activeKeys} onSelect={selectItem} />

@@ -57,8 +57,8 @@ import { onGetRemoteValuesBase } from '@/components/yakitUI/utils'
 import { grpcSetGlobalProxyRulesConfig } from '@/apiUtils/grpc'
 import { MITMConsts } from './mitm/MITMConsts'
 import { checkProxyVersion } from '@/utils/proxyConfigUtil'
-import { RuiYanAppShell, RuiYanModal } from '@/components/renyanUI'
-import { RENYAN_SHELL_ENABLED, RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
+import { RuiYanAppShell } from '@/components/renyanUI'
+import { RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
 
 import './main.scss'
 import './GlobalClass.scss'
@@ -697,30 +697,18 @@ const Main: React.FC<MainProp> = React.memo((props) => {
           </AutoSpin>
 
           {loginshow && <Login visible={loginshow} onCancel={() => setLoginShow(false)}></Login>}
-          {RENYAN_SHELL_ENABLED ? (
-            <RuiYanModal
-              open={passwordShow}
-              title={t('Main.setPassword')}
-              width={480}
-              closeOnBackdrop={false}
-              onClose={() => setPasswordShow(false)}
-            >
-              <SetPassword onCancel={() => setPasswordShow(false)} userInfo={userInfo} />
-            </RuiYanModal>
-          ) : (
-            <YakitModal
-              visible={passwordShow}
-              title={t('Main.setPassword')}
-              destroyOnClose={true}
-              maskClosable={false}
-              bodyStyle={{ padding: '10px 24px 24px 24px' }}
-              width={520}
-              onCancel={() => setPasswordShow(false)}
-              footer={null}
-            >
-              <SetPassword onCancel={() => setPasswordShow(false)} userInfo={userInfo} />
-            </YakitModal>
-          )}
+          <YakitModal
+            visible={passwordShow}
+            title={t('Main.setPassword')}
+            destroyOnClose={true}
+            maskClosable={false}
+            bodyStyle={{ padding: '10px 24px 24px 24px' }}
+            width={520}
+            onCancel={() => setPasswordShow(false)}
+            footer={null}
+          >
+            <SetPassword onCancel={() => setPasswordShow(false)} userInfo={userInfo} />
+          </YakitModal>
 
           {(isCommunityEdition() || isEnpriTrace()) && <YakChatCS visible={chatShow} setVisible={setChatShow} />}
           {messageCenterShow && <MessageCenterModal visible={messageCenterShow} setVisible={setMessageCenterShow} />}

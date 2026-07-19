@@ -5,7 +5,7 @@
 .private-domain {
   padding: 20px;
   color: var(--ruiyan-color-text);
-  background: var(--ruiyan-color-surface);
+  background: radial-gradient(circle at 100% 0, rgb(22 119 255 / 7%), transparent 34%), var(--ruiyan-color-surface);
 
   .private-domain-heading {
     display: flex;

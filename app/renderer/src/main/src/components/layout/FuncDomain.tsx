@@ -53,6 +53,7 @@ import {
   ControlOther,
 } from '../../pages/dynamicControl/DynamicControl'
 import { showYakitModal } from '../yakitUI/YakitModal/YakitModalConfirm'
+import { YakitModal } from '../yakitUI/YakitModal/YakitModal'
 import { WinKeyborad } from '../yakitUI/YakitEditor/editorUtils'
 import { ScrecorderModal } from '@/pages/screenRecorder/ScrecorderModal'
 import { useScreenRecorder } from '@/store/screenRecorder'
@@ -60,7 +61,7 @@ import { YakitRoute } from '@/enums/yakitRoute'
 import { RouteToPageProps } from '@/pages/layout/publicMenu/PublicMenu'
 import { useRunNodeStore } from '@/store/runNode'
 import emiter from '@/utils/eventBus/eventBus'
-import { RENYAN_SHELL_ENABLED, RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
+import { RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
 import { RuiYanButton, RuiYanDrawer, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 import { useTemporaryProjectStore } from '@/store/temporaryProject'
 import { visitorsStatisticsFun } from '@/utils/visitorsStatistics'
@@ -1101,18 +1102,19 @@ export const FuncDomain: React.FC<FuncDomainProp> = React.memo((props) => {
         />
       )}
 
-      {passwordShow ? (
-        <RuiYanModal
-          open={true}
-          closable={passwordClose}
-          title={t('Main.setPassword')}
-          width={480}
-          onClose={() => passwordClose && setPasswordShow(false)}
-          closeOnBackdrop={false}
-        >
-          <SetPassword onCancel={() => setPasswordShow(false)} userInfo={userInfo} />
-        </RuiYanModal>
-      ) : null}
+      <YakitModal
+        visible={passwordShow}
+        closable={passwordClose}
+        title={t('Main.setPassword')}
+        destroyOnClose={true}
+        maskClosable={false}
+        bodyStyle={{ padding: '10px 24px 24px 24px' }}
+        width={520}
+        onCancel={() => setPasswordShow(false)}
+        footer={null}
+      >
+        <SetPassword onCancel={() => setPasswordShow(false)} userInfo={userInfo} />
+      </YakitModal>
 
       {uploadModalShow ? (
         <RuiYanModal
@@ -1629,16 +1631,6 @@ export const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
         if (dynamicStatus.isDynamicStatus) {
           warn(t('UIOpSetting.remoteModeCannotModify'))
           return
-        }
-        if (RENYAN_SHELL_ENABLED) {
-          let modal: ReturnType<typeof showRuiYanModal>
-          modal = showRuiYanModal({
-            title: t('UIOpSetting.configPrivateDomain'),
-            width: i18n.language.startsWith('zh') ? 480 : 720,
-            closeOnBackdrop: false,
-            content: <ConfigPrivateDomain onClose={() => modal.destroy()} />,
-          })
-          return modal
         }
         const m = showYakitModal({
           title: (modalT) => modalT('UIOpSetting.configPrivateDomain'),

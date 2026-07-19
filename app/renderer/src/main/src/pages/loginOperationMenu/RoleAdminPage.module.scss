@@ -20,7 +20,12 @@
   .role-workspace {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+  }
+
+  .role-detail {
+    height: 100%;
+    border: 0;
+    border-radius: 0;
   }
 
   .role-detail-content {
@@ -53,6 +58,12 @@
     }
   }
 
+  .permission-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
   .edit-icon {
     svg {
       color: var(--ruiyan-color-text);
@@ -66,16 +77,4 @@
 }
 .icon-question {
   color: var(--ruiyan-color-text-tertiary);
-}
-
-.operation-form {
-  padding: 4px;
-}
-
-.operation-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: 20px;
-  gap: 8px;
 }

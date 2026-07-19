@@ -20,7 +20,12 @@
   .account-workspace {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+  }
+
+  .account-detail {
+    height: 100%;
+    border: 0;
+    border-radius: 0;
   }
 
   .account-detail-content {
@@ -177,7 +182,7 @@
         height: 20px;
         color: #fff;
         border-radius: var(--ruiyan-radius-sm);
-        background: var(--ruiyan-color-primary);
+        background: linear-gradient(135deg, var(--ruiyan-color-primary), var(--ruiyan-color-teal));
         font-size: 14px;
       }
     }
@@ -224,16 +229,4 @@
       height: 16px;
     }
   }
-}
-
-.operation-form {
-  padding: 4px;
-}
-
-.operation-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: 20px;
-  gap: 8px;
 }
