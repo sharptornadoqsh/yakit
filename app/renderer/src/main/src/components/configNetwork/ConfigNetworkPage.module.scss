@@ -50,7 +50,11 @@
   }
 }
 
-.settings-section {
+.settings-form > .settings-section {
+  display: block;
+  height: auto;
+  min-height: auto;
+  flex: none;
   scroll-margin-top: 16px;
   overflow: visible;
 
@@ -63,6 +67,10 @@
   }
 
   > div:last-child {
+    display: block;
+    height: auto;
+    min-height: auto;
+    flex: none;
     overflow: visible;
   }
 

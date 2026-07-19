@@ -896,6 +896,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
     {
       title: t('AccountList.username'),
       dataKey: 'user_name',
+      width: 160,
       render: (text, record) => (
         <div className={styles['userNameWrapper']}>
           {judgeAvatar(record)}
@@ -906,6 +907,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
     {
       title: t('OrganizationAdmin.organization'),
       dataKey: 'department_name',
+      width: 180,
       render: (text, record) => (
         <div>
           {record?.department_parent_name && `${record.department_parent_name} / `}
@@ -916,6 +918,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
     {
       title: t('AccountList.role'),
       dataKey: 'role_name',
+      width: 120,
       render: (text) => {
         return <span>{text ?? t('AccountList.defaultRole')}</span>
       },
@@ -923,6 +926,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
     {
       title: t('AccountList.createdAt'),
       dataKey: 'created_at',
+      width: 150,
       render: (text) => <span>{moment.unix(text).format('YYYY-MM-DD HH:mm')}</span>,
     },
     {

@@ -243,11 +243,10 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
     const editor = diffEditorRef.current
     if (!editor) return
     const model = editor.getModel()
-    editor.setModel(null)
-    editor.dispose()
-    model?.original.dispose()
-    model?.modified.dispose()
     diffEditorRef.current = undefined
+    editor.dispose()
+    model?.original?.dispose()
+    model?.modified?.dispose()
   }
 
   // 构建右键菜单数据
@@ -380,8 +379,8 @@ export const CodeComparison: React.FC<CodeComparisonProps> = React.forwardRef((p
       original: leftModel,
       modified: rightModel,
     })
-    previousModel?.original.dispose()
-    previousModel?.modified.dispose()
+    previousModel?.original?.dispose()
+    previousModel?.modified?.dispose()
   }
   useEffect(() => {
     //如果存在先销毁以前的组件
