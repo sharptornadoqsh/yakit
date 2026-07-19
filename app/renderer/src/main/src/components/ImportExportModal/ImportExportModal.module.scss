@@ -1,14 +1,31 @@
 .import-export-modal {
+  padding: 16px;
+
+  :global(.ant-form-item) {
+    margin-bottom: 14px;
+  }
+
   .export-hint {
     background: var(--Colors-Use-Green-Bg);
-    color: var(--Colors-Use-Neutral-Text-3-Secondary);
-    padding: 8px 16px;
-    margin-bottom: 15px;
+    color: var(--Colors-Use-Neutral-Text-2-Primary);
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    border: 1px solid var(--Colors-Use-Success-Border);
+    border-left: 2px solid var(--Colors-Use-Success-Primary);
+    border-radius: 2px;
+    font-size: 12px;
+    line-height: 18px;
   }
+
   .import-hint {
     background: var(--Colors-Use-Error-Bg);
-    color: var(--Colors-Use-Neutral-Text-3-Secondary);
-    padding: 8px 16px;
-    margin-bottom: 16px;
+    color: var(--Colors-Use-Neutral-Text-2-Primary);
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    border: 1px solid var(--Colors-Use-Error-Border);
+    border-left: 2px solid var(--Colors-Use-Error-Primary);
+    border-radius: 2px;
+    font-size: 12px;
+    line-height: 18px;
   }
 }

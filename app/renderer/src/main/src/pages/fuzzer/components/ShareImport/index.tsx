@@ -171,7 +171,7 @@ export const ShareImport: React.FC<ShareImportProps> = (props) => {
   })
   return (
     <>
-      <Form {...layout} name="control-hooks" onFinish={onFinish} style={{ padding: 24 }}>
+      <Form {...layout} name="control-hooks" onFinish={onFinish} className="share-import-form">
         <Form.Item
           name="share_id"
           label={t('WebFuzzer.ShareImport.shareId')}
@@ -188,7 +188,7 @@ export const ShareImport: React.FC<ShareImportProps> = (props) => {
             <YakitInput placeholder={t('WebFuzzer.ShareImport.pleaseEnterPassword')} allowClear />
           </Form.Item>
         )}
-        <Form.Item {...tailLayout}>
+        <Form.Item {...tailLayout} className="share-import-actions">
           <YakitButton type="primary" htmlType="submit" className="btn-sure" loading={loading}>
             {t('YakitButton.ok')}
           </YakitButton>

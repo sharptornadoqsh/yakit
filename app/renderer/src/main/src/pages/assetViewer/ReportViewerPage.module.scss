@@ -1,10 +1,20 @@
 .reportViewerPage {
   height: 100%;
+  min-height: 0;
+  padding: 12px;
+  box-sizing: border-box;
+  background: var(--Colors-Use-Neutral-Bg);
+
   .list-item {
     position: relative;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     cursor: pointer;
     background-color: var(--Colors-Use-Basic-Background);
+    border-radius: 2px;
+    transition:
+      background-color 120ms ease,
+      box-shadow 120ms ease;
+
     &-header {
       border: 1px solid var(--Colors-Use-Neutral-Border);
     }
@@ -16,6 +26,7 @@
   .list-item-hoverable {
     &:hover {
       background-color: var(--Colors-Use-Neutral-Bg-Hover);
+      box-shadow: inset 2px 0 0 var(--Colors-Use-Main-Primary);
     }
   }
   .icon-select {
@@ -34,6 +45,7 @@
   }
   .card {
     border: none;
+    border-radius: 2px;
     background-color: var(--Colors-Use-Basic-Background);
     &-title {
       display: flex;
@@ -62,7 +74,9 @@
       height: 100%;
     }
     &-selected {
-      background-color: red;
+      background-color: var(--Colors-Use-Main-Bg);
+      box-shadow: inset 2px 0 0 var(--Colors-Use-Main-Primary);
+
       .list-item-header,
       .list-item-body {
         border: 1px solid var(--Colors-Use-Main-Border);
@@ -73,6 +87,7 @@
     position: relative;
     background-color: var(--Colors-Use-Basic-Background);
     height: 100%;
+    border-left: 1px solid var(--Colors-Use-Neutral-Border);
     .report-empty {
       position: absolute;
       left: 50%;
@@ -107,7 +122,7 @@
 }
 
 .pagination {
-  padding-top: 24px;
+  padding-top: 12px;
   display: flex;
   justify-content: flex-end;
 }

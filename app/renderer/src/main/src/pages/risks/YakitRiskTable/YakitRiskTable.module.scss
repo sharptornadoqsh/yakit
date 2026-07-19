@@ -43,9 +43,11 @@ $keyColor: map-keys($tagColor);
   width: 100%;
   overflow: hidden;
   padding: 12px;
-  border: 1px solid #c7d9db;
-  border-radius: 3px;
+  box-sizing: border-box;
+  border: 1px solid var(--Colors-Use-Neutral-Border);
+  border-radius: 2px;
   background: var(--Colors-Use-Basic-Background);
+
   .table-severity-tag {
     margin-right: 0;
   }
@@ -67,10 +69,12 @@ $keyColor: map-keys($tagColor);
   }
   .yakit-risk-details {
     @extend %display-column-center;
-    border-radius: 0 0 4px 4px;
+    border-radius: 0 0 2px 2px;
     position: relative;
     height: 100%;
     border-top: 0;
+    background: var(--Colors-Use-Basic-Background);
+
     .yakit-risk-details-title {
       @extend %display-flex-center;
       justify-content: space-between;
@@ -94,6 +98,9 @@ $keyColor: map-keys($tagColor);
   border: 1px solid var(--Colors-Use-Neutral-Border);
   display: flex;
   flex-direction: column;
+  border-radius: 2px;
+  background: var(--Colors-Use-Basic-Background);
+
   :global {
     .ant-descriptions-bordered .ant-descriptions-view > table {
       table-layout: fixed;
@@ -104,8 +111,11 @@ $keyColor: map-keys($tagColor);
 .content-heard {
   @extend %display-flex-center;
   align-items: center;
-  padding: 4px 12px;
-  // border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
+  min-height: 44px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
+  background: var(--Colors-Use-Neutral-Bg);
+
   .content-heard-left {
     @extend %display-flex-center;
     overflow: hidden;
@@ -120,8 +130,8 @@ $keyColor: map-keys($tagColor);
         line-height: 16px;
       }
       svg {
-        width: 28px;
-        height: 28px;
+        width: 24px;
+        height: 24px;
       }
     }
     .content-heard-body {
@@ -131,10 +141,10 @@ $keyColor: map-keys($tagColor);
       flex-wrap: wrap;
       .content-heard-body-title {
         color: var(--Colors-Use-Neutral-Text-1-Title);
-        font-size: 16px;
+        font-size: 14px;
         font-style: normal;
         font-weight: 600;
-        line-height: 24px;
+        line-height: 20px;
       }
       .content-heard-body-title-click {
         cursor: pointer;
@@ -198,9 +208,9 @@ $keyColor: map-keys($tagColor);
     flex-wrap: wrap;
     .table-renderTitle-text {
       color: var(--Colors-Use-Neutral-Text-1-Title);
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
-      line-height: 24px;
+      line-height: 20px;
     }
   }
   .table-head-extra {
@@ -251,7 +261,7 @@ $keyColor: map-keys($tagColor);
 }
 
 .yakit-risk-select-tag {
-  padding: 24px;
+  padding: 16px;
   .yakit-risk-select-tag-btns {
     @extend %display-flex-center;
     justify-content: flex-end;
@@ -306,7 +316,7 @@ $keyColor: map-keys($tagColor);
   min-width: 134px;
   background: var(--Colors-Use-Basic-Background);
   color: var(--Colors-Use-Neutral-Disable);
-  border-radius: 4px;
+  border-radius: 2px;
   border: 1px solid var(--Colors-Use-Neutral-Border);
   height: 24px;
   padding: 3px 8px;

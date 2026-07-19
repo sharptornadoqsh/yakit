@@ -18,6 +18,7 @@ import { DiagnoseNetworkDNSForm } from '@/pages/diagnoseNetwork/DiagnoseNetworkD
 import { TracerouteForm } from '@/pages/diagnoseNetwork/TracerouteForm'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { useXTermOptions } from '@/hook/useXTermOptions/useXTermOptions'
+import styles from './DiagnoseNetworkPage.module.scss'
 
 export interface DiagnoseNetworkPageProp {}
 
@@ -148,68 +149,70 @@ export const DiagnoseNetworkPage: React.FC<DiagnoseNetworkPageProp> = (props) =>
   }, [])
 
   return (
-    <AutoCard
-      title={
-        <Space>
-          网络诊断
-          {loading && <AutoSpin size={'small'} />}
-          <YakitButton
-            type={'text'}
-            colors="danger"
-            icon={<CloseCircleIcon />}
-            onClick={() => {
-              xtermClear(xtermRef)
-            }}
-          />
-        </Space>
-      }
-      bordered={false}
-      size={'small'}
-      bodyStyle={{ padding: 0 }}
-    >
-      <YakitResizeBox
-        firstRatio={'300px'}
-        firstMinSize={'300px'}
-        firstNode={
-          <div style={{ marginTop: 12 }}>
-            <DiagnoseNetworkForm
-              onSubmit={(params) => {
-                submit(params)
+    <div className={styles['diagnose-page']}>
+      <AutoCard
+        title={
+          <Space>
+            网络诊断
+            {loading && <AutoSpin size={'small'} />}
+            <YakitButton
+              type={'text'}
+              colors="danger"
+              icon={<CloseCircleIcon />}
+              onClick={() => {
+                xtermClear(xtermRef)
               }}
             />
-            <Divider />
-            <DiagnoseNetworkDNSForm
-              onSubmit={(params) => {
-                submitDNSDiag(params)
-              }}
-            />
-            <Divider />
-            <TracerouteForm
-              onSubmit={(params) => {
-                submitTraceroute(params)
-              }}
-            />
-          </div>
+          </Space>
         }
-        secondNode={
-          <div style={{ height: '100%', backgroundColor: 'var(--Colors-Use-Neutral-Bg)' }}>
-            <ReactResizeDetector
-              onResize={(width, height) => {
-                if (!width || !height) return
+        bordered={false}
+        size={'small'}
+        bodyStyle={{ padding: 0 }}
+      >
+        <YakitResizeBox
+          firstRatio={'300px'}
+          firstMinSize={'300px'}
+          firstNode={
+            <div className={styles['form-pane']}>
+              <DiagnoseNetworkForm
+                onSubmit={(params) => {
+                  submit(params)
+                }}
+              />
+              <Divider />
+              <DiagnoseNetworkDNSForm
+                onSubmit={(params) => {
+                  submitDNSDiag(params)
+                }}
+              />
+              <Divider />
+              <TracerouteForm
+                onSubmit={(params) => {
+                  submitTraceroute(params)
+                }}
+              />
+            </div>
+          }
+          secondNode={
+            <div className={styles['terminal-pane']}>
+              <ReactResizeDetector
+                onResize={(width, height) => {
+                  if (!width || !height) return
 
-                const row = Math.floor(height / 18.5)
-                const col = Math.floor(width / 10)
-                if (xtermRef) xtermFit(xtermRef, col, row)
-              }}
-              handleWidth={true}
-              handleHeight={true}
-              refreshMode={'debounce'}
-              refreshRate={50}
-            />
-            <XTerm ref={xtermRef} options={terminalOptions} />
-          </div>
-        }
-      />
-    </AutoCard>
+                  const row = Math.floor(height / 18.5)
+                  const col = Math.floor(width / 10)
+                  if (xtermRef) xtermFit(xtermRef, col, row)
+                }}
+                handleWidth={true}
+                handleHeight={true}
+                refreshMode={'debounce'}
+                refreshRate={50}
+              />
+              <XTerm ref={xtermRef} options={terminalOptions} />
+            </div>
+          }
+        />
+      </AutoCard>
+    </div>
   )
 }

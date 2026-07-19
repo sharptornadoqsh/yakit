@@ -1,55 +1,68 @@
 .shortcut-key {
   width: 100%;
+  height: 100%;
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--Colors-Use-Basic-Background);
 
   .header {
     color: var(--Colors-Use-Neutral-Text-1-Title);
-    font-size: 20px;
+    font-size: 14px;
     font-weight: 600;
-    line-height: 25px;
-    padding: 10px 0 10px 20px;
+    line-height: 20px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
   }
 
   .shortcut-key-content {
     flex: 1;
     overflow: hidden auto;
-    padding-top: 20px;
-    padding-left: 30px;
-    border-top: 1px solid var(--Colors-Use-Neutral-Border);
+    min-height: 0;
+    padding: 8px 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 2px;
   }
 
   .option {
-    padding-top: 20px;
-    padding-left: 250px;
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 16px;
+    border-top: 1px solid var(--Colors-Use-Neutral-Border);
   }
 
   .key-opt {
     display: flex;
     align-items: center;
-    gap: 20px;
+    min-height: 36px;
+    gap: 12px;
+    border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
+
     .opt-name {
-      width: 200px;
+      width: 220px;
       color: var(--Colors-Use-Neutral-Text-1-Title);
-      font-size: 14px;
-      line-height: 20px;
-      padding: 7px;
+      font-size: 12px;
+      line-height: 18px;
+      padding: 7px 4px;
     }
+
     .opt-key {
       cursor: pointer;
-      padding: 4px 10px;
-      color: black;
-      font-size: 14px;
-      line-height: 20px;
+      min-width: 112px;
+      padding: 3px 8px;
+      font-size: 12px;
+      line-height: 18px;
       user-select: none;
       border: 1px solid var(--Colors-Use-Neutral-Border);
+      border-radius: 2px;
+      background: var(--Colors-Use-Neutral-Bg);
       color: var(--Colors-Use-Neutral-Text-1-Title);
+      text-align: center;
+
       &:hover {
-        border: 1px solid var(--Colors-Use-Main-Border);
+        border-color: var(--Colors-Use-Main-Border);
+        background: var(--Colors-Use-Main-Bg);
       }
     }
   }
@@ -113,20 +126,25 @@
   height: 100%;
   width: 100%;
   display: flex;
-  padding: 4px;
+  min-height: 0;
+  padding: 0;
+  background: var(--Colors-Use-Basic-Background);
+
   .list {
     overflow: auto;
-    width: 260px;
-    padding: 0px 4px;
+    width: 220px;
+    padding: 6px;
     border-right: 1px solid var(--Colors-Use-Neutral-Border);
+    background: var(--Colors-Use-Neutral-Bg);
+
     .list-item {
-      border-radius: 4px;
+      position: relative;
+      border-radius: 2px;
       color: var(--Colors-Use-Neutral-Text-1-Title);
-      padding: 8px 6px 8px 8px;
-      border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
-      border-top: 1px solid transparent;
+      padding: 8px 10px;
+      border: 1px solid transparent;
       width: 100%;
-      height: 46px;
+      height: 36px;
       overflow: hidden;
       display: flex;
       justify-content: space-between;
@@ -138,15 +156,22 @@
         background-color: var(--Colors-Use-Neutral-Bg-Hover);
       }
     }
+
     .list-item-active {
-      background-color: var(--Colors-Use-Main-Primary);
-      color: var(--Colors-Use-Main-On-Primary);
+      background-color: var(--Colors-Use-Main-Bg);
+      border-color: var(--Colors-Use-Main-Border);
+      color: var(--Colors-Use-Main-Primary);
+      box-shadow: inset 2px 0 0 var(--Colors-Use-Main-Primary);
+
       &:hover {
-        background-color: var(--Colors-Use-Main-Primary);
+        background-color: var(--Colors-Use-Main-Bg);
       }
     }
   }
+
   .content {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
   }
 }

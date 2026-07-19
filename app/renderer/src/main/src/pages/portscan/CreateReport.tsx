@@ -17,6 +17,7 @@ import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import emiter from '@/utils/eventBus/eventBus'
 import { ShowModalProps } from '@/utils/showModal'
+import styles from './CreateReport.module.scss'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -28,7 +29,7 @@ export const onCreateReportModal = (createReportContent: CreateReportContentProp
     onCancel: () => {
       m.destroy()
     },
-    bodyStyle: { padding: 24 },
+    bodyStyle: { padding: 0 },
     ...modalProps,
   })
 }
@@ -120,8 +121,8 @@ const CreateReportContent: React.FC<CreateReportContentProps> = React.memo((prop
     if (onCancel) onCancel()
   })
   return (
-    <div>
-      <div style={{ textAlign: 'center' }}>
+    <div className={styles['create-report-content']}>
+      <div className={styles['create-report-form']}>
         <YakitInput
           placeholder="请输入任务名称"
           allowClear
@@ -136,13 +137,13 @@ const CreateReportContent: React.FC<CreateReportContentProps> = React.memo((prop
             trailColor="var(--Colors-Use-Neutral-Bg)"
             percent={Math.trunc(reportPercent * 100)}
             format={(percent) => `${percent}%`}
-            style={{ marginTop: 12, display: 'flex', alignItems: 'center' }}
+            className={styles['create-report-progress']}
           />
         )}
       </div>
-      <div style={{ marginTop: 20, textAlign: 'right' }}>
+      <div className={styles['create-report-actions']}>
         <YakitButton
-          style={{ marginRight: 8 }}
+          className={styles['create-report-cancel']}
           onClick={() => {
             apiCancelSimpleDetectCreatReport(tokenRef.current)
             if (onCancel) onCancel()

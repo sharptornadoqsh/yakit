@@ -1,0 +1,61 @@
+.diagnose-page {
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
+  box-sizing: border-box;
+  background: var(--Colors-Use-Neutral-Bg);
+
+  :global(.ant-card) {
+    border: 1px solid var(--Colors-Use-Neutral-Border);
+    border-radius: 2px;
+    background: var(--Colors-Use-Basic-Background);
+  }
+
+  :global(.ant-card-head) {
+    min-height: 36px;
+    padding: 0 12px;
+    border-bottom-color: var(--Colors-Use-Neutral-Border);
+  }
+
+  :global(.ant-card-head-title) {
+    padding: 8px 0;
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  :global(.ant-card-body) {
+    min-height: 0;
+    overflow: hidden;
+
+    > div {
+      height: 100%;
+    }
+  }
+
+  :global(.ant-divider-horizontal) {
+    margin: 12px 0;
+  }
+}
+
+.form-pane {
+  height: 100%;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  overflow: hidden auto;
+  background: var(--Colors-Use-Basic-Background);
+}
+
+.terminal-pane {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-left: 1px solid var(--Colors-Use-Neutral-Border);
+  background: var(--ruiyan-color-deep, #0f1b2d);
+
+  :global(.xterm) {
+    height: 100%;
+  }
+}

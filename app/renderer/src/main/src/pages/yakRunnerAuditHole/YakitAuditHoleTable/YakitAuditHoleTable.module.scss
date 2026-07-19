@@ -43,6 +43,9 @@ $keyColor: map-keys($tagColor);
   width: 100%;
   overflow: hidden;
   padding: 12px;
+  box-sizing: border-box;
+  background: var(--Colors-Use-Neutral-Bg);
+
   .table-severity-tag {
     margin-right: 0;
   }
@@ -64,10 +67,12 @@ $keyColor: map-keys($tagColor);
   }
   .yakit-risk-details {
     @extend %display-column-center;
-    border-radius: 0 0 4px 4px;
+    border-radius: 0 0 2px 2px;
     position: relative;
     height: 100%;
     border-top: 0;
+    background: var(--Colors-Use-Basic-Background);
+
     .yakit-risk-details-title {
       @extend %display-flex-center;
       justify-content: space-between;
@@ -104,9 +109,9 @@ $keyColor: map-keys($tagColor);
     flex-wrap: wrap;
     .table-renderTitle-text {
       color: var(--Colors-Use-Neutral-Text-1-Title);
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
-      line-height: 24px;
+      line-height: 20px;
     }
   }
   .table-head-extra {
@@ -219,7 +224,7 @@ $keyColor: map-keys($tagColor);
           overflow: hidden;
         }
         .detail {
-          color: #b4bbca;
+          color: var(--Colors-Use-Neutral-Text-3-Secondary);
           font-size: 12px;
           font-weight: 400;
           overflow: hidden;
@@ -241,7 +246,7 @@ $keyColor: map-keys($tagColor);
 .disabled-open {
   background: var(--Colors-Use-Basic-Background);
   color: var(--Colors-Use-Neutral-Disable);
-  border-radius: 4px;
+  border-radius: 2px;
   border: 1px solid var(--Colors-Use-Neutral-Border);
   height: 24px;
   padding: 3px 8px;
@@ -273,6 +278,9 @@ $keyColor: map-keys($tagColor);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--Colors-Use-Neutral-Border);
+  border-radius: 2px;
+  background: var(--Colors-Use-Basic-Background);
+
   :global {
     .ant-descriptions-bordered .ant-descriptions-view > table {
       table-layout: fixed;
@@ -281,8 +289,11 @@ $keyColor: map-keys($tagColor);
   .content-heard {
     @extend %display-flex-center;
     align-items: flex-start;
-    padding: 4px 12px;
-    // border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
+    min-height: 44px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
+    background: var(--Colors-Use-Neutral-Bg);
+
     .content-heard-left {
       @extend %display-flex-center;
       overflow: hidden;
@@ -297,8 +308,8 @@ $keyColor: map-keys($tagColor);
           line-height: 16px;
         }
         svg {
-          width: 28px;
-          height: 28px;
+          width: 24px;
+          height: 24px;
         }
       }
       .content-heard-body {
@@ -308,10 +319,10 @@ $keyColor: map-keys($tagColor);
         flex-wrap: wrap;
         .content-heard-body-title {
           color: var(--Colors-Use-Neutral-Text-1-Title);
-          font-size: 16px;
+          font-size: 14px;
           font-style: normal;
           font-weight: 600;
-          line-height: 24px;
+          line-height: 20px;
         }
         .content-heard-body-description {
           @extend %display-flex-center;
@@ -355,7 +366,7 @@ $keyColor: map-keys($tagColor);
   min-width: 134px;
   background: var(--Colors-Use-Basic-Background);
   color: var(--Colors-Use-Neutral-Disable);
-  border-radius: 4px;
+  border-radius: 2px;
   border: 1px solid var(--Colors-Use-Neutral-Border);
   height: 24px;
   padding: 3px 8px;
@@ -376,7 +387,7 @@ $keyColor: map-keys($tagColor);
 .audit-result-history {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 // ---------- 插件日志各种类型对应样式 ----------
@@ -448,7 +459,7 @@ $keyColor: map-keys($tagColor);
     width: 100%;
     display: flex;
     flex-direction: column;
-    border-radius: 4px;
+    border-radius: 2px;
     overflow: hidden;
   }
   .info-header {
@@ -515,11 +526,11 @@ $keyColor: map-keys($tagColor);
     }
   }
   .info-header-line-additional {
-    border-radius: 4px 4px 0 0;
+    border-radius: 2px 2px 0 0;
   }
   .info-additional {
     padding: 10px 12px;
-    border-radius: 0 0 4px 4px;
+    border-radius: 0 0 2px 2px;
     border: 1px solid var(--Colors-Use-Neutral-Border);
     border-top: 0;
     background: var(--Colors-Use-Basic-Background);
@@ -530,9 +541,9 @@ $keyColor: map-keys($tagColor);
       --yakit-ellipsis-row: 3;
 
       color: var(--Colors-Use-Neutral-Text-1-Title);
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 400;
-      line-height: 20px;
+      line-height: 18px;
     }
 
     .comment-image-style {
@@ -584,7 +595,7 @@ $keyColor: map-keys($tagColor);
     display: flex;
     flex-direction: column;
     gap: 2px;
-    border-radius: 4px;
+    border-radius: 2px;
     border: 1px solid var(--Colors-Use-Neutral-Border);
     cursor: text;
     .select-wrapper {
