@@ -1,9 +1,9 @@
 .app-shell {
   display: grid;
   grid-template:
-    'top top top' 56px
+    'top top top' var(--ruiyan-shell-topbar-height)
     'primary secondary main' minmax(0, 1fr) /
-    72px 200px minmax(0, 1fr);
+    var(--ruiyan-shell-primary-width) var(--ruiyan-shell-secondary-width) minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-width: 960px;
@@ -24,20 +24,25 @@
   z-index: 30;
   grid-area: top;
   display: grid;
-  grid-template-columns: 200px minmax(240px, 620px) minmax(300px, 1fr);
+  grid-template-columns: var(--ruiyan-shell-sidebar-width) minmax(240px, 620px) minmax(300px, 1fr);
   align-items: center;
   gap: 20px;
-  padding: 0 16px;
+  padding: 0 16px 0 0;
   color: var(--ruiyan-color-text);
-  background: var(--ruiyan-color-surface);
+  background: var(--ruiyan-color-toolbar);
   border-bottom: 1px solid var(--ruiyan-color-border);
 }
 
 .brand {
   display: flex;
+  height: 100%;
   align-items: center;
   min-width: 0;
   gap: 10px;
+  padding: 0 14px;
+  color: var(--ruiyan-color-nav-text);
+  background: var(--ruiyan-color-nav);
+  border-right: 1px solid var(--ruiyan-color-nav-border);
 }
 
 .brand-mark {
@@ -60,7 +65,7 @@
 .brand-text {
   min-width: 0;
   overflow: hidden;
-  color: var(--ruiyan-color-text);
+  color: var(--ruiyan-color-nav-text);
   font-size: 16px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -208,7 +213,7 @@
 }
 
 .command-button:first-child {
-  color: #fff;
+  color: var(--ruiyan-color-on-primary);
   background: var(--ruiyan-color-primary);
 }
 
@@ -217,7 +222,7 @@
 .profile-button:hover {
   color: var(--ruiyan-color-primary);
   background: var(--ruiyan-color-primary-soft);
-  border-color: rgb(22 119 255 / 20%);
+  border-color: color-mix(in srgb, var(--ruiyan-color-primary) 20%, transparent);
 }
 
 .top-icon-button {
@@ -250,7 +255,7 @@
   height: 24px;
   flex: 0 0 auto;
   place-items: center;
-  color: #fff;
+  color: var(--ruiyan-color-on-primary);
   background: var(--ruiyan-color-primary);
   border-radius: var(--ruiyan-radius-sm);
 }
@@ -288,11 +293,11 @@
   display: flex;
   min-height: 0;
   flex-direction: column;
-  padding: 8px 6px;
+  padding: 8px 4px;
   overflow: auto;
-  color: var(--ruiyan-color-text-secondary);
-  background: var(--ruiyan-color-surface);
-  border-right: 1px solid var(--ruiyan-color-border);
+  color: var(--ruiyan-color-nav-text-muted);
+  background: var(--ruiyan-color-nav);
+  border-right: 1px solid var(--ruiyan-color-nav-border);
 }
 
 .primary-list {
@@ -305,7 +310,7 @@
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 52px;
+  min-height: 48px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -315,7 +320,7 @@
   font: inherit;
   background: transparent;
   border: 0;
-  border-radius: var(--ruiyan-radius-sm);
+  border-radius: 2px;
   cursor: pointer;
   transition: var(--ruiyan-duration-hover) ease;
 }
@@ -334,13 +339,23 @@
 }
 
 .primary-item:hover {
-  color: var(--ruiyan-color-text);
-  background: var(--ruiyan-color-surface-muted);
+  color: var(--ruiyan-color-nav-text);
+  background: var(--ruiyan-color-nav-hover);
 }
 
 .primary-active {
-  color: var(--ruiyan-color-primary);
-  background: var(--ruiyan-color-primary-soft);
+  color: var(--ruiyan-color-on-primary);
+  background: var(--ruiyan-color-nav-active);
+}
+
+.primary-active::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: -4px;
+  width: 3px;
+  content: '';
+  background: var(--ruiyan-color-nav-indicator);
 }
 
 .secondary-nav {
@@ -350,18 +365,18 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  color: var(--ruiyan-color-text);
-  background: var(--ruiyan-color-surface);
-  border-right: 1px solid var(--ruiyan-color-border);
+  color: var(--ruiyan-color-nav-text);
+  background: var(--ruiyan-color-nav-panel);
+  border-right: 1px solid var(--ruiyan-color-nav-border);
 }
 
 .secondary-header {
   display: flex;
-  min-height: 56px;
+  min-height: 44px;
   align-items: center;
   gap: 10px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--ruiyan-color-border);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ruiyan-color-nav-border);
 }
 
 .secondary-header strong {
@@ -375,7 +390,7 @@
 .secondary-scroll {
   min-height: 0;
   flex: 1;
-  padding: 8px;
+  padding: 6px;
   overflow: auto;
 }
 
@@ -389,17 +404,17 @@
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 36px;
+  min-height: 34px;
   align-items: center;
   gap: 9px;
-  padding: 0 10px 0 12px;
-  color: var(--ruiyan-color-text-secondary);
+  padding: 0 8px 0 10px;
+  color: var(--ruiyan-color-nav-text-muted);
   font: inherit;
   font-size: 12px;
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: var(--ruiyan-radius-sm);
+  border-radius: 2px;
   cursor: pointer;
 }
 
@@ -409,13 +424,13 @@
 }
 
 .secondary-item:hover {
-  color: var(--ruiyan-color-text);
-  background: var(--ruiyan-color-surface-muted);
+  color: var(--ruiyan-color-nav-text);
+  background: var(--ruiyan-color-nav-hover);
 }
 
 .secondary-active {
-  color: var(--ruiyan-color-primary);
-  background: var(--ruiyan-color-primary-soft);
+  color: var(--ruiyan-color-on-primary);
+  background: var(--ruiyan-color-nav-active);
   font-weight: 600;
 }
 
@@ -426,7 +441,7 @@
   left: 0;
   width: 3px;
   content: '';
-  background: var(--ruiyan-color-primary);
+  background: var(--ruiyan-color-nav-indicator);
   border-radius: 0 3px 3px 0;
 }
 
@@ -453,8 +468,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  min-height: 76px;
-  padding: 16px 24px;
+  min-height: 68px;
+  padding: 12px 16px;
   background: var(--ruiyan-color-surface);
   border-bottom: 1px solid var(--ruiyan-color-border);
 }
@@ -561,7 +576,7 @@
 }
 
 .button-primary {
-  color: #fff;
+  color: var(--ruiyan-color-on-primary);
   background: var(--ruiyan-color-primary);
   border-color: var(--ruiyan-color-primary);
   box-shadow: none;
@@ -581,7 +596,7 @@
 .button-ghost:hover {
   color: var(--ruiyan-color-primary);
   background: var(--ruiyan-color-primary-soft);
-  border-color: rgb(22 119 255 / 35%);
+  border-color: color-mix(in srgb, var(--ruiyan-color-primary) 35%, transparent);
 }
 
 .button-ghost {
@@ -590,7 +605,7 @@
 }
 
 .button-danger {
-  color: #fff;
+  color: var(--ruiyan-color-on-primary);
   background: var(--ruiyan-color-danger);
   border-color: var(--ruiyan-color-danger);
 }
@@ -614,7 +629,7 @@
 .icon-button:hover {
   color: var(--ruiyan-color-primary);
   background: var(--ruiyan-color-primary-soft);
-  border-color: rgb(22 119 255 / 35%);
+  border-color: color-mix(in srgb, var(--ruiyan-color-primary) 35%, transparent);
 }
 
 .spinner {
@@ -649,7 +664,7 @@
 }
 
 .card-interactive:hover {
-  border-color: rgb(22 119 255 / 40%);
+  border-color: color-mix(in srgb, var(--ruiyan-color-primary) 40%, transparent);
   box-shadow: none;
 }
 
@@ -868,8 +883,8 @@
   width: 7px;
   height: 4px;
   content: '';
-  border-bottom: 2px solid #fff;
-  border-left: 2px solid #fff;
+  border-bottom: 2px solid var(--ruiyan-color-on-primary);
+  border-left: 2px solid var(--ruiyan-color-on-primary);
   transform: rotate(-45deg) translate(1px, -1px);
 }
 
@@ -1056,7 +1071,7 @@
   font-weight: 600;
   background: var(--ruiyan-color-surface-muted);
   border: 1px solid var(--ruiyan-color-border);
-  border-radius: 10px;
+  border-radius: 2px;
 }
 
 .status-badge::before {
@@ -1085,7 +1100,7 @@
 .status-info {
   color: var(--ruiyan-color-primary);
   background: var(--ruiyan-color-primary-soft);
-  border-color: rgb(22 119 255 / 22%);
+  border-color: color-mix(in srgb, var(--ruiyan-color-primary) 22%, transparent);
 }
 
 .metric-card {
@@ -1121,7 +1136,7 @@
   color: var(--ruiyan-color-primary);
   font-size: 20px;
   background: var(--ruiyan-color-primary-soft);
-  border-radius: 11px;
+  border-radius: 2px;
 }
 
 .metric-content {
@@ -1168,8 +1183,8 @@
   color: var(--ruiyan-color-primary);
   font-size: 25px;
   background: var(--ruiyan-color-primary-soft);
-  border: 1px solid rgb(22 119 255 / 14%);
-  border-radius: 15px;
+  border: 1px solid color-mix(in srgb, var(--ruiyan-color-primary) 14%, transparent);
+  border-radius: 4px;
 }
 
 .state h3 {
@@ -1209,7 +1224,7 @@
   width: 32px;
   height: 32px;
   font-size: 15px;
-  border-radius: 9px;
+  border-radius: 2px;
 }
 
 .state-compact h3 {
@@ -1515,7 +1530,7 @@
 
 @media (max-width: 1240px) {
   .top-bar {
-    grid-template-columns: 230px minmax(220px, 1fr) auto;
+    grid-template-columns: var(--ruiyan-shell-sidebar-width) minmax(220px, 1fr) auto;
     gap: 10px;
   }
 

@@ -1,16 +1,18 @@
 .status-bar {
+  position: relative;
+  z-index: 40;
   width: 100%;
-  height: 28px;
+  height: var(--ruiyan-shell-status-height, 32px);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  border-top: 1px solid var(--ruiyan-color-border, #e6eaf0);
-  background: #ffffff;
-  color: var(--ruiyan-color-text-secondary, #64748b);
+  border-top: 1px solid var(--ruiyan-color-nav-border, rgb(255 255 255 / 10%));
+  background: var(--ruiyan-color-deep, #0b2035);
+  color: var(--ruiyan-color-nav-text-muted, #afbfce);
   font-size: 11px;
-  line-height: 27px;
+  line-height: calc(var(--ruiyan-shell-status-height, 32px) - 1px);
 }
 
 .status-group {
@@ -20,9 +22,14 @@
   white-space: nowrap;
 
   strong {
-    color: var(--ruiyan-color-text-primary, #1f2937);
+    color: var(--ruiyan-color-nav-text, #f2f6fb);
     font-weight: 600;
   }
+}
+
+.status-spacer {
+  min-width: 12px;
+  flex: 1;
 }
 
 .status-dot {
@@ -42,11 +49,11 @@
 .status-divider {
   width: 1px;
   height: 12px;
-  background: var(--ruiyan-color-border, #e6eaf0);
+  background: var(--ruiyan-color-nav-border, rgb(255 255 255 / 10%));
 }
 
 .status-label {
-  color: var(--ruiyan-color-text-tertiary, #94a3b8);
+  color: var(--ruiyan-color-nav-text-muted, #afbfce);
 }
 
 .team-connected {

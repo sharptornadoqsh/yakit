@@ -47,12 +47,35 @@ describe('睿眼菜单模型', () => {
     expect(groups['workbench']).toEqual(['安全概览', '最近任务', '风险趋势'])
     expect(groups['interactive-proxy']).toEqual(['代理控制台', '劫持会话', '拦截规则', '证书与代理设置'])
     expect(groups['traffic-center']).toEqual(['历史流量', '请求详情', '响应详情', '流量筛选'])
-    expect(groups['vulnerability-detection']).toEqual(['通用检测', '专项检测', '检测任务', '风险结果'])
+    expect(groups['vulnerability-detection']).toEqual([
+      '通用检测',
+      '专项检测',
+      '端口检测',
+      '检测任务',
+      '扫描结果',
+      '风险结果',
+      '安全测试报告',
+    ])
     expect(groups['brute-force']).toEqual(['爆破任务', '字典管理', '命中结果', '执行日志'])
-    expect(groups['packet-tools']).toEqual(['报文重放', '报文差异', '编解码', '操作历史'])
-    expect(groups['plugin-center']).toEqual(['插件仓库', '已安装插件', '本地插件', '插件开发', '插件日志', '插件配置'])
+    expect(groups['packet-tools']).toEqual(['报文重放', 'WebSocket 调试', '报文差异', '编解码', '哈希摘要', '操作历史'])
+    expect(groups['plugin-center']).toEqual([
+      '插件仓库',
+      '批量导入',
+      '已安装插件',
+      '本地插件',
+      '插件开发',
+      '插件日志',
+      '插件配置',
+    ])
     expect(groups['team-collaboration']).toEqual(['服务连接', '用户管理', '角色权限', '组织管理'])
-    expect(groups['project-security']).toEqual(['项目管理', '安全概览', '风险与漏洞', '扫描结果', '项目导入导出'])
+    expect(groups['project-security']).toEqual([
+      '项目管理',
+      '安全概览',
+      '风险与漏洞',
+      '扫描结果',
+      '项目导入导出',
+      '客户端测试总览',
+    ])
     expect(groups['system-settings']).toEqual([
       '引擎',
       '网络与 DNS',
@@ -61,31 +84,32 @@ describe('睿眼菜单模型', () => {
       '密码策略',
       '第三方应用',
       '日志诊断',
+      '快捷键帮助',
       '关于',
     ])
   })
 
-  it('默认隐藏序号十一、十五、十七和二十四对应入口', () => {
+  it('公开已有真实页面并隐藏尚未交付能力', () => {
     const keys = flattenRenyanMenu(buildRenyanMenu()).map((item) => item.key)
-    expect(keys).not.toContain('security-report')
+    expect(keys).toContain('security-report')
+    expect(keys).toContain('managed-client-overview')
+    expect(keys).toContain('plugin-batch-import')
+    expect(keys).toContain('shortcut-help')
     expect(keys).not.toContain('domestic-crypto')
     expect(keys).not.toContain('plugin-pipeline')
-    expect(keys).not.toContain('managed-client-overview')
   })
 
-  it('功能标志开启后保留待交付状态且不可导航', () => {
+  it('功能标志开启后仍阻止待交付能力导航', () => {
     const menu = buildRenyanMenu({
       featureFlags: {
-        reportExport: true,
         domesticCrypto: true,
         pluginPipeline: true,
-        managedClientOverview: true,
       },
     })
     const plannedItems = flattenRenyanMenu(menu).filter((item) =>
-      ['security-report', 'domestic-crypto', 'plugin-pipeline', 'managed-client-overview'].includes(item.key),
+      ['domestic-crypto', 'plugin-pipeline'].includes(item.key),
     )
-    expect(plannedItems).toHaveLength(4)
+    expect(plannedItems).toHaveLength(2)
     plannedItems.forEach((item) => {
       expect(item.deliveryStatus).toBe('planned')
       expect(isRenyanMenuItemNavigable(item)).toBe(false)

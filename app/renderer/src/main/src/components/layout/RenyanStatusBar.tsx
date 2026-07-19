@@ -2,6 +2,7 @@ import React from 'react'
 import classNames from 'classnames'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import styles from './RenyanStatusBar.module.scss'
+import { RenyanTaskCenter } from './RenyanTaskCenter'
 
 interface RenyanStatusBarProps {
   engineLink: boolean
@@ -36,6 +37,8 @@ export const RenyanStatusBar: React.FC<RenyanStatusBarProps> = React.memo((props
           {teamConnected ? '已登录' : '未登录'}
         </strong>
       </div>
+      <span className={styles['status-spacer']} />
+      <RenyanTaskCenter enabled={teamConnected} />
     </footer>
   )
 })

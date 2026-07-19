@@ -13,9 +13,9 @@
     width: 100%;
     min-height: 52px;
     padding: 8px 12px;
-    border: 1px solid #e6eaf0;
-    border-radius: 10px;
-    background: #ffffff;
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-md);
+    background: var(--ruiyan-color-surface);
 
     > div {
       display: flex;
@@ -23,12 +23,12 @@
       gap: 2px;
 
       strong {
-        color: #1f2937;
+        color: var(--ruiyan-color-text);
         font-size: 13px;
       }
 
       span {
-        color: #64748b;
+        color: var(--ruiyan-color-text-secondary);
         font-size: 11px;
       }
     }
@@ -91,11 +91,11 @@
   .yakit-modal-content-body {
     display: flex;
     flex: 1;
-    border-radius: 8px;
+    border-radius: var(--ruiyan-radius-md);
     border: 1px solid var(--Colors-Use-Neutral-Border);
     video {
       object-fit: cover;
-      border-radius: 8px;
+      border-radius: var(--ruiyan-radius-md);
     }
     &-video {
       width: 100%;

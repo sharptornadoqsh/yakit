@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   useGetState,
   useInterval,
@@ -47,7 +48,7 @@ import {
   ProjectsResponse,
 } from '@/pages/softwareSettings/ProjectManage'
 import { YakitHint } from '../yakitUI/YakitHint/YakitHint'
-import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
+import { RuiYanButton } from '@/components/renyanUI'
 import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
 import moment from 'moment'
 const { ipcRenderer } = window.require('electron')
@@ -531,6 +532,59 @@ export const MessageCenter: React.FC<MessageCenterProps> = (props) => {
   )
 }
 
+interface MessageCenterPanelProps {
+  open: boolean
+  width?: number
+  title: React.ReactNode
+  description?: React.ReactNode
+  onClose: () => void
+  footer?: React.ReactNode
+  panelRef: React.RefObject<HTMLElement>
+  children: React.ReactNode
+}
+
+const MessageCenterPanel: React.FC<MessageCenterPanelProps> = ({
+  open,
+  width,
+  title,
+  description,
+  onClose,
+  footer,
+  panelRef,
+  children,
+}) => {
+  if (!open || typeof document === 'undefined') return null
+
+  return createPortal(
+    <div
+      className={styles['message-center-overlay']}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <section
+        ref={panelRef}
+        className={styles['message-center-panel']}
+        style={width ? { maxWidth: width } : undefined}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="renyan-message-center-title"
+        tabIndex={-1}
+      >
+        <header className={styles['message-center-panel-header']}>
+          <div className={styles['message-center-panel-copy']}>
+            <h2 id="renyan-message-center-title">{title}</h2>
+            {description ? <p>{description}</p> : null}
+          </div>
+        </header>
+        <div className={styles['message-center-panel-body']}>{children}</div>
+        {footer ? <footer className={styles['message-center-panel-footer']}>{footer}</footer> : null}
+      </section>
+    </div>,
+    document.body,
+  )
+}
+
 export interface MessageCenterModalProps {
   visible: boolean
   setVisible: (v: boolean) => void
@@ -545,12 +599,53 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
   const [dataSorce, setDataSorce] = useState<API.MessageLogDetail[]>([])
   const [noRedDataTotal, setNoRedDataTotal] = useState<number>()
   const [isRef, setIsRef] = useState<boolean>(false)
+  const messagePanelRef = useRef<HTMLElement>(null)
 
   const refresh = useMemoizedFn(() => {
     update()
   })
 
   const [taskLoading, taskModalInfo, taskErrModalInfo, debugTaskEvent] = useEETaskNotificationHook({ refresh })
+
+  useEffect(() => {
+    if (!RENYAN_SHELL_ENABLED || !visible || typeof document === 'undefined') return
+
+    const previous = document.activeElement as HTMLElement | null
+    messagePanelRef.current?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setVisible(false)
+        return
+      }
+      if (event.key !== 'Tab' || !messagePanelRef.current) return
+
+      const focusable = Array.from(
+        messagePanelRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+      if (focusable.length === 0) {
+        event.preventDefault()
+        messagePanelRef.current.focus()
+        return
+      }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === messagePanelRef.current)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previous?.focus()
+    }
+  }, [visible, setVisible])
 
   const onSetWidth = useThrottleFn(
     (value) => {
@@ -780,8 +875,9 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
 
   if (RENYAN_SHELL_ENABLED) {
     return (
-      <RuiYanDrawer
+      <MessageCenterPanel
         open={visible}
+        panelRef={messagePanelRef}
         width={480}
         title={t('MessageCenter.title')}
         description="集中查看未读消息与全部通知"
@@ -793,7 +889,7 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
         }
       >
         <div className={styles['message-center-layout']}>{messageTabs}</div>
-      </RuiYanDrawer>
+      </MessageCenterPanel>
     )
   }
 

@@ -1,22 +1,45 @@
 :root {
-  --ruiyan-color-primary: #1677ff;
-  --ruiyan-color-primary-hover: #0958d9;
-  --ruiyan-color-primary-soft: #eaf3ff;
-  --ruiyan-color-accent: #00bfa6;
-  --ruiyan-color-teal: #00bfa6;
-  --ruiyan-color-success: #22c55e;
-  --ruiyan-color-warning: #f59e0b;
-  --ruiyan-color-danger: #ef4444;
-  --ruiyan-color-nav: #0b1220;
-  --ruiyan-color-deep: #111a2e;
-  --ruiyan-color-text: #1f2937;
-  --ruiyan-color-text-secondary: #64748b;
-  --ruiyan-color-text-tertiary: #94a3b8;
-  --ruiyan-color-border: #e5eaf2;
-  --ruiyan-color-border-strong: #cbd5e1;
-  --ruiyan-color-background: #f6f8fc;
+  --ruiyan-color-primary: #1d63b3;
+  --ruiyan-color-primary-hover: #155393;
+  --ruiyan-color-primary-soft: #e8f1fb;
+  --ruiyan-color-on-primary: #ffffff;
+  --ruiyan-color-accent: #158f78;
+  --ruiyan-color-teal: #158f78;
+  --ruiyan-color-success: #24914b;
+  --ruiyan-color-warning: #c9780d;
+  --ruiyan-color-danger: #d83b3b;
+  --ruiyan-color-danger-border: #f2bcbc;
+  --ruiyan-color-danger-soft: #fff3f3;
+  --ruiyan-color-nav: #102a44;
+  --ruiyan-color-nav-panel: #163550;
+  --ruiyan-color-nav-active: #1c5fa8;
+  --ruiyan-color-nav-indicator: #8ec2f3;
+  --ruiyan-color-nav-hover: rgb(255 255 255 / 8%);
+  --ruiyan-color-nav-border: rgb(255 255 255 / 10%);
+  --ruiyan-color-nav-text: #f2f6fb;
+  --ruiyan-color-nav-text-muted: #afbfce;
+  --ruiyan-color-deep: #0b2035;
+  --ruiyan-color-toolbar: #ffffff;
+  --ruiyan-color-toolbar-muted: #f5f7fa;
+  --ruiyan-color-toolbar-text: #1c2b3a;
+  --ruiyan-color-text: #202d3c;
+  --ruiyan-color-text-secondary: #5f6f80;
+  --ruiyan-color-text-tertiary: #8997a6;
+  --ruiyan-color-border: #d9dfe7;
+  --ruiyan-color-border-strong: #bdc7d3;
+  --ruiyan-color-background: #f2f4f7;
   --ruiyan-color-surface: #ffffff;
-  --ruiyan-color-surface-muted: #f8fafc;
+  --ruiyan-color-surface-muted: #f6f7f9;
+  --ruiyan-shell-sidebar-width: 220px;
+  --ruiyan-shell-primary-width: 64px;
+  --ruiyan-shell-secondary-width: 156px;
+  --ruiyan-window-chrome-height: 32px;
+  --ruiyan-shell-topbar-height: 52px;
+  --ruiyan-shell-status-height: 32px;
+  --ruiyan-shell-content-top: calc(var(--ruiyan-window-chrome-height) + var(--ruiyan-shell-topbar-height));
+  --ruiyan-page-gap: 16px;
+  --ruiyan-panel-padding: 16px;
+  --ruiyan-table-row-height: 38px;
   --ruiyan-space-1: 4px;
   --ruiyan-space-2: 8px;
   --ruiyan-space-3: 12px;
@@ -24,14 +47,14 @@
   --ruiyan-space-5: 20px;
   --ruiyan-space-6: 24px;
   --ruiyan-space-8: 32px;
-  --ruiyan-radius-sm: 6px;
-  --ruiyan-radius-md: 10px;
-  --ruiyan-radius-lg: 12px;
+  --ruiyan-radius-sm: 2px;
+  --ruiyan-radius-md: 4px;
+  --ruiyan-radius-lg: 4px;
   --ruiyan-radius-pill: 999px;
   --ruiyan-shadow-sm: none;
   --ruiyan-shadow-card: none;
-  --ruiyan-shadow-md: 0 16px 40px rgb(15 23 42 / 14%);
-  --ruiyan-shadow-focus: 0 0 0 3px rgb(22 119 255 / 18%);
+  --ruiyan-shadow-md: 0 3px 10px rgb(15 35 55 / 14%);
+  --ruiyan-shadow-focus: 0 0 0 2px color-mix(in srgb, var(--ruiyan-color-primary) 20%, transparent);
   --ruiyan-duration-hover: 120ms;
   --ruiyan-duration-panel: 160ms;
   --ruiyan-duration-drawer: 180ms;
@@ -82,4 +105,113 @@
 .ruiyan-app-shell :focus-visible {
   outline: 2px solid var(--ruiyan-color-primary);
   outline-offset: 2px;
+}
+
+body.ruiyan-workspace-active {
+  .ant-dropdown-menu {
+    padding: 4px;
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-sm);
+    box-shadow: var(--ruiyan-shadow-md);
+  }
+
+  .ant-dropdown-menu-item,
+  .ant-dropdown-menu-submenu-title {
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: var(--ruiyan-radius-sm);
+    color: var(--ruiyan-color-text);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .ant-dropdown-menu-item:hover,
+  .ant-dropdown-menu-submenu-title:hover {
+    background: var(--ruiyan-color-primary-soft);
+    color: var(--ruiyan-color-primary);
+  }
+
+  .ant-tooltip-inner {
+    min-height: 28px;
+    padding: 5px 8px;
+    border-radius: var(--ruiyan-radius-sm);
+    background: var(--ruiyan-color-deep);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .ant-popover-inner {
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-md);
+    box-shadow: var(--ruiyan-shadow-md);
+  }
+
+  .ant-popover-inner-content {
+    padding: 10px 12px;
+    color: var(--ruiyan-color-text);
+  }
+
+  .ant-notification-notice {
+    padding: 12px 16px;
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-md);
+    box-shadow: var(--ruiyan-shadow-md);
+  }
+
+  .ant-notification-notice-message {
+    margin-bottom: 2px;
+    color: var(--ruiyan-color-text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .ant-notification-notice-description {
+    color: var(--ruiyan-color-text-secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .ant-message-notice-content {
+    padding: 8px 12px;
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-sm);
+    color: var(--ruiyan-color-text);
+    box-shadow: var(--ruiyan-shadow-md);
+  }
+
+  .ant-modal-wrap:not(:has(.login-type-body)):not(:has(.private-domain)) .ant-modal-content,
+  .ant-drawer-content {
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-md);
+    background: var(--ruiyan-color-surface);
+    box-shadow: var(--ruiyan-shadow-md);
+  }
+
+  .ant-modal-wrap:not(:has(.login-type-body)):not(:has(.private-domain)) .ant-modal-header,
+  .ant-drawer-header {
+    min-height: 44px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--ruiyan-color-border);
+    border-radius: 0;
+    background: var(--ruiyan-color-toolbar-muted);
+  }
+
+  .ant-modal-wrap:not(:has(.login-type-body)):not(:has(.private-domain)) .ant-modal-title,
+  .ant-drawer-title {
+    color: var(--ruiyan-color-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 22px;
+  }
+
+  .ant-modal-wrap:not(:has(.login-type-body)):not(:has(.private-domain)) .ant-modal-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--ruiyan-color-border);
+    border-radius: 0;
+    background: var(--ruiyan-color-toolbar-muted);
+  }
+
+  .ant-spin-dot-item {
+    background-color: var(--ruiyan-color-primary);
+  }
 }

@@ -3,7 +3,7 @@
 .hTTPHistory {
   height: 100%;
   min-height: 0;
-  background: #f6f8fc;
+  background: var(--ruiyan-color-background);
 }
 
 .history-filter-drawer {
@@ -19,9 +19,9 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  background: #ffffff;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-md);
+  background: var(--ruiyan-color-surface);
 }
 
 .webTree-wrapper,
@@ -44,9 +44,9 @@
 
 .history-table-stage {
   overflow: hidden;
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  background: #ffffff;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-md);
+  background: var(--ruiyan-color-surface);
 }
 
 .history-detail-drawer {
@@ -72,9 +72,9 @@
 }
 
 .history-aside-detail {
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  background: #ffffff;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-md);
+  background: var(--ruiyan-color-surface);
 }
 
 .history-process-popover {

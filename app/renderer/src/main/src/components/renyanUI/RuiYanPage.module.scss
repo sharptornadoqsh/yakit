@@ -51,7 +51,7 @@
 .ruiyan-page :global(.ant-tabs-tab.ant-tabs-tab-active) {
   color: var(--ruiyan-color-primary);
   background: var(--ruiyan-color-primary-soft);
-  border-color: rgb(22 119 255 / 18%);
+  border-color: color-mix(in srgb, var(--ruiyan-color-primary) 18%, transparent);
 }
 
 .ruiyan-page :global(.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn) {
@@ -62,7 +62,7 @@
 .ruiyan-page :global(.ant-card) {
   background: var(--ruiyan-color-surface);
   border-color: var(--ruiyan-color-border);
-  border-radius: 10px;
+  border-radius: var(--ruiyan-radius-md);
   box-shadow: none;
 }
 
@@ -81,7 +81,7 @@
 .ruiyan-page :global(.ant-input-number),
 .ruiyan-page :global(.ant-select:not(.ant-select-customize-input) .ant-select-selector),
 .ruiyan-page :global(.ant-picker) {
-  min-height: 36px;
+  min-height: 32px;
   color: var(--ruiyan-color-text);
   background: var(--ruiyan-color-surface);
   border-color: var(--ruiyan-color-border-strong);
@@ -103,12 +103,12 @@
 .ruiyan-page :global(.ant-select-focused .ant-select-selector),
 .ruiyan-page :global(.ant-picker-focused) {
   border-color: var(--ruiyan-color-primary) !important;
-  box-shadow: 0 0 0 3px rgb(22 119 255 / 12%) !important;
+  box-shadow: var(--ruiyan-shadow-focus) !important;
 }
 
 .ruiyan-page :global(.ant-btn),
 .ruiyan-page :global([class*='yakit-button']) {
-  min-height: 36px;
+  min-height: 32px;
   border-radius: var(--ruiyan-radius-sm);
 }
 
@@ -121,11 +121,11 @@
 
 .ruiyan-page :global(.ant-table-container) {
   overflow: hidden;
-  border-radius: 9px;
+  border-radius: var(--ruiyan-radius-md);
 }
 
 .ruiyan-page :global(.ant-table-thead > tr > th) {
-  height: 40px;
+  height: var(--ruiyan-table-row-height);
   padding: 8px 12px;
   color: var(--ruiyan-color-text-secondary);
   font-size: 11px;
@@ -135,13 +135,13 @@
 }
 
 .ruiyan-page :global(.ant-table-tbody > tr > td) {
-  height: 40px;
+  height: var(--ruiyan-table-row-height);
   padding: 8px 12px;
   border-bottom-color: var(--ruiyan-color-border);
 }
 
 .ruiyan-page :global(.ant-table-tbody > tr.ant-table-row:hover > td) {
-  background: rgb(22 119 255 / 4%);
+  background: color-mix(in srgb, var(--ruiyan-color-primary) 5%, transparent);
 }
 
 .ruiyan-page :global(.ant-empty) {

@@ -10,12 +10,21 @@ export interface RuiYanAppShellProps {
   children: React.ReactNode
 }
 
-export const RuiYanAppShell: React.FC<RuiYanAppShellProps> = ({ navigation, children }) => (
-  <div className={classNames('ruiyan-app-shell', styles['app-shell'])}>
-    {navigation}
-    <main className={styles['app-main']}>{children}</main>
-  </div>
-)
+const RUIYAN_BODY_CLASS = 'ruiyan-workspace-active'
+
+export const RuiYanAppShell: React.FC<RuiYanAppShellProps> = ({ navigation, children }) => {
+  useEffect(() => {
+    document.body.classList.add(RUIYAN_BODY_CLASS)
+    return () => document.body.classList.remove(RUIYAN_BODY_CLASS)
+  }, [])
+
+  return (
+    <div className={classNames('ruiyan-app-shell', styles['app-shell'])}>
+      {navigation}
+      <main className={styles['app-main']}>{children}</main>
+    </div>
+  )
+}
 
 export interface RuiYanSearchItem {
   key: string
@@ -43,7 +52,7 @@ export interface RuiYanTopCommandBarProps {
 }
 
 export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
-  productName = '睿眼',
+  productName = '睿眼自动化渗透系统',
   searchItems,
   onSearchSelect,
   commands,
@@ -90,7 +99,7 @@ export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
         </span>
         <strong className={styles['brand-text']}>{productName}</strong>
       </div>
-      <div className={styles['top-search']}>
+      <div className={styles['top-search']} role="search">
         <RuiYanIcon name="search" />
         <input
           ref={inputRef}
@@ -133,7 +142,9 @@ export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
                 </button>
               ))
             ) : (
-              <div className={styles['search-empty']}>未找到匹配功能</div>
+              <div className={styles['search-empty']} role="status">
+                未找到匹配功能
+              </div>
             )}
           </div>
         ) : null}
@@ -147,9 +158,9 @@ export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
         ))}
         <button type="button" className={styles['top-icon-button']} aria-label="消息通知" onClick={onNotifications}>
           <RuiYanIcon name="bell" />
-          {hasUnreadNotifications ? <span className={styles['notification-dot']} /> : null}
+          {hasUnreadNotifications ? <span className={styles['notification-dot']} aria-hidden="true" /> : null}
         </button>
-        <button type="button" className={styles['profile-button']} onClick={onProfile}>
+        <button type="button" className={styles['profile-button']} aria-label={`账户：${userName}`} onClick={onProfile}>
           <span className={styles.avatar}>
             <RuiYanIcon name="user" />
           </span>
@@ -218,14 +229,15 @@ const getItemIcon = (item: RenyanMenuItem): RuiYanIconName => {
 
 export const RuiYanSecondaryNav: React.FC<RuiYanSecondaryNavProps> = ({ group, activeKeys, onSelect }) => {
   const items = group.children.filter(isRenyanMenuItemNavigable)
+  const headingId = `ruiyan-secondary-heading-${group.key}`
 
   return (
-    <aside className={styles['secondary-nav']}>
-      <header className={styles['secondary-header']}>
+    <aside className={styles['secondary-nav']} aria-labelledby={headingId}>
+      <header className={styles['secondary-header']} id={headingId}>
         <strong>{group.title}</strong>
       </header>
       <div className={styles['secondary-scroll']}>
-        <div className={styles['secondary-list']}>
+        <nav className={styles['secondary-list']} aria-label={`${group.title}功能导航`}>
           {items.map((item) => {
             const active = activeKeys.includes(item.key)
             return (
@@ -241,7 +253,7 @@ export const RuiYanSecondaryNav: React.FC<RuiYanSecondaryNavProps> = ({ group, a
               </button>
             )
           })}
-        </div>
+        </nav>
       </div>
     </aside>
   )

@@ -15,7 +15,7 @@
   height: 100%;
   padding: 0 !important;
   overflow: hidden;
-  background: #f6f8fc;
+  background: var(--ruiyan-color-background);
   :global {
     .resize-box .resize-split-line:hover {
       border: 1px solid var(--Colors-Use-Main-Primary);
@@ -30,17 +30,17 @@
   min-height: 44px;
   padding: 0 16px;
   gap: 12px;
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  color: #1f2937;
-  background: #ffffff;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-md);
+  color: var(--ruiyan-color-text);
+  background: var(--ruiyan-color-surface);
 
   strong {
     font-size: 12px;
   }
 
   small {
-    color: #64748b;
+    color: var(--ruiyan-color-text-secondary);
     font-family: 'JetBrains Mono', Consolas, monospace;
     font-size: 11px;
   }
@@ -48,19 +48,19 @@
 
 .mitm-page[data-proxy-status='hijacking'] .mitm-console-strip,
 .mitm-page[data-proxy-status='hijacked'] .mitm-console-strip {
-  border-color: #bcefe7;
+  border-color: var(--Colors-Use-Success-Border, #bcefe7);
 }
 
 .mitm-status-indicator {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: var(--ruiyan-color-text-tertiary);
 }
 
 .mitm-page[data-proxy-status='hijacking'] .mitm-status-indicator,
 .mitm-page[data-proxy-status='hijacked'] .mitm-status-indicator {
-  background: #00bfa6;
+  background: var(--ruiyan-color-success);
 }
 
 .mitm-console-meta {
@@ -68,11 +68,11 @@
   align-items: center;
   gap: 6px;
   padding-left: 12px;
-  border-left: 1px solid #e6eaf0;
+  border-left: 1px solid var(--ruiyan-color-border);
 
   code,
   strong {
-    color: #1f2937;
+    color: var(--ruiyan-color-text);
     font-family: 'JetBrains Mono', Consolas, monospace;
     font-size: 11px;
     font-weight: 600;
@@ -105,9 +105,9 @@
   position: relative;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  background: #ffffff;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-md);
+  background: var(--ruiyan-color-surface);
 
   .mitm-idle-tab-wrap {
     display: flex;
@@ -137,15 +137,15 @@
     justify-content: center;
     min-height: 52px;
     padding: 8px 12px;
-    border-bottom: 1px solid #e6eaf0;
+    border-bottom: 1px solid var(--ruiyan-color-border);
 
     strong {
-      color: #1f2937;
+      color: var(--ruiyan-color-text);
       font-size: 13px;
     }
 
     span {
-      color: #64748b;
+      color: var(--ruiyan-color-text-secondary);
       font-size: 11px;
     }
   }
@@ -238,9 +238,9 @@
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  background: #ffffff;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-md);
+  background: var(--ruiyan-color-surface);
 }
 
 .plugin-group-modal {
@@ -603,7 +603,8 @@
   position: relative;
   display: flex;
   color: var(--Colors-Use-Neutral-Text-1-Title);
-  border-radius: 40px;
+  overflow: hidden;
+  border-radius: var(--ruiyan-radius-sm);
   .operation-btn-left {
     display: flex;
     justify-content: center;

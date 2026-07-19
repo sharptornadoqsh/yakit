@@ -48,6 +48,10 @@ const routeVisuals: Partial<Record<YakitRoute, RuiYanRouteVisual>> = {
     layout: 'request-response',
     emptyAsset: emptyRequest,
   },
+  [YakitRoute.WebsocketFuzzer]: {
+    layout: 'request-response',
+    emptyAsset: emptyRequest,
+  },
   [YakitRoute.DataCompare]: {
     layout: 'diff-studio',
     emptyAsset: emptyRequest,
@@ -57,6 +61,14 @@ const routeVisuals: Partial<Record<YakitRoute, RuiYanRouteVisual>> = {
     emptyAsset: emptyScan,
   },
   [YakitRoute.PoC]: {
+    layout: 'scan-workbench',
+    emptyAsset: emptyScan,
+  },
+  [YakitRoute.Mod_ScanPort]: {
+    layout: 'scan-workbench',
+    emptyAsset: emptyScan,
+  },
+  [YakitRoute.SimpleDetect]: {
     layout: 'scan-workbench',
     emptyAsset: emptyScan,
   },
@@ -72,6 +84,10 @@ const routeVisuals: Partial<Record<YakitRoute, RuiYanRouteVisual>> = {
     layout: 'plugin-catalog',
     emptyAsset: emptyPlugin,
   },
+  [YakitRoute.Plugin_Audit]: {
+    layout: 'plugin-catalog',
+    emptyAsset: emptyPlugin,
+  },
   [YakitRoute.AddYakitScript]: {
     layout: 'plugin-studio',
     emptyAsset: emptyPlugin,
@@ -84,11 +100,39 @@ const routeVisuals: Partial<Record<YakitRoute, RuiYanRouteVisual>> = {
     layout: 'scan-results',
     emptyAsset: emptyScan,
   },
+  [YakitRoute.YakRunner_Audit_Hole]: {
+    layout: 'risk-center',
+    emptyAsset: emptyRisk,
+  },
+  [YakitRoute.DB_Report]: {
+    layout: 'query-detail',
+    emptyAsset: emptyRisk,
+  },
+  [YakitRoute.DB_Ports]: {
+    layout: 'query-detail',
+    emptyAsset: emptyTraffic,
+  },
+  [YakitRoute.Data_Statistics]: {
+    layout: 'security-dashboard',
+    emptyAsset: emptyRisk,
+  },
   [YakitRoute.Beta_ConfigNetwork]: {
     layout: 'settings-center',
     emptyAsset: emptyRequest,
   },
   [YakitRoute.ConfigManagement]: {
+    layout: 'configuration-center',
+    emptyAsset: emptyRequest,
+  },
+  [YakitRoute.PayloadManager]: {
+    layout: 'configuration-center',
+    emptyAsset: emptyRequest,
+  },
+  [YakitRoute.Beta_DiagnoseNetwork]: {
+    layout: 'settings-center',
+    emptyAsset: emptyRequest,
+  },
+  [YakitRoute.ShortcutKey]: {
     layout: 'configuration-center',
     emptyAsset: emptyRequest,
   },

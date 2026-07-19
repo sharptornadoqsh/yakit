@@ -91,7 +91,7 @@ describe('睿眼顶部导航', () => {
     expect(screen.queryByRole('button', { name: '执行日志' })).not.toBeInTheDocument()
   })
 
-  it('系统设置写入目标分区并通过统一日志诊断事件调用真实能力', () => {
+  it('系统设置写入目标分区并打开真实网络诊断页面', () => {
     const onMenuSelect = vi.fn()
     render(<RenyanNavigation defaultExpand={true} onMenuSelect={onMenuSelect} setRouteToLabel={vi.fn()} />)
 
@@ -101,7 +101,8 @@ describe('睿眼顶部导航', () => {
     expect(window.sessionStorage.getItem('ruiyan:settings-section')).toBe('network-dns')
     expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.Beta_ConfigNetwork })
 
+    onMenuSelect.mockClear()
     fireEvent.click(screen.getByRole('button', { name: '日志诊断' }))
-    expect(emit).toHaveBeenCalledWith('onUIOpSettingMenuSelect', 'renyan-diagnostics')
+    expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.Beta_DiagnoseNetwork })
   })
 })
