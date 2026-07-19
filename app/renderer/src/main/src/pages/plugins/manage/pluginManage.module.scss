@@ -116,7 +116,8 @@
           display: flex;
           gap: 8px;
           border-radius: 8px;
-          background: linear-gradient(90deg, rgba(136, 99, 247, 0.1) 0%, rgba(247, 170, 99, 0.1) 100%);
+          background: var(--ruiyan-color-surface-muted, #f6f8fc);
+          border: 1px solid var(--ruiyan-color-border, #e5e7eb);
 
           .advice-icon {
             svg {
@@ -539,13 +540,6 @@
     padding: 8px 16px;
     color: var(--Colors-Use-Neutral-Text-1-Title);
     font-size: 12px;
-  }
-  &-footer {
-    display: flex;
-    justify-content: end;
-    gap: 8px;
-    width: 100%;
-    padding: 0 8px 8px 8px;
   }
 }
 

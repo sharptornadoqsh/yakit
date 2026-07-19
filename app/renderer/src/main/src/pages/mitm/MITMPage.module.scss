@@ -10,12 +10,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
   height: 100%;
-  padding: 8px !important;
+  padding: 0 !important;
   overflow: hidden;
-  background: #eef4f4;
+  background: #f6f8fc;
   :global {
     .resize-box .resize-split-line:hover {
       border: 1px solid var(--Colors-Use-Main-Primary);
@@ -27,48 +27,75 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  min-height: 34px;
-  padding: 0 10px;
-  gap: 8px;
-  border: 1px solid #c3d7d8;
-  border-left: 3px solid #90a6aa;
-  border-radius: 3px;
-  color: #35565c;
-  background: var(--Colors-Use-Basic-Background);
+  min-height: 44px;
+  padding: 0 16px;
+  gap: 12px;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  color: #1f2937;
+  background: #ffffff;
 
   strong {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   small {
-    color: #71898e;
+    color: #64748b;
     font-family: 'JetBrains Mono', Consolas, monospace;
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 
 .mitm-page[data-proxy-status='hijacking'] .mitm-console-strip,
 .mitm-page[data-proxy-status='hijacked'] .mitm-console-strip {
-  border-left-color: #0caf9f;
+  border-color: #bcefe7;
 }
 
 .mitm-status-indicator {
   width: 6px;
   height: 6px;
-  background: #90a6aa;
-  box-shadow: 0 0 0 3px rgba(144, 166, 170, 0.15);
+  border-radius: 50%;
+  background: #94a3b8;
 }
 
 .mitm-page[data-proxy-status='hijacking'] .mitm-status-indicator,
 .mitm-page[data-proxy-status='hijacked'] .mitm-status-indicator {
-  background: #0caf9f;
-  box-shadow: 0 0 0 3px rgba(12, 175, 159, 0.15);
+  background: #00bfa6;
+}
+
+.mitm-console-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 12px;
+  border-left: 1px solid #e6eaf0;
+
+  code,
+  strong {
+    color: #1f2937;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+  }
 }
 
 .mitm-console-content {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.mitm-workspace-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.mitm-plugin-expanded {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .mitm-server-start-pre-first {
@@ -78,20 +105,20 @@
   position: relative;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #c6d8da;
-  border-radius: 3px;
-  background: var(--Colors-Use-Basic-Background);
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
 
   .mitm-idle-tab-wrap {
     display: flex;
+    flex-direction: column;
     width: 100%;
     height: 100%;
     .mitm-idle-tab-cont-item {
       overflow: auto;
       width: 100%;
       height: 100%;
-      padding-left: 15px;
-      padding-top: 12px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
     }
@@ -100,6 +127,26 @@
       color: var(--Colors-Use-Neutral-Text-4-Help-text);
       font-size: 12px;
       margin-bottom: 12px;
+    }
+  }
+
+  .mitm-panel-heading {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 52px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e6eaf0;
+
+    strong {
+      color: #1f2937;
+      font-size: 13px;
+    }
+
+    span {
+      color: #64748b;
+      font-size: 11px;
     }
   }
 
@@ -189,11 +236,11 @@
   height: 100%;
   position: relative;
   flex-direction: column;
-  padding: 8px 0 13px 5px;
+  padding: 0;
   overflow: hidden;
-  border: 1px solid #b9d0d2;
-  border-radius: 3px;
-  background: var(--Colors-Use-Basic-Background);
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .plugin-group-modal {
@@ -248,19 +295,21 @@
 }
 
 .infoBox {
-  background: var(--Colors-Use-Error-Bg);
+  background: var(--ruiyan-color-danger-soft, #fff3f3);
   color: var(--Colors-Use-Neutral-Text-4-Help-text);
   padding: 8px 16px;
   margin-bottom: 16px;
+  border: 1px solid var(--ruiyan-color-danger-border, #ffd5d5);
+  border-radius: var(--ruiyan-radius-md, 6px);
 }
 
 .import-local-plugin-modal {
   .import-local-plugin-subTitle {
     display: flex;
-    margin-left: 70px;
+    margin-bottom: 16px;
   }
   .import-local-plugin-form {
-    padding: 0 16px;
+    padding: 0;
     :global {
       .ant-form-item-explain,
       .ant-form-item-extra {

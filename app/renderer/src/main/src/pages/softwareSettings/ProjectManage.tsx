@@ -7,7 +7,6 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronUpIcon,
-  DotsVerticalSvgIcon,
   ImportSvgIcon,
   OutlinePlusIcon,
   PlusBoldSvgIcon,
@@ -19,7 +18,6 @@ import {
 import {
   DocumentAddSvgIcon,
   DocumentDownloadSvgIcon,
-  DocumentTextSvgIcon,
   FolderOpenSvgIcon,
   ProjectDocumentTextSvgIcon,
   ProjectExportSvgIcon,
@@ -33,8 +31,8 @@ import { CopyComponents, YakitTag } from '@/components/yakitUI/YakitTag/YakitTag
 import { formatTimestamp } from '@/utils/timeUtil'
 import { Cascader, Divider, Dropdown, DropdownProps, Form, Progress, Tooltip, Upload } from 'antd'
 import { YakitMenu, YakitMenuProp } from '@/components/yakitUI/YakitMenu/YakitMenu'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
+import { RuiYanButton, RuiYanDrawer, RuiYanModal } from '@/components/renyanUI'
 import { randomString } from '@/utils/randomUtil'
 import { openABSFileLocated } from '@/utils/openWebsite'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
@@ -42,12 +40,7 @@ import { YaklangEngineMode } from '@/yakitGVDefine'
 import { YakitHint } from '@/components/yakitUI/YakitHint/YakitHint'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { showByRightContext } from '@/components/yakitUI/YakitMenu/showByRightContext'
-import {
-  OutlineDocumentduplicateIcon,
-  OutlineExportIcon,
-  OutlinePencilaltIcon,
-  OutlineTrashIcon,
-} from '@/assets/icon/outline'
+import { OutlineExportIcon, OutlinePencilaltIcon, OutlineTrashIcon } from '@/assets/icon/outline'
 
 import classNames from 'classnames'
 import styles from './ProjectManage.module.scss'
@@ -226,6 +219,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
   const [search, setSearch] = useState<{ name: string; total: number }>({ name: '', total: 0 })
 
   const [latestProject, setLatestProject] = useState<ProjectDescription>()
+  const [selectedProject, setSelectedProject] = useState<ProjectDescription>()
 
   const [vlistHeigth, setVListHeight] = useState(600)
   const containerRef = useRef<any>(null)
@@ -253,8 +247,6 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
 
     return false
   })
-
-  const [headerShow, setHeaderShow] = useState<boolean>(false)
 
   const [stopUpdate, setStopUpdate] = useState<boolean>(false)
 
@@ -1141,6 +1133,20 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
     }
   }, [props.projectListRefreshTrigger])
 
+  const onSelectProjectGroup = useMemoizedFn((type: string) => {
+    const nextParams = {
+      ...getParams(),
+      Type: type,
+      Pagination: { ...getParams().Pagination, Page: 1 },
+    }
+    delete nextParams.FolderId
+    delete nextParams.ChildFolderId
+    setSelectedProject(undefined)
+    setFiles([])
+    setParams(nextParams)
+    setTimeout(() => update(1), 300)
+  })
+
   return (
     <div className={styles['project-manage-wrapper']}>
       <div className={styles['project-manage-container']}>
@@ -1181,361 +1187,324 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
           />
         </div>
 
-        <div className={styles['project-operate']}>
-          <div
-            className={classNames(styles['open-recent-wrapper'], {
-              [styles['open-recent-focus-wrapper']]: headerShow,
-            })}
-          >
-            <div className={styles['open-recent-body']} onClick={() => operateFunc('setCurrent', latestProject)}>
-              <div className={styles['body-title']}>
-                <DocumentTextSvgIcon />
-                <div>
-                  <div className={styles['title-style']}>{latestProject?.ProjectName || '[default]'}</div>
-                  <div className={styles['subtitle-style']}>{`${t(
-                    'ProjectManage.recentOperation',
-                  )}：${latestProject ? formatTimestamp(latestProject?.UpdateAt) : '- -'}`}</div>
-                </div>
+        <div className={styles['project-workspace']}>
+          <aside className={styles['project-group-panel']} aria-label="项目分组">
+            <div className={styles['project-group-title']}>项目分组</div>
+            <div className={styles['project-group-list']}>
+              {typeFilter.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={classNames(styles['project-group-item'], {
+                    [styles['project-group-item-active']]: files.length === 0 && (params.Type || 'all') === item.key,
+                  })}
+                  onClick={() => onSelectProjectGroup(item.key)}
+                >
+                  <span className={styles['project-group-icon']}>{item.itemIcon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className={styles['current-project-card']}>
+              <div className={styles['current-project-label']}>当前项目</div>
+              <div className={styles['current-project-name']}>{latestProject?.ProjectName || '[default]'}</div>
+              <div className={styles['current-project-meta']}>
+                {latestProject ? formatTimestamp(latestProject.UpdateAt) : '- -'}
               </div>
+              <RuiYanButton
+                variant="secondary"
+                disabled={!latestProject}
+                onClick={() => setSelectedProject(latestProject)}
+              >
+                查看详情
+              </RuiYanButton>
+            </div>
+          </aside>
+
+          <section className={styles['project-list-panel']}>
+            <div className={styles['project-operate']}>
+              <button
+                type="button"
+                className={classNames(styles['btn-wrapper'], styles['new-temporary-project-wrapper'])}
+                onClick={async () => {
+                  if (await getTemporaryProjectId()) {
+                    setDetectionTemporaryProjectVisible(true)
+                  } else {
+                    await creatTemporaryProject()
+                  }
+                }}
+              >
+                <div className={styles['btn-body']}>
+                  <div className={styles['body-title']}>
+                    <TemporaryProjectSvgIcon className={styles['temporary-project-icon']} />
+                    {t('ProjectManage.temporaryProject')}
+                  </div>
+                  <div className={styles['icon-style']}>
+                    <PlusBoldSvgIcon />
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={classNames(styles['btn-wrapper'], styles['new-project-wrapper'])}
+                onClick={() => operateFunc('newProject')}
+              >
+                <div className={styles['btn-body']}>
+                  <div className={styles['body-title']}>
+                    <DocumentAddSvgIcon />
+                    {t('ProjectManage.newProject')}
+                  </div>
+                  <div className={styles['icon-style']}>
+                    <PlusBoldSvgIcon />
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={classNames(styles['btn-wrapper'], styles['new-folder-wrapper'])}
+                onClick={() => operateFunc('newFolder')}
+              >
+                <div className={styles['btn-body']}>
+                  <div className={styles['body-title']}>
+                    <FolderOpenSvgIcon />
+                    {t('YakitButton.newFolder')}
+                  </div>
+                  <div className={styles['icon-style']}>
+                    <PlusBoldSvgIcon />
+                  </div>
+                </div>
+              </button>
 
               {/* { engineMode !== "remote" && ( */}
-              <div className={styles['icon-wrapper']} onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu
-                  dropdown={{
-                    placement: 'bottomRight',
-                    overlayClassName: styles['dropdown-menu-filter-wrapper'],
-                    onVisibleChange: (open) => setHeaderShow(open),
-                  }}
-                  menu={{
-                    data: [
-                      {
-                        key: 'export',
-                        label: t('YakitButton.export'),
-                        itemIcon: <OutlineExportIcon />,
-                        children: [
-                          { key: 'encryption', label: t('ProjectManage.encryptedExport') },
-                          { key: 'plaintext', label: t('ProjectManage.plaintextExport') },
-                        ],
-                      },
-                      {
-                        key: 'edit',
-                        label: t('YakitButton.edit'),
-                        disabled:
-                          latestProject?.ProjectName === '[default]' ||
-                          (latestProject?.OnlineSubTaskID || '').length > 0,
-                        itemIcon: <OutlinePencilaltIcon />,
-                      },
-                      {
-                        key: 'copyPath',
-                        label: t('ProjectManage.copyPath'),
-                        itemIcon: <OutlineDocumentduplicateIcon />,
-                      },
-                      { type: 'divider' },
-                      {
-                        key: 'delete',
-                        label: t('YakitButton.delete'),
-                        type: 'danger',
-                        disabled: latestProject?.ProjectName === '[default]',
-                        itemIcon: <OutlineTrashIcon />,
-                      },
-                    ],
-                    className: styles['dropdown-menu-body'],
-                    popupClassName: styles['dropdown-menu-filter-wrapper'],
-                    onClick: ({ key }) => {
-                      setHeaderShow(false)
-                      if (key === 'delete') {
-                        if (latestProject) {
-                          setDelId({ Id: +latestProject.Id, Type: latestProject.Type })
-                          setDelShow(true)
-                        }
-                      } else operateFunc(key, latestProject)
-                    },
-                  }}
-                >
-                  <div
-                    className={classNames(styles['icon-body'], {
-                      [styles['icon-focus-body']]: headerShow,
-                    })}
-                  >
-                    <DotsVerticalSvgIcon />
+              <button
+                type="button"
+                className={classNames(styles['btn-wrapper'], styles['import-wrapper'])}
+                onClick={() => operateFunc('import')}
+              >
+                <div className={styles['btn-body']}>
+                  <div className={styles['body-title']}>
+                    <DocumentDownloadSvgIcon />
+                    {t('YakitButton.import')}
                   </div>
-                </DropdownMenu>
-              </div>
+                  <div className={styles['icon-style']}>
+                    <ImportSvgIcon />
+                  </div>
+                </div>
+              </button>
               {/* )} */}
             </div>
-          </div>
 
-          <button
-            type="button"
-            className={classNames(styles['btn-wrapper'], styles['new-temporary-project-wrapper'])}
-            onClick={async () => {
-              if (await getTemporaryProjectId()) {
-                setDetectionTemporaryProjectVisible(true)
-              } else {
-                await creatTemporaryProject()
-              }
-            }}
-          >
-            <div className={styles['btn-body']}>
-              <div className={styles['body-title']}>
-                <TemporaryProjectSvgIcon className={styles['temporary-project-icon']} />
-                {t('ProjectManage.temporaryProject')}
-              </div>
-              <div className={styles['icon-style']}>
-                <PlusBoldSvgIcon />
-              </div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            className={classNames(styles['btn-wrapper'], styles['new-project-wrapper'])}
-            onClick={() => operateFunc('newProject')}
-          >
-            <div className={styles['btn-body']}>
-              <div className={styles['body-title']}>
-                <DocumentAddSvgIcon />
-                {t('ProjectManage.newProject')}
-              </div>
-              <div className={styles['icon-style']}>
-                <PlusBoldSvgIcon />
-              </div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            className={classNames(styles['btn-wrapper'], styles['new-folder-wrapper'])}
-            onClick={() => operateFunc('newFolder')}
-          >
-            <div className={styles['btn-body']}>
-              <div className={styles['body-title']}>
-                <FolderOpenSvgIcon />
-                {t('YakitButton.newFolder')}
-              </div>
-              <div className={styles['icon-style']}>
-                <PlusBoldSvgIcon />
-              </div>
-            </div>
-          </button>
-
-          {/* { engineMode !== "remote" && ( */}
-          <button
-            type="button"
-            className={classNames(styles['btn-wrapper'], styles['import-wrapper'])}
-            onClick={() => operateFunc('import')}
-          >
-            <div className={styles['btn-body']}>
-              <div className={styles['body-title']}>
-                <DocumentDownloadSvgIcon />
-                {t('YakitButton.import')}
-              </div>
-              <div className={styles['icon-style']}>
-                <ImportSvgIcon />
-              </div>
-            </div>
-          </button>
-          {/* )} */}
-        </div>
-
-        {search.name && (
-          <div className={styles['project-search']}>
-            <Trans
-              i18nKey="ProjectManage.searchResult"
-              ns="projectManage"
-              components={{
-                code: <span className={styles['total-style']}></span>,
-              }}
-              values={{ name: search.name }}
-            />
-          </div>
-        )}
-
-        {files.length > 0 && (
-          <div className={styles['project-path-wrapper']}>
-            <div
-              className={styles['path-style']}
-              onClick={() => {
-                setParams({
-                  Type: 'all',
-                  Pagination: { Page: 1, Limit: 20, Order: 'desc', OrderBy: 'updated_at' },
-                })
-
-                setTimeout(() => {
-                  setFiles([])
-                  update()
-                }, 500)
-              }}
-            >
-              {t('ProjectManage.localFiles')}
-            </div>
-            <ChevronRightIcon className={styles['icon-style']} />
-            <div
-              className={styles['path-style']}
-              onClick={() => {
-                if (files.length > 1) {
-                  setLoading(true)
-                  setParams({
-                    Type: params.Type,
-                    Pagination: { ...params.Pagination, Page: 1 },
-                    FolderId: +files[0].Id,
-                  })
-                  setTimeout(() => {
-                    setFiles([files[0]])
-                    update()
-                  }, 500)
-                }
-              }}
-            >
-              {files[0].ProjectName}
-            </div>
-            {files.length > 1 && (
-              <>
-                <ChevronRightIcon className={styles['icon-style']} />
-                <div className={styles['path-style']}>{files[1].ProjectName}</div>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className={styles['project-table-wrapper']}>
-          <YakitSpin tip="Loading..." spinning={loading}>
-            <div className={styles['project-table-body']}>
-              <div className={styles['table-header-wrapper']}>
-                <div className={styles['header-titles']}>
-                  <div className={styles['titls-body']}>
-                    {projectHeader.map((item, index) => {
-                      return (
-                        <div key={item.key} style={{ ...item.style }} className={styles['title-opt']}>
-                          <div>{item.headerRender ? item.headerRender(index) : item.name}</div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                {/* { engineMode !== "remote" &&  */}
-                <div style={{ width: 120 }}>{t('YakitTable.action')}</div>
-                {/* } */}
-              </div>
-
-              <div className={styles['table-content-wrapper']}>
-                <ReactResizeDetector
-                  onResize={(width, height) => {
-                    if (!width || !height) {
-                      return
-                    }
-                    setVListHeight(height)
+            {search.name && (
+              <div className={styles['project-search']}>
+                <Trans
+                  i18nKey="ProjectManage.searchResult"
+                  ns="projectManage"
+                  components={{
+                    code: <span className={styles['total-style']}></span>,
                   }}
-                  handleWidth={true}
-                  handleHeight={true}
-                  refreshMode={'debounce'}
-                  refreshRate={50}
+                  values={{ name: search.name }}
                 />
+              </div>
+            )}
+
+            {files.length > 0 && (
+              <div className={styles['project-path-wrapper']}>
                 <div
-                  ref={containerRef as any}
-                  style={{ height: vlistHeigth, overflow: 'auto overlay', overflowAnchor: 'none' }}
+                  className={styles['path-style']}
+                  onClick={() => {
+                    setParams({
+                      Type: 'all',
+                      Pagination: { Page: 1, Limit: 20, Order: 'desc', OrderBy: 'updated_at' },
+                    })
+
+                    setTimeout(() => {
+                      setFiles([])
+                      update()
+                    }, 500)
+                  }}
                 >
-                  <div ref={wrapperRef as any}>
-                    {__data.Projects.length === 0 ? (
-                      <>
-                        {files.length > 0 && (
-                          <div className={styles['table-empty-wrapper']}>
-                            <YakitEmpty
-                              descriptionReactNode={
-                                <>
-                                  <div className={styles['title-style']}>
-                                    <span className={styles['file-style']}>{files[files.length - 1].ProjectName}</span>{' '}
-                                    {t('ProjectManage.noProjectContent')}
-                                  </div>
-                                  <div className={styles['operate-btn']}>
-                                    <YakitButton
-                                      size="max"
-                                      onClick={() => operateFunc('newProject', files[files.length - 1])}
-                                    >
-                                      {t('ProjectManage.newProject')}
-                                    </YakitButton>
-                                    <YakitButton
-                                      size="max"
-                                      type="outline2"
-                                      onClick={() => operateFunc('import', files[files.length - 1])}
-                                    >
-                                      {t('ProjectManage.importProject')}
-                                    </YakitButton>
-                                  </div>
-                                </>
-                              }
-                            />
-                          </div>
-                        )}
-                        {params.ProjectName && (
-                          <div className={styles['table-empty-wrapper']}>
-                            <YakitEmpty
-                              descriptionReactNode={
-                                <div className={styles['title-style']}>{t('YakitEmpty.searchEmpty')}</div>
-                              }
-                            />
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      list.map((i) => {
-                        return (
-                          <div
-                            key={i.index}
-                            style={{ height: 48 + 1 }}
-                            className={classNames(styles['table-opt'], {
-                              [styles['table-opt-selected']]: operateShow >= 0 && operateShow === +i.data.Id,
-                            })}
-                            onClick={(e) => {
-                              if (!i.data.Type || i.data.Type === getEnvTypeByProjects()) {
-                                operateFunc('setCurrent', i.data)
-                              }
-                              if (i.data.Type === 'file') {
-                                operateFunc('openFile', i.data)
-                              }
-                            }}
-                            onContextMenu={() => {
-                              if (!i.data.Type || i.data.Type === getEnvTypeByProjects()) {
-                                projectContextMenu(i.data)
-                              }
-                            }}
-                          >
-                            <div className={styles['opt-content']}>
-                              <div className={styles['content-body']}>
-                                {projectHeader.map((item) => {
-                                  return (
-                                    <div
-                                      key={`${i.index}-${item.key}`}
-                                      style={{ ...item.style }}
-                                      className={styles['content-opt']}
-                                    >
-                                      {item.render ? (
-                                        item.render(i.data, i.index)
-                                      ) : (
-                                        <div className={styles['content-style']} title={i.data[item.key] || ''}>
-                                          {i.data[item.key] || '-'}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                            {/* { engineMode !== "remote" && ( */}
-                            <div style={{ width: 120 }} className={styles['opt-operate']}>
-                              {projectOperate(i.data)}
-                            </div>
-                            {/* )} */}
-                          </div>
-                        )
+                  {t('ProjectManage.localFiles')}
+                </div>
+                <ChevronRightIcon className={styles['icon-style']} />
+                <div
+                  className={styles['path-style']}
+                  onClick={() => {
+                    if (files.length > 1) {
+                      setLoading(true)
+                      setParams({
+                        Type: params.Type,
+                        Pagination: { ...params.Pagination, Page: 1 },
+                        FolderId: +files[0].Id,
                       })
-                    )}
-                    {loadMore && <div className={styles['table-loading-more']}>{t('ProjectManage.loading')}</div>}
+                      setTimeout(() => {
+                        setFiles([files[0]])
+                        update()
+                      }, 500)
+                    }
+                  }}
+                >
+                  {files[0].ProjectName}
+                </div>
+                {files.length > 1 && (
+                  <>
+                    <ChevronRightIcon className={styles['icon-style']} />
+                    <div className={styles['path-style']}>{files[1].ProjectName}</div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className={styles['project-table-wrapper']}>
+              <YakitSpin tip="Loading..." spinning={loading}>
+                <div className={styles['project-table-body']}>
+                  <div className={styles['table-header-wrapper']}>
+                    <div className={styles['header-titles']}>
+                      <div className={styles['titls-body']}>
+                        {projectHeader.map((item, index) => {
+                          return (
+                            <div key={item.key} style={{ ...item.style }} className={styles['title-opt']}>
+                              <div>{item.headerRender ? item.headerRender(index) : item.name}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {/* { engineMode !== "remote" &&  */}
+                    <div style={{ width: 120 }}>{t('YakitTable.action')}</div>
+                    {/* } */}
+                  </div>
+
+                  <div className={styles['table-content-wrapper']}>
+                    <ReactResizeDetector
+                      onResize={(width, height) => {
+                        if (!width || !height) {
+                          return
+                        }
+                        setVListHeight(height)
+                      }}
+                      handleWidth={true}
+                      handleHeight={true}
+                      refreshMode={'debounce'}
+                      refreshRate={50}
+                    />
+                    <div
+                      ref={containerRef as any}
+                      style={{ height: vlistHeigth, overflow: 'auto overlay', overflowAnchor: 'none' }}
+                    >
+                      <div ref={wrapperRef as any}>
+                        {__data.Projects.length === 0 ? (
+                          <>
+                            {files.length > 0 && (
+                              <div className={styles['table-empty-wrapper']}>
+                                <YakitEmpty
+                                  descriptionReactNode={
+                                    <>
+                                      <div className={styles['title-style']}>
+                                        <span className={styles['file-style']}>
+                                          {files[files.length - 1].ProjectName}
+                                        </span>{' '}
+                                        {t('ProjectManage.noProjectContent')}
+                                      </div>
+                                      <div className={styles['operate-btn']}>
+                                        <YakitButton
+                                          size="max"
+                                          onClick={() => operateFunc('newProject', files[files.length - 1])}
+                                        >
+                                          {t('ProjectManage.newProject')}
+                                        </YakitButton>
+                                        <YakitButton
+                                          size="max"
+                                          type="outline2"
+                                          onClick={() => operateFunc('import', files[files.length - 1])}
+                                        >
+                                          {t('ProjectManage.importProject')}
+                                        </YakitButton>
+                                      </div>
+                                    </>
+                                  }
+                                />
+                              </div>
+                            )}
+                            {params.ProjectName && (
+                              <div className={styles['table-empty-wrapper']}>
+                                <YakitEmpty
+                                  descriptionReactNode={
+                                    <div className={styles['title-style']}>{t('YakitEmpty.searchEmpty')}</div>
+                                  }
+                                />
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          list.map((i) => {
+                            return (
+                              <div
+                                key={i.index}
+                                style={{ height: 48 + 1 }}
+                                className={classNames(styles['table-opt'], {
+                                  [styles['table-opt-selected']]:
+                                    selectedProject?.Id === i.data.Id ||
+                                    (operateShow >= 0 && operateShow === +i.data.Id),
+                                })}
+                                onClick={() => {
+                                  if (i.data.Type === 'file') {
+                                    operateFunc('openFile', i.data)
+                                  } else {
+                                    setSelectedProject(i.data)
+                                  }
+                                }}
+                                onDoubleClick={() => {
+                                  if (!i.data.Type || i.data.Type === getEnvTypeByProjects()) {
+                                    operateFunc('setCurrent', i.data)
+                                  }
+                                }}
+                                onContextMenu={() => {
+                                  if (!i.data.Type || i.data.Type === getEnvTypeByProjects()) {
+                                    projectContextMenu(i.data)
+                                  }
+                                }}
+                              >
+                                <div className={styles['opt-content']}>
+                                  <div className={styles['content-body']}>
+                                    {projectHeader.map((item) => {
+                                      return (
+                                        <div
+                                          key={`${i.index}-${item.key}`}
+                                          style={{ ...item.style }}
+                                          className={styles['content-opt']}
+                                        >
+                                          {item.render ? (
+                                            item.render(i.data, i.index)
+                                          ) : (
+                                            <div className={styles['content-style']} title={i.data[item.key] || ''}>
+                                              {i.data[item.key] || '-'}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                                {/* { engineMode !== "remote" && ( */}
+                                <div style={{ width: 120 }} className={styles['opt-operate']}>
+                                  {projectOperate(i.data)}
+                                </div>
+                                {/* )} */}
+                              </div>
+                            )
+                          })
+                        )}
+                        {loadMore && <div className={styles['table-loading-more']}>{t('ProjectManage.loading')}</div>}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </YakitSpin>
             </div>
-          </YakitSpin>
+          </section>
         </div>
       </div>
 
@@ -1552,6 +1521,128 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         onSuccess={onTransferProjectHint}
         setVisible={(open: boolean) => setTransferShow({ visible: open })}
       />
+
+      <RuiYanDrawer
+        open={!!selectedProject}
+        title={selectedProject?.ProjectName || '项目详情'}
+        description="查看项目元数据，并使用真实项目服务完成后续操作"
+        width={640}
+        onClose={() => setSelectedProject(undefined)}
+        footer={
+          selectedProject ? (
+            <>
+              <RuiYanButton variant="secondary" onClick={() => setSelectedProject(undefined)}>
+                关闭
+              </RuiYanButton>
+              {selectedProject.ProjectName !== '[default]' && (selectedProject.OnlineSubTaskID || '').length === 0 && (
+                <RuiYanButton
+                  variant="secondary"
+                  onClick={() => {
+                    const project = selectedProject
+                    setSelectedProject(undefined)
+                    operateFunc('edit', project)
+                  }}
+                >
+                  {t('YakitButton.edit')}
+                </RuiYanButton>
+              )}
+              <RuiYanButton
+                variant="primary"
+                loading={loading}
+                onClick={() => {
+                  const project = selectedProject
+                  setSelectedProject(undefined)
+                  operateFunc('setCurrent', project)
+                }}
+              >
+                {t('ProjectManage.openProject')}
+              </RuiYanButton>
+            </>
+          ) : undefined
+        }
+      >
+        {selectedProject ? (
+          <div className={styles['project-detail']}>
+            <div className={styles['project-detail-tags']}>
+              <YakitTag color="info">项目</YakitTag>
+              {latestProject?.Id === selectedProject.Id ? <YakitTag color="success">当前使用</YakitTag> : null}
+              {(selectedProject.OnlineSubTaskID || '').length > 0 ? (
+                <YakitTag color="info">{t('ProjectManage.server')}</YakitTag>
+              ) : null}
+            </div>
+
+            <dl className={styles['project-detail-list']}>
+              <div>
+                <dt>项目名称</dt>
+                <dd>{selectedProject.ProjectName}</dd>
+              </div>
+              <div>
+                <dt>{t('ProjectManage.description')}</dt>
+                <dd>{selectedProject.Description || '-'}</dd>
+              </div>
+              <div>
+                <dt>{t('ProjectManage.storagePath')}</dt>
+                <dd className={styles['project-detail-path']}>
+                  <span>{selectedProject.DatabasePath || '-'}</span>
+                  {selectedProject.DatabasePath ? (
+                    <CopyComponents copyText={selectedProject.DatabasePath} onAfterCopy={() => {}} />
+                  ) : null}
+                </dd>
+              </div>
+              <div>
+                <dt>{t('ProjectManage.size')}</dt>
+                <dd>{selectedProject.FileSize || '-'}</dd>
+              </div>
+              <div>
+                <dt>创建时间</dt>
+                <dd>{formatTimestamp(selectedProject.CreatedAt)}</dd>
+              </div>
+              <div>
+                <dt>{t('ProjectManage.recentOperation')}</dt>
+                <dd>{formatTimestamp(selectedProject.UpdateAt)}</dd>
+              </div>
+              {selectedProject.ExternalProjectCode ? (
+                <div>
+                  <dt>{t('ProjectManage.projectCode')}</dt>
+                  <dd>{selectedProject.ExternalProjectCode}</dd>
+                </div>
+              ) : null}
+              {selectedProject.ExternalModule ? (
+                <div>
+                  <dt>{t('ProjectManage.moduleCode')}</dt>
+                  <dd>{selectedProject.ExternalModule}</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            <div className={styles['project-detail-actions']}>
+              <RuiYanButton
+                variant="secondary"
+                onClick={() => {
+                  const project = selectedProject
+                  setSelectedProject(undefined)
+                  operateFunc('encryption', project)
+                }}
+              >
+                {t('ProjectManage.encryptedExport')}
+              </RuiYanButton>
+              <RuiYanButton
+                variant="secondary"
+                onClick={() => {
+                  const project = selectedProject
+                  setSelectedProject(undefined)
+                  operateFunc('plaintext', project)
+                }}
+              >
+                {t('ProjectManage.plaintextExport')}
+              </RuiYanButton>
+              <RuiYanButton variant="secondary" onClick={() => operateFunc('copyPath', selectedProject)}>
+                {t('ProjectManage.copyPath')}
+              </RuiYanButton>
+            </div>
+          </div>
+        ) : null}
+      </RuiYanDrawer>
 
       <YakitHint
         visible={delShow}
@@ -2082,17 +2173,24 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
     return judgeProjectConfig(eeSystemConfig).find((item) => item.key === 'ExternalModule')
   }, [eeSystemConfig])
   return (
-    <YakitModal
+    <RuiYanModal
       title={headerTitle}
-      maskClosable={true}
-      closable={true}
-      centered={true}
-      footer={null}
-      width={448}
-      destroyOnClose={true}
-      visible={visible}
-      onCancel={onClose}
-      bodyStyle={{ padding: 0 }}
+      width={720}
+      open={visible}
+      onClose={onClose}
+      closeOnBackdrop={true}
+      footer={
+        transferShow.visible ? null : (
+          <>
+            <RuiYanButton variant="secondary" loading={loading} onClick={onClose}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton variant="primary" loading={loading} onClick={onSubmit}>
+              {submitTitle}
+            </RuiYanButton>
+          </>
+        )
+      }
     >
       <Form
         form={form}
@@ -2388,16 +2486,6 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
             )}
           </>
         )}
-        <Form.Item label={''}>
-          <div className={styles['form-btn-wrapper']}>
-            <YakitButton loading={loading} size="large" type="outline2" onClick={onClose}>
-              {t('YakitButton.cancel')}
-            </YakitButton>
-            <YakitButton loading={loading} size="large" htmlType="submit">
-              {submitTitle}
-            </YakitButton>
-          </div>
-        </Form.Item>
       </Form>
 
       <TransferProject
@@ -2417,7 +2505,7 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
           setTransferShow({ ...transferShow, visible: open })
         }}
       />
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 

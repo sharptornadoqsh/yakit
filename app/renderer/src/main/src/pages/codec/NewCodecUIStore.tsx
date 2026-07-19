@@ -11,7 +11,7 @@ import { OutlineArrowscollapseIcon, OutlineArrowsexpandIcon, OutlineSearchIcon }
 import { IMonacoEditor } from '@/utils/editors'
 import { InternalTextAreaProps, YakitInputProps } from '@/components/yakitUI/YakitInput/YakitInputType'
 import { YakitSelectProps } from '@/components/yakitUI/YakitSelect/YakitSelectType'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanModal } from '@/components/renyanUI'
 import { DefaultOptionType } from 'antd/lib/select'
 import { queryYakScriptList } from '../yakitStore/network'
 import { YakScript } from '../invoker/schema'
@@ -472,16 +472,14 @@ export const NewCodecEditor: React.FC<NewCodecEditorProps> = (props) => {
         {...props}
       />
       {isShowExtend && (
-        <YakitModal
-          title={null}
-          footer={null}
-          width={1200}
-          type={'white'}
-          closable={false}
-          maskClosable={false}
-          hiddenHeader={true}
-          visible={isShowExtend}
-          bodyStyle={{ padding: 0 }}
+        <RuiYanModal
+          title="扩展编辑器"
+          description="在独立工作区中编辑当前输入内容"
+          width={960}
+          closeOnBackdrop={false}
+          open={isShowExtend}
+          onClose={() => setShowExtend(false)}
+          bodyClassName={styles['extended-editor-dialog']}
         >
           <NewCodecEditorBody
             extend={true}
@@ -494,7 +492,7 @@ export const NewCodecEditor: React.FC<NewCodecEditorProps> = (props) => {
             }}
             {...props}
           />
-        </YakitModal>
+        </RuiYanModal>
       )}
     </>
   )

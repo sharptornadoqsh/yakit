@@ -1,12 +1,13 @@
 @use '../securityTool.scss' as securityTool;
 
 .brute-wrapper {
-  display: flex;
+  display: grid;
   flex: 1;
-  gap: 8px;
-  padding: 8px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
   overflow: hidden;
-  background: #eef4f4;
+  background: var(--ruiyan-color-background);
 }
 
 .protocol-pane,
@@ -16,13 +17,13 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid #cbdadc;
-  border-radius: 3px;
-  background: var(--Colors-Use-Basic-Background);
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-lg);
+  background: var(--ruiyan-color-surface);
 }
 
 .protocol-pane {
-  flex: 0 0 238px;
+  width: 240px;
 }
 
 .protocol-pane-hidden {
@@ -36,10 +37,10 @@
 .pane-kicker {
   flex-shrink: 0;
   padding: 6px 10px;
-  border-bottom: 1px solid #d5e1e3;
-  color: #42636a;
-  background: #f3f8f8;
-  font-size: 10px;
+  border-bottom: 1px solid var(--ruiyan-color-border);
+  color: var(--ruiyan-color-text);
+  background: var(--ruiyan-color-surface);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -101,13 +102,19 @@
 }
 
 .brute-form-wrapper {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: all 0.3s ease;
-  padding-top: 16px;
+  display: block;
   :global {
     .ant-form {
       overflow: hidden;
+    }
+    .ant-form-item-row {
+      display: flex;
+      flex-direction: column;
+    }
+    .ant-form-item-label,
+    .ant-form-item-control {
+      max-width: 100%;
+      text-align: left;
     }
   }
   .plugin-execute-form-item {
@@ -126,10 +133,35 @@
   }
 }
 .brute-form-wrapper-hidden {
-  grid-template-rows: 0fr;
-  padding-top: 0;
+  display: none;
+}
+
+.brute-content-grid {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
+  gap: 12px;
+}
+
+.brute-config-pane,
+.brute-result-pane {
+  min-width: 0;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-lg);
+  background: var(--ruiyan-color-surface);
+}
+
+.brute-result-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .brute-execute-result-wrapper {
-  // padding: 12px;
+  min-height: 0;
+  flex: 1;
 }

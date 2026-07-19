@@ -473,47 +473,6 @@ $keyColor: map-keys($colors);
   }
 }
 
-.tab-menu-renyan {
-  > .tab-menu-first {
-    min-height: 34px;
-    padding: 4px 8px;
-    gap: 4px;
-    background: #132f35;
-
-    &::before,
-    &::after {
-      display: none;
-    }
-
-    .tab-menu-first-item {
-      height: 25px;
-      border: 1px solid rgba(168, 207, 207, 0.16);
-      border-radius: 2px;
-      color: #9eb5b9;
-      background: rgba(255, 255, 255, 0.025);
-
-      &:hover {
-        color: #e3f4f2;
-        background: rgba(12, 175, 159, 0.1);
-      }
-    }
-
-    .tab-menu-first-item-active {
-      color: #effffe;
-      background: rgba(12, 175, 159, 0.18);
-      border-color: rgba(90, 211, 198, 0.42);
-
-      &::before {
-        border-color: #35d0c0 !important;
-      }
-
-      &::after {
-        display: none;
-      }
-    }
-  }
-}
-
 .tab-menu-sub-item {
   display: flex;
   height: 32px;
@@ -689,7 +648,7 @@ $keyColor: map-keys($colors);
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 8px 16px 13px;
+  padding: 16px;
   overflow: auto;
 }
 

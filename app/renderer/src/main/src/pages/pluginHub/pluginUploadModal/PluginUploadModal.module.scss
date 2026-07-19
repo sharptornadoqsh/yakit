@@ -1,4 +1,8 @@
 // -------------------- PluginUploadModal ↓↓↓ --------------------
+.plugin-upload-modal-body {
+  padding: 0;
+}
+
 .plugin-upload-modal {
   padding: 24px;
   padding-top: 0;
@@ -24,7 +28,8 @@
   flex-direction: column;
   gap: 8px;
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(136, 99, 247, 0.1) 0%, rgba(247, 170, 99, 0.1) 100%);
+  background: var(--ruiyan-color-surface-muted, #f6f8fc);
+  border: 1px solid var(--ruiyan-color-border, #dce3ed);
   .header-title {
     color: var(--Colors-Use-Neutral-Text-1-Title);
     font-size: 12px;

@@ -12,6 +12,8 @@ import { YakitModalConfirm } from '@/components/yakitUI/YakitModal/YakitModalCon
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { yakitAuth } from '@/services/electronBridge'
+import { RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
 
 export interface LoginProp {
   visible: boolean
@@ -23,11 +25,21 @@ interface LoginParamsProp {
 }
 
 const Login: React.FC<LoginProp> = (props) => {
-  const { t } = useI18nNamespaces(['core'])
+  const { t } = useI18nNamespaces(['core', 'yakitUi'])
   const [loading, setLoading] = useState<boolean>(false)
   // 打开企业登录面板
   const openEnterpriseModal = () => {
     props.onCancel()
+    if (RENYAN_SHELL_ENABLED) {
+      let modal: ReturnType<typeof showRuiYanModal>
+      modal = showRuiYanModal({
+        title: t('Login.login'),
+        width: 480,
+        closeOnBackdrop: false,
+        content: <ConfigPrivateDomain onClose={() => modal.destroy()} enterpriseLogin={true} />,
+      })
+      return modal
+    }
     const m = showModal({
       title: '',
       centered: true,
@@ -71,6 +83,27 @@ const Login: React.FC<LoginProp> = (props) => {
     const cleanup = yakitAuth.onSignInData((res: any) => {
       const { ok, info } = res
       if (ok) {
+        if (RENYAN_SHELL_ENABLED) {
+          let modal: ReturnType<typeof showRuiYanModal>
+          const closeLogin = () => {
+            setTimeout(() => setLoading(false), 200)
+            props.onCancel()
+          }
+          modal = showRuiYanModal({
+            title: t('Login.dataSync'),
+            width: 480,
+            content: t('Login.syncDataConfirm'),
+            confirmText: t('YakitButton.confirm'),
+            cancelText: t('YakitButton.cancel'),
+            onClose: closeLogin,
+            onConfirm: () => {
+              apiDownloadPluginMine()
+              closeLogin()
+              modal.destroy()
+            },
+          })
+          return
+        }
         const m = YakitModalConfirm({
           type: 'white',
           title: (modalT) => modalT('Login.dataSync'),
@@ -98,6 +131,38 @@ const Login: React.FC<LoginProp> = (props) => {
       cleanup()
     }
   }, [])
+  const loginContent = (
+    <YakitSpin spinning={loading}>
+      <div className="login-type-body">
+        {!RENYAN_SHELL_ENABLED && <h2 className="login-text">{t('Login.login')}</h2>}
+        <div className="login-icon-body">
+          <div className="login-icon" onClick={() => fetchLogin('github')}>
+            <div className="login-icon-text">
+              <GithubOutlined className="type-icon" />
+              {t('Login.loginWithGithub')}
+            </div>
+            <RightOutlined className="icon-right" />
+          </div>
+          <div className="login-icon" onClick={() => fetchLogin('wechat')}>
+            <div className="login-icon-text">
+              <WechatOutlined className="type-icon icon-wx" />
+              {t('Login.loginWithWechat')}
+            </div>
+            <RightOutlined className="icon-right" />
+          </div>
+        </div>
+      </div>
+    </YakitSpin>
+  )
+
+  if (RENYAN_SHELL_ENABLED) {
+    return (
+      <RuiYanModal open={props.visible} title={t('Login.login')} width={480} onClose={props.onCancel}>
+        {loginContent}
+      </RuiYanModal>
+    )
+  }
+
   return (
     <Modal
       visible={props.visible}
@@ -108,28 +173,7 @@ const Login: React.FC<LoginProp> = (props) => {
       width={409}
       style={{ top: '25%' }}
     >
-      <YakitSpin spinning={loading}>
-        <div className="login-type-body">
-          <h2 className="login-text">{t('Login.login')}</h2>
-          <div className="login-icon-body">
-            {/*<div className='login-icon' onClick={() => githubAuth()}>*/}
-            <div className="login-icon" onClick={() => fetchLogin('github')}>
-              <div className="login-icon-text">
-                <GithubOutlined className="type-icon" />
-                {t('Login.loginWithGithub')}
-              </div>
-              <RightOutlined className="icon-right" />
-            </div>
-            <div className="login-icon" onClick={() => fetchLogin('wechat')}>
-              <div className="login-icon-text">
-                <WechatOutlined className="type-icon icon-wx" />
-                {t('Login.loginWithWechat')}
-              </div>
-              <RightOutlined className="icon-right" />
-            </div>
-          </div>
-        </div>
-      </YakitSpin>
+      {loginContent}
     </Modal>
   )
 }

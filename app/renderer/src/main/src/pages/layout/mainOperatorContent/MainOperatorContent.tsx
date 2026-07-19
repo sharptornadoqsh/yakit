@@ -73,7 +73,6 @@ import { useStore } from '@/store'
 import { getRemoteProjectValue, getRemoteValue, setRemoteProjectValue, setRemoteValue } from '@/utils/kv'
 import { GroupCount, QueryYakScriptsResponse } from '@/pages/invoker/schema'
 import { DownloadAllPlugin } from '@/pages/simpleDetect/SimpleDetect'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import { yakitFailed, yakitNotify } from '@/utils/notification'
 import { randomString } from '@/utils/randomUtil'
@@ -182,8 +181,9 @@ import { SoftMode, useSoftMode, YakitModeEnum } from '@/store/softMode'
 import { RemoteSoftModeGV } from '@/enums/softMode'
 import { debugToPrintLogs } from '@/utils/logCollection'
 import { RenyanPageHeader } from '@/components/layout/RenyanPageHeader'
-import { isRuiYanTargetRoute, RuiYanPage } from '@/components/renyanUI'
+import { isRuiYanTargetRoute, RuiYanButton, RuiYanModal, RuiYanPage, showRuiYanModal } from '@/components/renyanUI'
 import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
 
 const BatchAddNewGroup = React.lazy(() => import('./BatchAddNewGroup'))
 const BatchEditGroup = React.lazy(() => import('./BatchEditGroup/BatchEditGroup'))
@@ -2670,14 +2670,14 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
       }
       ipcRenderer.invoke('QueryYakScript', newParams).then((item: QueryYakScriptsResponse) => {
         if (item.Data.length === 0) {
-          const m = showYakitModal({
-            title: (modalT) => modalT('MainOperatorContent.importPlugin'),
-            type: 'white',
-            content: <DownloadAllPlugin onClose={() => m.destroy()} />,
-            bodyStyle: { padding: 24 },
-            footer: null,
+          let modal: ReturnType<typeof showRuiYanModal>
+          modal = showRuiYanModal({
+            title: t('MainOperatorContent.importPlugin'),
+            width: 720,
+            closeOnBackdrop: false,
+            content: <DownloadAllPlugin onClose={() => modal.destroy()} />,
           })
-          return m
+          return modal
         }
       })
     }
@@ -3291,14 +3291,16 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
     switch (routeKey) {
       case YakitRoute.HTTPFuzzer:
         setRecoveryModel('coverage')
-        const m = showYakitModal({
-          title: (modalT) => modalT('MainOperatorContent.restoreTab'),
-          footer: null,
+        let modal: ReturnType<typeof showRuiYanModal>
+        modal = showRuiYanModal({
+          title: t('MainOperatorContent.restoreTab'),
+          width: 720,
+          closeOnBackdrop: false,
           content: (
             <RestoreTabContent
               setSecondaryTabsNum={setSecondaryTabsNum}
               setRecoveryModel={setRecoveryModel}
-              onClose={() => m.destroy()}
+              onClose={() => modal.destroy()}
               onRestore={onRestoreHTTPFuzzer}
             />
           ),
@@ -3448,23 +3450,33 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
           />
         </YakitSpin>
       </div>
-      <YakitModal
-        visible={bugTestShow}
-        onCancel={() => setBugTestShow(false)}
-        onOk={() => {
-          if (!bugTestValue) {
-            yakitNotify('error', t('MainOperatorContent.selectTypeAgain'))
-            return
-          }
-          addBugTest(2)
-          setBugTestShow(false)
-        }}
-        type="white"
-        title={<></>}
-        closable={true}
-        bodyStyle={{ padding: 0 }}
+      <RuiYanModal
+        open={bugTestShow}
+        onClose={() => setBugTestShow(false)}
+        closeOnBackdrop={false}
+        width={480}
+        title={t('MainOperatorContent.specialVulnType')}
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={() => setBugTestShow(false)}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton
+              onClick={() => {
+                if (!bugTestValue) {
+                  yakitNotify('error', t('MainOperatorContent.selectTypeAgain'))
+                  return
+                }
+                addBugTest(2)
+                setBugTestShow(false)
+              }}
+            >
+              {t('YakitButton.confirm')}
+            </RuiYanButton>
+          </>
+        }
       >
-        <div style={{ padding: '0 24px' }}>
+        <div>
           <Form.Item
             label={t('MainOperatorContent.specialVulnType')}
             help={
@@ -3499,7 +3511,7 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
             </YakitSelect>
           </Form.Item>
         </div>
-      </YakitModal>
+      </RuiYanModal>
     </Content>
   )
 })
@@ -3559,14 +3571,8 @@ const TabContent: React.FC<TabContentProps> = React.memo((props) => {
       firstTabMenuBodyHeight: height,
     })
   })
-  const activePage = pageCache.find((item) => item.routeKey === currentTabKey)
-
   return (
-    <div
-      className={classNames(styles['tab-menu'], {
-        [styles['tab-menu-renyan']]: isRuiYanTargetRoute(activePage?.route),
-      })}
-    >
+    <div className={styles['tab-menu']}>
       <ReactResizeDetector
         onResize={(_, height) => {
           if (!height) return
@@ -3577,15 +3583,17 @@ const TabContent: React.FC<TabContentProps> = React.memo((props) => {
         refreshMode={'debounce'}
         refreshRate={50}
       />
-      <TabList
-        softMode={softMode}
-        pageCache={pageCache}
-        setPageCache={setPageCache}
-        currentTabKey={currentTabKey}
-        setCurrentTabKey={setCurrentTabKey}
-        onRemove={onRemove}
-        onDragEnd={onDragEnd}
-      />
+      {!RENYAN_SHELL_ENABLED ? (
+        <TabList
+          softMode={softMode}
+          pageCache={pageCache}
+          setPageCache={setPageCache}
+          currentTabKey={currentTabKey}
+          setCurrentTabKey={setCurrentTabKey}
+          onRemove={onRemove}
+          onDragEnd={onDragEnd}
+        />
+      ) : null}
       <TabChildren
         softMode={softMode}
         pageCache={pageCache}
@@ -3613,12 +3621,8 @@ const TabChildren: React.FC<TabChildrenProps> = React.memo((props) => {
     <>
       {pageCache.map((pageItem, index) => {
         const useRuiYanWorkspace = isRuiYanTargetRoute(pageItem.route)
-        const pageHeader = currentTabKey === pageItem.routeKey && (
-          <RenyanPageHeader
-            route={pageItem.route}
-            fallbackTitle={pageItem.verbose}
-            onNavigateHome={() => openMultipleMenuPage({ route: YakitRoute.NewHome })}
-          />
+        const pageHeader = useRuiYanWorkspace && currentTabKey === pageItem.routeKey && (
+          <RenyanPageHeader route={pageItem.route} fallbackTitle={pageItem.verbose} />
         )
         const pageContent = (
           <div
@@ -4091,6 +4095,7 @@ const SubTabList: React.FC<SubTabListProps> = React.memo((props) => {
         softMode={softMode}
         currentTabKey={currentTabKey}
         ref={subTabsRef}
+        headless={RENYAN_SHELL_ENABLED}
         onFocusPage={onFocusPage}
         pageItem={pageItem}
         subPage={subPage}
@@ -4116,6 +4121,7 @@ const SubTabs: React.FC<SubTabsProps> = React.memo(
     const {
       softMode,
       currentTabKey,
+      headless = false,
       pageItem,
       onFocusPage,
       subPage,
@@ -5879,6 +5885,7 @@ const SubTabs: React.FC<SubTabsProps> = React.memo(
     const isWebFuzzerRoute = useCreation(() => {
       return currentTabKey === YakitRoute.HTTPFuzzer
     }, [currentTabKey])
+    if (headless) return null
     return (
       <DragDropContext
         onDragEnd={onSubMenuDragEnd}

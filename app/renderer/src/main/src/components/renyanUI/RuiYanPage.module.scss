@@ -7,13 +7,252 @@
   flex-direction: column;
   overflow: hidden;
   color: var(--ruiyan-color-text);
-  background:
-    linear-gradient(90deg, rgb(22 119 255 / 2%) 1px, transparent 1px),
-    linear-gradient(rgb(22 119 255 / 2%) 1px, transparent 1px), var(--ruiyan-color-background);
-  background-size: 24px 24px;
+  background: var(--ruiyan-color-background);
+  animation: ruiyan-page-in var(--ruiyan-duration-hover) ease both;
 }
 
 .ruiyan-page > :last-child {
   min-height: 0;
   flex: 1;
+}
+
+.ruiyan-page :global(.ant-tabs-nav) {
+  min-height: 42px;
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--ruiyan-color-surface);
+  border-bottom: 1px solid var(--ruiyan-color-border);
+}
+
+.ruiyan-page :global(.ant-tabs-nav::before),
+.ruiyan-page :global(.ant-tabs-ink-bar) {
+  display: none;
+}
+
+.ruiyan-page :global(.ant-tabs-tab) {
+  min-height: 30px;
+  margin: 0 4px 0 0 !important;
+  padding: 5px 11px !important;
+  color: var(--ruiyan-color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--ruiyan-radius-sm);
+  transition:
+    color var(--ruiyan-duration-fast) ease,
+    background var(--ruiyan-duration-fast) ease,
+    border-color var(--ruiyan-duration-fast) ease;
+}
+
+.ruiyan-page :global(.ant-tabs-tab:hover) {
+  color: var(--ruiyan-color-primary);
+  background: var(--ruiyan-color-primary-soft);
+}
+
+.ruiyan-page :global(.ant-tabs-tab.ant-tabs-tab-active) {
+  color: var(--ruiyan-color-primary);
+  background: var(--ruiyan-color-primary-soft);
+  border-color: rgb(22 119 255 / 18%);
+}
+
+.ruiyan-page :global(.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: inherit;
+  font-weight: 600;
+}
+
+.ruiyan-page :global(.ant-card) {
+  background: var(--ruiyan-color-surface);
+  border-color: var(--ruiyan-color-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.ruiyan-page :global(.ant-card-head) {
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom-color: var(--ruiyan-color-border);
+}
+
+.ruiyan-page :global(.ant-card-body) {
+  padding: 16px;
+}
+
+.ruiyan-page :global(.ant-input),
+.ruiyan-page :global(.ant-input-affix-wrapper),
+.ruiyan-page :global(.ant-input-number),
+.ruiyan-page :global(.ant-select:not(.ant-select-customize-input) .ant-select-selector),
+.ruiyan-page :global(.ant-picker) {
+  min-height: 36px;
+  color: var(--ruiyan-color-text);
+  background: var(--ruiyan-color-surface);
+  border-color: var(--ruiyan-color-border-strong);
+  border-radius: var(--ruiyan-radius-sm) !important;
+  box-shadow: none !important;
+}
+
+.ruiyan-page :global(.ant-input:hover),
+.ruiyan-page :global(.ant-input-affix-wrapper:hover),
+.ruiyan-page :global(.ant-input-number:hover),
+.ruiyan-page :global(.ant-select:not(.ant-select-disabled):hover .ant-select-selector),
+.ruiyan-page :global(.ant-picker:hover) {
+  border-color: var(--ruiyan-color-primary);
+}
+
+.ruiyan-page :global(.ant-input:focus),
+.ruiyan-page :global(.ant-input-affix-wrapper-focused),
+.ruiyan-page :global(.ant-input-number-focused),
+.ruiyan-page :global(.ant-select-focused .ant-select-selector),
+.ruiyan-page :global(.ant-picker-focused) {
+  border-color: var(--ruiyan-color-primary) !important;
+  box-shadow: 0 0 0 3px rgb(22 119 255 / 12%) !important;
+}
+
+.ruiyan-page :global(.ant-btn),
+.ruiyan-page :global([class*='yakit-button']) {
+  min-height: 36px;
+  border-radius: var(--ruiyan-radius-sm);
+}
+
+.ruiyan-page :global(.ant-table),
+.ruiyan-page :global(.ant-table-container) {
+  color: var(--ruiyan-color-text);
+  background: var(--ruiyan-color-surface);
+  border-color: var(--ruiyan-color-border) !important;
+}
+
+.ruiyan-page :global(.ant-table-container) {
+  overflow: hidden;
+  border-radius: 9px;
+}
+
+.ruiyan-page :global(.ant-table-thead > tr > th) {
+  height: 40px;
+  padding: 8px 12px;
+  color: var(--ruiyan-color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--ruiyan-color-surface-muted);
+  border-bottom-color: var(--ruiyan-color-border);
+}
+
+.ruiyan-page :global(.ant-table-tbody > tr > td) {
+  height: 40px;
+  padding: 8px 12px;
+  border-bottom-color: var(--ruiyan-color-border);
+}
+
+.ruiyan-page :global(.ant-table-tbody > tr.ant-table-row:hover > td) {
+  background: rgb(22 119 255 / 4%);
+}
+
+.ruiyan-page :global(.ant-empty) {
+  margin: 12px 0;
+}
+
+.ruiyan-page :global(.ant-empty-image) {
+  display: none;
+}
+
+.ruiyan-page :global(.ant-empty-description) {
+  color: var(--ruiyan-color-text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ruiyan-page :global([class*='virtual-table-body']) {
+  height: 100%;
+  min-height: 0;
+}
+
+.ruiyan-page :global([class*='virtual-table-body'] [class*='virtual-table-list-container']) {
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-bottom: 22px;
+  scrollbar-color: rgb(125 152 184 / 34%) transparent;
+  scrollbar-width: thin;
+}
+
+.ruiyan-page :global([class*='virtual-table-list-container']::-webkit-scrollbar) {
+  width: 5px;
+  height: 5px;
+}
+
+.ruiyan-page :global([class*='virtual-table-list-container']::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+.ruiyan-page :global([class*='virtual-table-list-container']::-webkit-scrollbar-thumb) {
+  background: rgb(125 152 184 / 34%);
+  border-radius: 999px;
+}
+
+.ruiyan-page :global([class*='virtual-table-list-container']::-webkit-scrollbar-thumb:hover) {
+  background: rgb(125 152 184 / 52%);
+}
+
+.ruiyan-page :global([class*='virtual-table-body'] [class*='virtual-table-list-pagination']) {
+  bottom: 3px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.ruiyan-page :global([class*='virtual-table-list-pagination'] [class*='pagination-loading']),
+.ruiyan-page :global([class*='virtual-table-list-pagination'] [class*='pagination-text']) {
+  height: 18px;
+  color: var(--ruiyan-color-text-tertiary);
+  font-size: 10px;
+  line-height: 18px;
+}
+
+.ruiyan-page
+  :global(
+    [class*='virtual-table-body']:not(:has([class*='virtual-table-row-cell'])) [class*='virtual-table-list-pagination']
+  ) {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.ruiyan-page
+  :global([class*='virtual-table-body']:not(:has([class*='virtual-table-row-cell'])) [class*='pagination-text']) {
+  width: max-content;
+  margin: 0 auto;
+  padding: 0 10px;
+  visibility: visible;
+}
+
+.ruiyan-page :global([class*='no-more-text']),
+.ruiyan-page :global([class*='no-more-wrapper']),
+.ruiyan-page :global([class*='time-line-item-bottom']),
+.ruiyan-page :global([class*='list-bottom']) {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--ruiyan-color-text-tertiary);
+  font-size: 10px;
+  line-height: 16px;
+  background: transparent;
+}
+
+.ruiyan-page[data-ruiyan-layout='settings-center'] > :last-child,
+.ruiyan-page[data-ruiyan-layout='configuration-center'] > :last-child,
+.ruiyan-page[data-ruiyan-layout='team-administration'] > :last-child,
+.ruiyan-page[data-ruiyan-layout='role-administration'] > :last-child {
+  background: var(--ruiyan-color-background);
+}
+
+@keyframes ruiyan-page-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ruiyan-page,
+  .ruiyan-page :global(.ant-tabs-tab) {
+    animation: none;
+    transition: none;
+  }
 }

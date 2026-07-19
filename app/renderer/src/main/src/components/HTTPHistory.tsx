@@ -30,7 +30,6 @@ import {
   OutlineFilterIcon,
   OutlineLog2Icon,
   OutlineMessageCirclePlusIcon,
-  OutlinePlusIcon,
   OutlineSearchIcon,
   OutlineXIcon,
 } from '@/assets/icon/outline'
@@ -81,7 +80,6 @@ import MITMContext from '@/pages/mitm/Context/MITMContext'
 import { RemoteGV } from '@/yakitGV'
 import { cloneDeep } from 'lodash'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
-import { YakitSideTab } from './yakitSideTab/YakitSideTab'
 import { YakitTabsProps } from './yakitSideTab/YakitSideTabType'
 import { JSONParseLog } from '@/utils/tool'
 import { histroyAiStore } from '@/pages/ai-agent/store/ChatDataStore'
@@ -93,6 +91,7 @@ import { FiltersItemProps } from './TableVirtualResize/TableVirtualResizeType'
 import { HTTPFlowRuleDataFilter } from './HTTPFlowTable/HTTPFlowRuleDataFilter'
 import { useCampare } from '@/hook/useCompare/useCompare'
 import { useBuiltinTagList } from './HTTPFlowTable/useBuiltinTagList'
+import { RuiYanButton, RuiYanDrawer, RuiYanEmptyState, RuiYanIconButton, RuiYanSegmented } from './renyanUI'
 
 const { ipcRenderer } = window.require('electron')
 const { YakitPanel } = YakitCollapse
@@ -148,10 +147,10 @@ export const HistoryTab: YakitTabsProps[] = [
 const HTTPHistoryInner: React.FC<HTTPHistoryProp> = (props) => {
   const { renderHistoryAIReActChat, setShowFreeChat, historyAIReActChatBridge, focusModeLoop } = useHistoryAIReActChat()
   const { pageType, ...historyProps } = props
-  const { t, i18n } = useI18nNamespaces(['history'])
+  const { t } = useI18nNamespaces(['history'])
   // #region 左侧tab
   const [activeKey, setActiveKey] = useState<string>('web-tree')
-  const [openTabsFlag, setOpenTabsFlag] = useState<boolean>(true)
+  const [openTabsFlag, setOpenTabsFlag] = useState<boolean>(false)
   useEffect(() => {
     getRemoteValue(RemoteHistoryGV.HistoryLeftTabs).then((setting: string) => {
       if (setting) {
@@ -179,21 +178,6 @@ const HTTPHistoryInner: React.FC<HTTPHistoryProp> = (props) => {
     { wait: 300 },
   )
 
-  const ResizeBoxProps = useCreation(() => {
-    let p = {
-      firstRatio: '20%',
-      secondRatio: '80%',
-    }
-
-    if (activeKey === 'rules' && openTabsFlag) {
-      p.firstRatio = '470px'
-    } else if (openTabsFlag) {
-      p.firstRatio = '20%'
-    } else {
-      p.firstRatio = '24px'
-    }
-    return p
-  }, [openTabsFlag, activeKey])
   // #endregion
 
   // #region 网站树、进程
@@ -291,79 +275,103 @@ const HTTPHistoryInner: React.FC<HTTPHistoryProp> = (props) => {
 
   return (
     <div className={styles.hTTPHistory} ref={httpHistoryRef}>
-      <YakitResizeBox
-        isVer={false}
-        freeze={openTabsFlag}
-        isRecalculateWH={openTabsFlag}
-        firstNode={() => (
-          <div className={styles['hTTPHistory-left']}>
-            <YakitSideTab
-              type="horizontal"
-              key={i18n.language}
-              t={t}
-              yakitTabs={HistoryTab}
-              activeKey={activeKey}
-              onActiveKey={onActiveKey}
-              show={openTabsFlag}
-              setShow={setOpenTabsFlag}
+      <HTTPFlowRealTimeTableAndEditor
+        pageType={pageType}
+        includeInUrl={includeInUrl}
+        curProcess={curProcess}
+        curTags={curTags}
+        builtinTagList={builtinTagList}
+        mitmAggregateFilterRows={mitmAggregateFilterRows}
+        onQueryParams={onQueryParams}
+        onSetTableTotal={setHttpFlowTableDataLength}
+        onSetSelectedHttpFlowIds={onSetSelectedHttpFlowIds}
+        onRegisterTableSelectApi={onRegisterTableSelectApi}
+        setOnlyShowFirstNode={setOnlyShowFirstNode}
+        setSecondNodeVisible={setSecondNodeVisible}
+        filterTagDom={
+          <RuiYanButton variant="secondary" onClick={() => setOpenTabsFlag(true)}>
+            高级条件
+          </RuiYanButton>
+        }
+        detailMode="drawer"
+        showHistoryAnalysisBtn
+        {...historyProps}
+      />
+      <RuiYanDrawer
+        open={openTabsFlag}
+        title="高级条件"
+        description="按网站、进程标签或规则缩小历史流量范围"
+        width={640}
+        onClose={() => setOpenTabsFlag(false)}
+        footer={
+          <RuiYanButton variant="primary" onClick={() => setOpenTabsFlag(false)}>
+            完成
+          </RuiYanButton>
+        }
+      >
+        <div className={styles['history-filter-drawer']}>
+          <RuiYanSegmented
+            value={activeKey}
+            label="高级条件类型"
+            items={[
+              { value: 'web-tree', label: t('HTTPHistory.websiteTree') },
+              { value: 'process', label: t('RangeInputNumberTableWrapper.filter') },
+              { value: 'rules', label: t('HTTPFlowExtractedDataTable.ruleData') },
+              { value: 'ai', label: t('HTTPHistory.AI') },
+            ]}
+            onChange={onActiveKey}
+          />
+          <div className={styles['history-filter-content']}>
+            <ReactResizeDetector
+              onResize={(width, height) => {
+                if (!width || !height) return
+                setTreeWrapHeight(height)
+              }}
+              handleWidth={true}
+              handleHeight={true}
+              refreshMode="debounce"
+              refreshRate={50}
             />
-            <div className={styles['tab-content']}>
-              <ReactResizeDetector
-                onResize={(width, height) => {
-                  if (!width || !height) return
-                  setTreeWrapHeight(height)
-                }}
-                handleWidth={true}
-                handleHeight={true}
-                refreshMode={'debounce'}
-                refreshRate={50}
+            <div className={styles['webTree-wrapper']} hidden={activeKey !== 'web-tree'}>
+              <WebTree
+                ref={webTreeRef}
+                height={treeWrapHeight - 32}
+                searchPlaceholder={t('HTTPHistory.pleaseEnterDomainToSearch')}
+                treeExtraQueryparams={treeQueryparams}
+                refreshTreeFlag={refreshFlag}
+                multiple
+                onSelectNodesKeys={(selectKeys) => setIncludeInUrl(selectKeys.map((item) => String(item)))}
               />
-              <div
-                className={styles['webTree-wrapper']}
-                style={{ display: activeKey === 'web-tree' ? 'block' : 'none' }}
-              >
-                <WebTree
-                  ref={webTreeRef}
-                  height={treeWrapHeight - 30}
-                  searchPlaceholder={t('HTTPHistory.pleaseEnterDomainToSearch')}
-                  treeExtraQueryparams={treeQueryparams}
-                  refreshTreeFlag={refreshFlag}
-                  multiple
-                  onSelectNodesKeys={(selectKeys) => setIncludeInUrl(selectKeys.map((i) => i + ''))}
-                ></WebTree>
-              </div>
-              <div
-                className={styles['process-wrapper']}
-                style={{ display: activeKey === 'process' ? 'block' : 'none' }}
-              >
-                <HistoryProcess
-                  queryparamsStr={processQueryparams}
-                  refreshProcessFlag={refreshFlag}
-                  curProcess={curProcess}
-                  curTags={curTags}
-                  onSetCurTags={setCurTags}
-                  onSetCurProcess={setCurProcess}
-                  setBuiltinTagList={setBuiltinTagList}
-                  resetTableAndEditorShow={(table, editor) => {
-                    setOnlyShowFirstNode(table)
-                    setSecondNodeVisible(editor)
-                  }}
-                ></HistoryProcess>
-              </div>
-              <div className={styles['process-wrapper']} style={{ display: activeKey === 'rules' ? 'block' : 'none' }}>
-                <HTTPFlowRuleDataFilter
-                  baseParams={historyProps.params}
-                  queryparamsStr={rulesQueryparams}
-                  onSetFilterRows={setMitmAggregateFilterRows}
-                  httpFlowTableDataLength={httpFlowTableDataLength}
-                  resetTableAndEditorShow={(table, editor) => {
-                    setOnlyShowFirstNode(table)
-                    setSecondNodeVisible(editor)
-                  }}
-                />
-              </div>
-              {activeKey === 'ai' &&
-                renderHistoryAIReActChat({
+            </div>
+            <div className={styles['process-wrapper']} hidden={activeKey !== 'process'}>
+              <HistoryProcess
+                queryparamsStr={processQueryparams}
+                refreshProcessFlag={refreshFlag}
+                curProcess={curProcess}
+                curTags={curTags}
+                onSetCurTags={setCurTags}
+                onSetCurProcess={setCurProcess}
+                setBuiltinTagList={setBuiltinTagList}
+                resetTableAndEditorShow={(table, editor) => {
+                  setOnlyShowFirstNode(table)
+                  setSecondNodeVisible(editor)
+                }}
+              />
+            </div>
+            <div className={styles['process-wrapper']} hidden={activeKey !== 'rules'}>
+              <HTTPFlowRuleDataFilter
+                baseParams={historyProps.params}
+                queryparamsStr={rulesQueryparams}
+                onSetFilterRows={setMitmAggregateFilterRows}
+                httpFlowTableDataLength={httpFlowTableDataLength}
+                resetTableAndEditorShow={(table, editor) => {
+                  setOnlyShowFirstNode(table)
+                  setSecondNodeVisible(editor)
+                }}
+              />
+            </div>
+            {activeKey === 'ai'
+              ? renderHistoryAIReActChat({
                   externalParameters: {
                     isOpen: false,
                     rightIcon: {
@@ -371,65 +379,37 @@ const HTTPHistoryInner: React.FC<HTTPHistoryProp> = (props) => {
                       dataDetails: { type: 'text2' },
                       add: (
                         <Tooltip title={t('HTTPHistory.new_session')}>
-                          <YakitButton
-                            type="text2"
+                          <RuiYanIconButton
+                            label={t('HTTPHistory.new_session')}
                             icon={<OutlineMessageCirclePlusIcon />}
                             onClick={() => historyAIReActChatBridge.onNewChat()}
                           />
                         </Tooltip>
                       ),
                       close: (
-                        <YakitButton type="text2" icon={<OutlineXIcon />} onClick={() => setOpenTabsFlag(false)} />
+                        <RuiYanIconButton
+                          label="关闭高级条件"
+                          icon={<OutlineXIcon />}
+                          onClick={() => setOpenTabsFlag(false)}
+                        />
                       ),
                       taskDetails: true,
                     },
                     footerRightTypes: [
                       {
                         type: AIInputFooterRightEnum.AIFocusMode,
-                        props: {
-                          value: focusModeLoop,
-                          onChange: () => {},
-                          disabled: true,
-                        },
+                        props: { value: focusModeLoop, onChange: () => {}, disabled: true },
                       },
                     ],
                     filterMentionType: ['focusMode'],
                     onHttpFlowRemove: clearHttpFlowSelection,
                     onAfterSubmit: clearHttpFlowSelection,
                   },
-                })}
-            </div>
+                })
+              : null}
           </div>
-        )}
-        lineStyle={{ display: '' }}
-        firstMinSize={openTabsFlag ? '325px' : '24px'}
-        secondMinSize={720}
-        secondNode={
-          <div className={styles['hTTPHistory-right']}>
-            <HTTPFlowRealTimeTableAndEditor
-              pageType={pageType}
-              includeInUrl={includeInUrl}
-              curProcess={curProcess}
-              curTags={curTags}
-              builtinTagList={builtinTagList}
-              mitmAggregateFilterRows={mitmAggregateFilterRows}
-              onQueryParams={onQueryParams}
-              onSetTableTotal={setHttpFlowTableDataLength}
-              onSetSelectedHttpFlowIds={onSetSelectedHttpFlowIds}
-              onRegisterTableSelectApi={onRegisterTableSelectApi}
-              setOnlyShowFirstNode={setOnlyShowFirstNode}
-              setSecondNodeVisible={setSecondNodeVisible}
-              showHistoryAnalysisBtn
-              {...historyProps}
-            />
-          </div>
-        }
-        secondNodeStyle={{
-          padding: undefined,
-          display: '',
-        }}
-        {...ResizeBoxProps}
-      />
+        </div>
+      </RuiYanDrawer>
     </div>
   )
 }
@@ -452,6 +432,7 @@ interface HTTPFlowRealTimeTableAndEditorProps extends HistoryTableTitleShow {
   titleHeight?: number
   wrapperStyle?: CSSProperties
   showFlod?: boolean
+  detailMode?: 'split' | 'drawer' | 'aside'
   params?: YakQueryHTTPFlowRequest
   includeInUrl?: string[]
   curProcess?: string[]
@@ -505,6 +486,7 @@ export const HTTPFlowRealTimeTableAndEditor: React.FC<HTTPFlowRealTimeTableAndEd
     showSetting = true,
     showRefresh = true,
     showFlod = true,
+    detailMode = 'split',
     showHistoryAnalysisBtn = false,
     onHistoryAnalysisClick,
     defaultExcludeColumnsKey,
@@ -601,109 +583,133 @@ export const HTTPFlowRealTimeTableAndEditor: React.FC<HTTPFlowRealTimeTableAndEd
   }, [onlyShowFirstNode])
   // #endregion
 
+  const renderFlowTable = () => (
+    <div className={styles['history-table-stage']}>
+      <HTTPFlowTable
+        containerClassName={containerClassName}
+        runTimeId={runtimeId}
+        mitmAggregateFilterRows={mitmAggregateFilterRows}
+        noTableTitle={noTableTitle}
+        showSourceType={showSourceType}
+        showAdvancedSearch={showAdvancedSearch}
+        showProtocolType={showProtocolType}
+        showHistorySearch={showHistorySearch}
+        showColorSwatch={showColorSwatch}
+        showBatchActions={showBatchActions}
+        showDelAll={showDelAll}
+        showSetting={showSetting}
+        showRefresh={showRefresh}
+        params={params}
+        includeInUrl={includeInUrl}
+        onSelected={setSelectedHTTPFlow}
+        filterTagDom={filterTagDom}
+        onSearch={setHighlightSearch}
+        onlyShowFirstNode={onlyShowFirstNode}
+        setOnlyShowFirstNode={setOnlyShowFirstNode}
+        refresh={refresh}
+        importRefresh={importRefresh}
+        pageType={pageType}
+        historyId={historyId}
+        onQueryParams={onQueryParams}
+        inViewport={inViewport}
+        downstreamProxyStr={downstreamProxy}
+        ProcessName={curProcess}
+        TagsFilter={curTags}
+        builtinTagList={builtinTagList}
+        onSetTableTotal={onSetTableTotal}
+        onSetTableSelectNum={onSetTableSelectNum}
+        onSetHasNewData={onSetHasNewData}
+        onSetSelectedHttpFlowIds={onSetSelectedHttpFlowIds}
+        onRegisterTableSelectApi={onRegisterTableSelectApi}
+        httpHistoryTableTitleStyle={httpHistoryTableTitleStyle}
+        titleHeight={titleHeight}
+        showHistoryAnalysisBtn={showHistoryAnalysisBtn}
+        onHistoryAnalysisClick={onHistoryAnalysisClick}
+        defaultExcludeColumnsKey={defaultExcludeColumnsKey}
+      />
+    </div>
+  )
+
+  const renderFlowDetail = (drawer: boolean) =>
+    secondNodeVisible ? (
+      <HTTPFlowDetailMini
+        noHeader={true}
+        search={highlightSearch}
+        id={selected?.Id || 0}
+        sendToWebFuzzer={true}
+        selectedFlow={selected}
+        refresh={refresh}
+        historyId={historyId}
+        downstreamProxyStr={downstreamProxy}
+        pageType={pageType}
+        showFlod={!drawer && showFlod}
+      />
+    ) : null
+
+  const closeDetail = () => {
+    setSecondNodeVisible(false)
+    setOnlyShowFirstNode(true)
+  }
+
   return (
     <div
       className={styles['hTTPFlowRealTimeTableAndEditor']}
       ref={hTTPFlowRealTimeTableAndEditorRef}
       style={wrapperStyle}
     >
-      <YakitResizeBox
-        isVer={true}
-        // 隐藏详情只需要展示第一个节点
-        onClickHiddenBox={() => setOnlyShowFirstNode(true)}
-        firstNode={() => (
-          <div style={{ width: '100%', height: '100%' }}>
-            <HTTPFlowTable
-              containerClassName={containerClassName}
-              runTimeId={runtimeId}
-              mitmAggregateFilterRows={mitmAggregateFilterRows}
-              noTableTitle={noTableTitle}
-              showSourceType={showSourceType}
-              showAdvancedSearch={showAdvancedSearch}
-              showProtocolType={showProtocolType}
-              showHistorySearch={showHistorySearch}
-              showColorSwatch={showColorSwatch}
-              showBatchActions={showBatchActions}
-              showDelAll={showDelAll}
-              showSetting={showSetting}
-              showRefresh={showRefresh}
-              params={params}
-              includeInUrl={includeInUrl}
-              onSelected={(i) => {
-                setSelectedHTTPFlow(i)
-              }}
-              filterTagDom={filterTagDom}
-              onSearch={setHighlightSearch}
-              onlyShowFirstNode={onlyShowFirstNode}
-              setOnlyShowFirstNode={setOnlyShowFirstNode}
-              refresh={refresh}
-              importRefresh={importRefresh}
-              pageType={pageType}
-              historyId={historyId}
-              onQueryParams={onQueryParams}
-              inViewport={inViewport}
-              downstreamProxyStr={downstreamProxy}
-              ProcessName={curProcess}
-              TagsFilter={curTags}
-              builtinTagList={builtinTagList}
-              onSetTableTotal={onSetTableTotal}
-              onSetTableSelectNum={onSetTableSelectNum}
-              onSetHasNewData={onSetHasNewData}
-              onSetSelectedHttpFlowIds={onSetSelectedHttpFlowIds}
-              onRegisterTableSelectApi={onRegisterTableSelectApi}
-              httpHistoryTableTitleStyle={httpHistoryTableTitleStyle}
-              titleHeight={titleHeight}
-              showHistoryAnalysisBtn={showHistoryAnalysisBtn}
-              onHistoryAnalysisClick={onHistoryAnalysisClick}
-              defaultExcludeColumnsKey={defaultExcludeColumnsKey}
-            />
-          </div>
-        )}
-        secondNode={
-          <div style={{ width: '100%', height: '100%' }}>
-            {secondNodeVisible && (
-              <HTTPFlowDetailMini
-                noHeader={true}
-                search={highlightSearch}
-                id={selected?.Id || 0}
-                sendToWebFuzzer={true}
-                selectedFlow={selected}
-                refresh={refresh}
-                historyId={historyId}
-                downstreamProxyStr={downstreamProxy}
-                pageType={pageType}
-                showFlod={showFlod}
-              />
+      {detailMode === 'aside' ? (
+        <div className={styles['history-aside-layout']}>
+          <div className={styles['history-aside-table']}>{renderFlowTable()}</div>
+          <aside className={styles['history-aside-detail']} aria-label="流量检查器">
+            {selected && secondNodeVisible ? (
+              renderFlowDetail(true)
+            ) : (
+              <RuiYanEmptyState compact title="选择流量查看详情" description="请求与响应将在此处显示" />
             )}
-          </div>
-        }
-        firstMinSize={80}
-        secondMinSize={200}
-        secondNodeStyle={{
-          display: !secondNodeVisible ? 'none' : '',
-          padding: !secondNodeVisible ? 0 : undefined,
-        }}
-        lineStyle={{
-          display: !secondNodeVisible ? 'none' : '',
-          marginTop: pageType === 'MITM' ? 6 : 0, // MITM列表需要和拖拽线有间距
-        }}
-        lineDirection="top"
-        onMouseUp={({ firstSizePercent, secondSizePercent }) => {
-          lastRatioRef.current = {
-            firstRatio: firstSizePercent,
-            secondRatio: secondSizePercent,
-          }
-          // 缓存比例用于下次加载
-          setRemoteValue(
-            RemoteGV.historyTableYakitResizeBox,
-            JSON.stringify({
-              firstSizePercent,
-              secondSizePercent,
-            }),
-          )
-        }}
-        {...ResizeBoxProps}
-      />
+          </aside>
+        </div>
+      ) : detailMode === 'drawer' ? (
+        <>
+          {renderFlowTable()}
+          <RuiYanDrawer
+            open={secondNodeVisible && Boolean(selected)}
+            title="流量详情"
+            description={selected ? `${selected.Method || ''} ${selected.Url || ''}`.trim() : undefined}
+            width={640}
+            onClose={closeDetail}
+            footer={
+              <RuiYanButton variant="secondary" onClick={closeDetail}>
+                关闭
+              </RuiYanButton>
+            }
+          >
+            <div className={styles['history-detail-drawer']}>{renderFlowDetail(true)}</div>
+          </RuiYanDrawer>
+        </>
+      ) : (
+        <YakitResizeBox
+          isVer={true}
+          onClickHiddenBox={closeDetail}
+          firstNode={renderFlowTable}
+          secondNode={<div className={styles['history-detail-split']}>{renderFlowDetail(false)}</div>}
+          firstMinSize={80}
+          secondMinSize={200}
+          secondNodeStyle={{
+            display: !secondNodeVisible ? 'none' : '',
+            padding: !secondNodeVisible ? 0 : undefined,
+          }}
+          lineStyle={{
+            display: !secondNodeVisible ? 'none' : '',
+            marginTop: pageType === 'MITM' ? 6 : 0,
+          }}
+          lineDirection="top"
+          onMouseUp={({ firstSizePercent, secondSizePercent }) => {
+            lastRatioRef.current = { firstRatio: firstSizePercent, secondRatio: secondSizePercent }
+            setRemoteValue(RemoteGV.historyTableYakitResizeBox, JSON.stringify({ firstSizePercent, secondSizePercent }))
+          }}
+          {...ResizeBoxProps}
+        />
+      )}
     </div>
   )
 })

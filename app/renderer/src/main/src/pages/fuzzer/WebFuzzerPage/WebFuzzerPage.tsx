@@ -10,8 +10,7 @@ import {
   OutlineViewboardsIcon,
   OutlineBookopenIcon,
 } from '@/assets/icon/outline'
-import classNames from 'classnames'
-import { useCreation, useInViewport, useMemoizedFn } from 'ahooks'
+import { useInViewport, useMemoizedFn } from 'ahooks'
 import { YakitRoute } from '@/enums/yakitRoute'
 import 'video-react/dist/video-react.css' // import css
 import { PageNodeItemProps, usePageInfo } from '@/store/pageInfo'
@@ -27,6 +26,7 @@ import ShortcutKeyFocusHook from '@/utils/globalShortcutKey/shortcutKeyFocusHook
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useFuzzerSequence } from '@/store/fuzzerSequence'
 import { JSONParseLog } from '@/utils/tool'
+import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
 const { ipcRenderer } = window.require('electron')
 
 export const webFuzzerTabs = (t: TFunction) => {
@@ -95,6 +95,7 @@ const WebFuzzerPage: React.FC<WebFuzzerPageProps> = React.memo((props) => {
   const webFuzzerRef = useRef<any>(null)
   const [inViewport] = useInViewport(webFuzzerRef)
   const [type, setType] = useState<WebFuzzerType>(props.defaultType || 'config')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   // 高级配置的隐藏/显示
   const [advancedConfigShow, setAdvancedConfigShow] = useState<AdvancedConfigShowProps>({
     ...defaultAdvancedConfigShow,
@@ -204,23 +205,6 @@ const WebFuzzerPage: React.FC<WebFuzzerPageProps> = React.memo((props) => {
     // 当前页面在fuzzer页面
     emiter.emit('onCurrentFuzzerPage', true)
   })
-  const isUnShow = useCreation(() => {
-    switch (type) {
-      case 'config':
-        return !advancedConfigShow.config
-      case 'rule':
-        return !advancedConfigShow.rule
-      case 'hot-patch':
-        return !advancedConfigShow['hot-patch']
-      case 'api-doc':
-        return !advancedConfigShow['api-doc']
-      case 'ai':
-        return !advancedConfigShow.ai
-      default:
-        return false
-    }
-  }, [type, advancedConfigShow])
-
   return (
     <ShortcutKeyFocusHook
       className={styles['web-fuzzer']}
@@ -228,25 +212,45 @@ const WebFuzzerPage: React.FC<WebFuzzerPageProps> = React.memo((props) => {
       focusId={props.id ? [props.id] : undefined}
       isUpdateFocus={false}
     >
-      <div className={styles['web-fuzzer-tab']}>
-        {webFuzzerTabs(t).map((item) => (
-          <div
-            key={item.key}
-            className={classNames(styles['web-fuzzer-tab-item'], {
-              [styles['web-fuzzer-tab-item-active']]: type === item.key,
-              [styles['web-fuzzer-tab-item-advanced-config-unShow']]: item.key === type && isUnShow,
-            })}
-            onClick={() => {
-              const keyType = item.key as WebFuzzerType
-              onSetType(keyType)
-            }}
-          >
-            {item.icon}
-            <span className={styles['web-fuzzer-tab-label']}>{item.label}</span>
-          </div>
-        ))}
+      <div className={styles['web-fuzzer-toolbar']}>
+        <div>
+          <strong>请求与响应</strong>
+          <span>低频参数统一置于高级设置</span>
+        </div>
+        <RuiYanButton variant="secondary" onClick={() => setAdvancedOpen(true)}>
+          高级设置
+        </RuiYanButton>
       </div>
-      <div className={classNames(styles['web-fuzzer-tab-content'])}>{props.children}</div>
+      <div className={styles['web-fuzzer-tab-content']}>{props.children}</div>
+      <RuiYanDrawer
+        open={advancedOpen}
+        title="高级设置"
+        description="配置规则、热加载、接口文档、智能分析及批量执行方式"
+        width={480}
+        onClose={() => setAdvancedOpen(false)}
+        footer={
+          <RuiYanButton variant="secondary" onClick={() => setAdvancedOpen(false)}>
+            关闭
+          </RuiYanButton>
+        }
+      >
+        <div className={styles['web-fuzzer-advanced-list']}>
+          {webFuzzerTabs(t).map((item) => (
+            <RuiYanButton
+              key={item.key}
+              variant={type === item.key ? 'secondary' : 'ghost'}
+              icon={item.icon}
+              aria-current={type === item.key ? 'page' : undefined}
+              onClick={() => {
+                onSetType(item.key as WebFuzzerType)
+                setAdvancedOpen(false)
+              }}
+            >
+              {item.label}
+            </RuiYanButton>
+          ))}
+        </div>
+      </RuiYanDrawer>
     </ShortcutKeyFocusHook>
   )
 })

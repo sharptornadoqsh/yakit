@@ -20,7 +20,6 @@ import { MITMContentReplacerRule } from './MITMRule/MITMRuleType'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { loadNucleiPoCFromLocal, loadYakitPluginCode } from '../yakitStore/YakitStorePage'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
 import { YakitFormDragger } from '@/components/yakitUI/YakitForm/YakitForm'
 import { StartExecYakCodeModal, YakScriptParam } from '@/utils/basic'
@@ -40,8 +39,7 @@ import {
   maskProxyPassword,
   MITMServerStartForm,
 } from './MITMServerStartForm/MITMServerStartForm'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
-import { YakitResizeBox } from '@/components/yakitUI/YakitResizeBox/YakitResizeBox'
+import { RuiYanButton, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import emiter from '@/utils/eventBus/eventBus'
 import { YakitRoute } from '@/enums/yakitRoute'
@@ -49,7 +47,7 @@ import { apiDownloadPluginOther, apiQueryYakScript } from '../plugins/utils'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { MITMConsts } from './MITMConsts'
 import { onSetRemoteValuesBase } from '@/components/yakitUI/utils'
-import { CacheDropDownGV, RemoteGV } from '@/yakitGV'
+import { CacheDropDownGV } from '@/yakitGV'
 import classNames from 'classnames'
 import { useStore } from '@/store/mitmState'
 import MITMContext from './Context/MITMContext'
@@ -71,8 +69,6 @@ import {
 import { KVPair } from '@/models/kv'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useProxy } from '@/hook/useProxy'
-import { YakitSideTab } from '@/components/yakitSideTab/YakitSideTab'
-import { YakitTabsProps } from '@/components/yakitSideTab/YakitSideTabType'
 import { registerShortcutKeyHandle, unregisterShortcutKeyHandle } from '@/utils/globalShortcutKey/utils'
 import { ShortcutKeyPage } from '@/utils/globalShortcutKey/events/pageMaps'
 import { getStorageMitmShortcutKeyEvents } from '@/utils/globalShortcutKey/events/page/mitm'
@@ -214,15 +210,12 @@ export const MITMPage: React.FC<MITMPageProp> = (props) => {
         info(t('MITMPage.serverClosed'))
       } else {
         failed(t('MITMPage.serverErrorOrClosed'))
-        const m = showYakitModal({
-          title: (modalT) => modalT('MITMPage.startMitmServerError'),
-          type: 'white',
-          cancelButtonProps: { style: { display: 'none' } },
+        let modal: ReturnType<typeof showRuiYanModal>
+        modal = showRuiYanModal({
+          title: t('MITMPage.startMitmServerError'),
+          width: 480,
           content: <div style={{ padding: '12px 24px' }}>{msg}</div>,
-          onOkText: 'OK',
-          onOk: () => {
-            m.destroy()
-          },
+          footer: <RuiYanButton onClick={() => modal.destroy()}>OK</RuiYanButton>,
         })
       }
       grpcMITMStopCall(mitmVersion)
@@ -523,7 +516,14 @@ export const MITMPage: React.FC<MITMPageProp> = (props) => {
         <div className={style['mitm-console-strip']}>
           <span className={style['mitm-status-indicator']} />
           <strong>{status === 'idle' ? '代理待命' : '代理运行中'}</strong>
-          <small>{`${host}:${port}`}</small>
+          <span className={style['mitm-console-meta']}>
+            <small>监听地址</small>
+            <code>{`${host}:${port}`}</code>
+          </span>
+          <span className={style['mitm-console-meta']}>
+            <small>HTTPS</small>
+            <strong>证书代理</strong>
+          </span>
         </div>
         <div className={style['mitm-console-content']}>{onRenderMITM()}</div>
       </div>
@@ -636,17 +636,7 @@ export const MITMServer: React.FC<MITMServerProps> = React.memo((props) => {
 
   const [openTabsFlag, setOpenTabsFlag] = useState<boolean>(true)
 
-  const { t, i18n } = useI18nNamespaces(['mitm', 'yakitUi'])
-
-  const MITMIdleTab: YakitTabsProps[] = useMemo(
-    () => [
-      {
-        label: t('MITMServer.passive_plugin'),
-        value: 'plugin',
-      },
-    ],
-    [i18n.language],
-  )
+  const { t } = useI18nNamespaces(['mitm', 'yakitUi'])
 
   /**
    * @description 插件勾选
@@ -850,37 +840,6 @@ export const MITMServer: React.FC<MITMServerProps> = React.memo((props) => {
     })
   })
 
-  // #region 左侧tab
-  const idleTabsRef = useRef<HTMLDivElement>(null)
-  const [inViewport] = useInViewport(idleTabsRef)
-  const [activeKey, setActiveKey] = useState<string>('plugin')
-  useEffect(() => {
-    if (inViewport) {
-      getRemoteValue(RemoteGV.MitmIdleLeftTabs).then((setting: string) => {
-        if (setting) {
-          try {
-            const tabs = JSONParseLog(setting, { page: 'MITMPage', fun: 'MitmIdleLeftTabs' })
-            setOpenTabsFlag(tabs.contShow)
-            onActiveKey(tabs.curTabKey)
-          } catch (error) {}
-        }
-      })
-    }
-  }, [inViewport])
-  const onActiveKey = useMemoizedFn((key) => {
-    setActiveKey(key)
-  })
-  useDebounceEffect(
-    () => {
-      if (inViewport) {
-        setRemoteValue(RemoteGV.MitmIdleLeftTabs, JSON.stringify({ contShow: openTabsFlag, curTabKey: activeKey }))
-      }
-    },
-    [openTabsFlag, activeKey, inViewport],
-    { wait: 300 },
-  )
-  // #endregion
-
   const setTotalFun = useMemoizedFn((t) => {
     setTotal(t)
     getAllSatisfyScript(t)
@@ -893,14 +852,11 @@ export const MITMServer: React.FC<MITMServerProps> = React.memo((props) => {
     switch (status) {
       case 'idle':
         return (
-          <div className={style['mitm-idle-tab-wrap']} ref={idleTabsRef}>
-            <YakitSideTab
-              yakitTabs={MITMIdleTab}
-              activeKey={activeKey}
-              onActiveKey={onActiveKey}
-              show={openTabsFlag}
-              setShow={setOpenTabsFlag}
-            />
+          <div className={style['mitm-idle-tab-wrap']}>
+            <div className={style['mitm-panel-heading']}>
+              <strong>规则与插件</strong>
+              <span>{t('MITMServer.passive_plugin')}</span>
+            </div>
             <div
               className={style['mitm-idle-tab-cont-item']}
               style={{
@@ -1096,45 +1052,17 @@ export const MITMServer: React.FC<MITMServerProps> = React.memo((props) => {
     }
   })
 
-  const ResizeBoxProps = useCreation(() => {
-    let p = {
-      firstRatio: '25%',
-      secondRatio: '50%',
-    }
-
-    if (openTabsFlag) {
-      p.firstRatio = '25%'
-    } else {
-      p.firstRatio = '24px'
-    }
-
-    if (isFullScreenFirstNode) {
-      p.secondRatio = '0%'
-      p.firstRatio = 'calc(100% + 6px)'
-    }
-    return p
-  }, [isFullScreenFirstNode, openTabsFlag])
-
   return (
-    <YakitResizeBox
-      isVer={false}
-      freeze={openTabsFlag}
-      isRecalculateWH={openTabsFlag}
-      firstNode={() => <div className={style['mitm-server-start-pre-first']}>{onRenderFirstNode()}</div>}
-      lineStyle={{ display: isFullScreenFirstNode ? 'none' : '' }}
-      firstMinSize={openTabsFlag ? '400px' : '24px'}
-      secondMinSize={520}
-      secondNode={() => (
-        <div className={style['mitm-server-start-pre-second']} style={{ display: isFullScreenFirstNode ? 'none' : '' }}>
+    <div className={classNames(style['mitm-workspace-grid'], isFullScreenFirstNode && style['mitm-plugin-expanded'])}>
+      <aside className={style['mitm-server-start-pre-first']} aria-label="规则与插件">
+        {onRenderFirstNode()}
+      </aside>
+      {!isFullScreenFirstNode ? (
+        <section className={style['mitm-server-start-pre-second']} aria-label="代理流量工作区">
           {onRenderSecondNode()}
-        </div>
-      )}
-      secondNodeStyle={{
-        padding: isFullScreenFirstNode ? 0 : undefined,
-        display: isFullScreenFirstNode ? 'none' : '',
-      }}
-      {...ResizeBoxProps}
-    />
+        </section>
+      ) : null}
+    </div>
   )
 })
 
@@ -1437,14 +1365,11 @@ export const ImportLocalPlugin: React.FC<ImportLocalPluginProps> = React.memo((p
 
   return (
     <>
-      <YakitModal
-        type="white"
-        visible={visible}
-        onCancel={onCancel}
-        width={getLoadModeInfo('width') || 680}
-        closable={true}
-        maskClosable={false}
-        destroyOnClose={true}
+      <RuiYanModal
+        open={visible}
+        onClose={onCancel}
+        width={720}
+        closeOnBackdrop={false}
         title={
           !loadPluginMode ? (
             t('ImportLocalPlugin.pluginImportMethod')
@@ -1454,39 +1379,29 @@ export const ImportLocalPlugin: React.FC<ImportLocalPluginProps> = React.memo((p
             </>
           )
         }
-        className={style['import-local-plugin-modal']}
-        subTitle={
-          loadPluginMode ? (
-            <></>
-          ) : (
-            <YakitRadioButtons
-              wrapClassName={style['import-local-plugin-subTitle']}
-              buttonStyle="solid"
-              value={loadMode}
-              onChange={(e) => {
-                setLoadMode(e.target.value)
-              }}
-              options={loadModeInfo.map((item) => ({ value: item.value, label: t(item.label) }))}
-            ></YakitRadioButtons>
-          )
-        }
-        bodyStyle={{ padding: 0 }}
-        footerStyle={{ justifyContent: 'flex-end' }}
+        bodyClassName={style['import-local-plugin-modal']}
         footer={
-          <>
-            <div style={{ marginLeft: 12, display: 'block' }}>
-              <YakitButton onClick={onOk} loading={importLoading}>
-                {t('YakitButton.import')}
-              </YakitButton>
-            </div>
-          </>
+          <RuiYanButton onClick={onOk} loading={importLoading}>
+            {t('YakitButton.import')}
+          </RuiYanButton>
         }
       >
+        {!loadPluginMode && (
+          <YakitRadioButtons
+            wrapClassName={style['import-local-plugin-subTitle']}
+            buttonStyle="solid"
+            value={loadMode}
+            onChange={(e) => {
+              setLoadMode(e.target.value)
+            }}
+            options={loadModeInfo.map((item) => ({ value: item.value, label: t(item.label) }))}
+          ></YakitRadioButtons>
+        )}
         <div className={style.infoBox}>{t('ImportLocalPlugin.externalResourceWarning')}</div>
         <Form form={form} className={style['import-local-plugin-form']}>
           {getRenderByLoadMode(loadMode)}
         </Form>
-      </YakitModal>
+      </RuiYanModal>
       <StartExecYakCodeModal
         visible={startExecYakCodeModalVisible}
         verbose={startExecYakCodeVerbose}

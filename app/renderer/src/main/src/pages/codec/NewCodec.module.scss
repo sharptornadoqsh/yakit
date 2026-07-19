@@ -1,5 +1,5 @@
 .drag-list-item-clone {
-  width: 420px;
+  width: 320px;
   padding: 10px 12px 10px 16px;
   display: flex;
   align-items: center;
@@ -46,13 +46,13 @@
   height: 100%;
   display: flex;
   flex-direction: row;
-  gap: 8px;
-  padding: 8px;
-  background: #eef4f4;
+  gap: 12px;
+  padding: 12px;
+  background: var(--ruiyan-color-background, #f6f8fc);
   .new-codec-drag-list {
     height: 100%;
-    border: 1px solid #c6d8da;
-    border-radius: 3px;
+    border: 1px solid var(--ruiyan-color-border, #dce3ed);
+    border-radius: var(--ruiyan-radius-lg, 8px);
     background: var(--Colors-Use-Basic-Background);
     display: flex;
     flex-direction: column;
@@ -61,7 +61,7 @@
       opacity 0.2s ease;
     overflow: hidden;
     .header {
-      width: 301px;
+      width: 180px;
       display: flex;
       padding: 6px 12px;
       justify-content: space-between;
@@ -77,7 +77,7 @@
       }
     }
     .search {
-      width: 301px;
+      width: 180px;
       padding: 0px 12px 8px 12px;
       .prefix {
         display: flex;
@@ -90,7 +90,7 @@
       }
     }
     .left-drag-list {
-      width: 301px;
+      width: 180px;
       overflow: auto;
 
       .codec-list-state {
@@ -206,20 +206,20 @@
   }
   .new-codec-drag-list-show {
     opacity: 1;
-    width: 301px;
+    width: 180px;
   }
   .new-codec-drag-list-hidden {
     opacity: 0;
     width: 0px;
   }
   .new-codec-run-list {
-    width: 420px;
+    width: 320px;
     height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid #c6d8da;
-    border-radius: 3px;
+    border: 1px solid var(--ruiyan-color-border, #dce3ed);
+    border-radius: var(--ruiyan-radius-lg, 8px);
     background: var(--Colors-Use-Basic-Background);
     .header {
       padding: 6px 12px;
@@ -317,8 +317,7 @@
       flex-direction: row;
       gap: 12px;
       border-top: 1px solid var(--Colors-Use-Neutral-Border);
-      /* 投影/上/16 */
-      box-shadow: 0px -8px 16px 0px var(--Colors-Use-Basic-Shadow);
+      box-shadow: none;
       &-btn {
         flex: 1;
       }
@@ -327,8 +326,8 @@
   .new-codec-editor-box {
     flex: 1;
     overflow: hidden;
-    border: 1px solid #b9d0d2;
-    border-radius: 3px;
+    border: 1px solid var(--ruiyan-color-border, #dce3ed);
+    border-radius: var(--ruiyan-radius-lg, 8px);
     background: var(--Colors-Use-Basic-Background);
     .editor-box {
       display: flex;
@@ -715,13 +714,6 @@
 }
 .codec-save-modal {
   padding: 20px;
-  .btn-box {
-    display: flex;
-    justify-content: flex-end;
-    width: 100%;
-    gap: 10px;
-    margin-top: 29px;
-  }
 }
 .codec-input-menu,
 .codec-output-menu {

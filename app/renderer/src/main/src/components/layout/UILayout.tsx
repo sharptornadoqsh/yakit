@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useCreation, useDebounceEffect, useMemoizedFn, useUpdateEffect } from 'ahooks'
 import { MacUIOp } from './MacUIOp'
 import { PerformanceDisplay, yakProcess } from './PerformanceDisplay'
-import { FuncDomain } from './FuncDomain'
+import { FuncDomain, UIOpNotice, UIOpSetting } from './FuncDomain'
 import { TemporaryProjectPop, WinUIOp } from './WinUIOp'
 import { GlobalState } from './GlobalState'
 import { YakitGlobalHost } from './YakitGlobalHost'
@@ -35,7 +35,7 @@ import { AllKillEngineConfirm } from './AllKillEngineConfirm'
 import { SoftwareSettings } from '@/pages/softwareSettings/SoftwareSettings'
 import { StopIcon } from '@/assets/newIcon'
 import EnterpriseJudgeLogin from '@/pages/EnterpriseJudgeLogin'
-import {
+import ProjectManage, {
   ExportProjectProps,
   getEnvTypeByProjects,
   NewProjectAndFolder,
@@ -111,10 +111,11 @@ import { getValueByType, ParamsToGroupByGroupName } from '@/pages/plugins/editDe
 import { YakExecutorParam } from '@/pages/invoker/YakExecutorParams'
 import { PluginHasParamsModal } from '../pluginHasParamsDrawer/PluginHasParamsDrawer'
 import { YakitRoute } from '@/enums/yakitRoute'
-import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
+import { RENYAN_SHELL_ENABLED, RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
 import { grpcFetchLocalPluginDetail } from '@/pages/pluginHub/utils/grpc'
 import { resolveEngineUpdateStatus, shouldCheckEngineUpdate } from './engineUpdate'
 import type { EngineUpdateStatus } from './engineUpdate'
+import { RuiYanButton, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 
 const DefaultCredential: YaklangEngineWatchDogCredential = {
   Host: '127.0.0.1',
@@ -812,29 +813,26 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
       .then(() => {
         yakitEngine.writeEngineKeyToYakitProjects().finally(() => {
           yakitNotify('info', t('UILayout.unpackBuiltinEngineSuccess'))
-          showYakitModal({
+          showRuiYanModal({
+            title: t('UILayout.unpackBuiltinEngineNeedRestart'),
+            content: null,
+            width: 480,
             closable: false,
-            maskClosable: false,
-            keyboard: false,
-            type: 'white',
-            title: (modalT) => modalT('UILayout.unpackBuiltinEngineNeedRestart'),
-            content: (modalT) => (
-              <div style={{ height: 80, padding: 24, display: 'flex', alignItems: 'center' }}>
-                <YakitButton
-                  onClick={() => {
-                    yakitApp
-                      .relaunch()
-                      .then(() => {})
-                      .catch((e) => {
-                        failed(t('UILayout.restartFailed', { error: String(e) }))
-                      })
-                  }}
-                >
-                  {modalT('UILayout.restartNow')}
-                </YakitButton>
-              </div>
+            closeOnBackdrop: false,
+            footer: (
+              <RuiYanButton
+                onClick={() => {
+                  yakitApp
+                    .relaunch()
+                    .then(() => {})
+                    .catch((e) => {
+                      failed(t('UILayout.restartFailed', { error: String(e) }))
+                    })
+                }}
+              >
+                {t('UILayout.restartNow')}
+              </RuiYanButton>
             ),
-            footer: null,
           })
         })
       })
@@ -1174,7 +1172,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
   const [projectModalLoading, setProjectModalLoading] = useState<boolean>(false)
   // 项目名字
   const projectName = useMemo(() => {
-    if (showProjectManage) return ''
+    if (showProjectManage && !RENYAN_SHELL_ENABLED) return ''
     if (!!currentProject?.ProjectName) {
       if (currentProject.ProjectName.length > 10) return `${currentProject.ProjectName.slice(0, 10)}...`
       else return currentProject.ProjectName
@@ -1238,7 +1236,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
   }, [projectName, engineLink, temporaryProjectId, currentProject])
   /**  yakit是否进入首页 */
   const pageShowHome = useMemo(() => {
-    const flag = engineLink && !isJudgeLicense && !showProjectManage
+    const flag = engineLink && !isJudgeLicense && (RENYAN_SHELL_ENABLED || !showProjectManage)
     return flag
   }, [engineLink, isJudgeLicense, showProjectManage])
 
@@ -1377,41 +1375,53 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
           if (res.Ok) {
             addNewPluginTab(codecParams)
           } else {
-            let m = showYakitModal({
-              title: (modalT) => modalT('UILayout.addThirdPartyApp'),
-              width: 600,
-              footer: null,
-              closable: true,
-              maskClosable: false,
-              content: (
-                <>
-                  <div className={styles['ai-describe']}>{t('UILayout.selectAiTypeForApiKey')}</div>
-                  <NewThirdPartyApplicationConfig
-                    isOnlyShowAiType={true}
-                    onAdd={(data) => {
-                      // 新增，有影响ai优化级
-                      const newParams = handleAIConfig(
-                        {
-                          AppConfigs: obj.AppConfigs,
-                          AiApiPriority: obj.AiApiPriority,
-                        },
-                        data,
-                      )
-                      if (!newParams) {
-                        yakitNotify('error', t('UILayout.onFuzzerModalParamsError'))
-                        return
-                      }
-                      const params: GlobalNetworkConfig = { ...obj, ...newParams }
-                      apiSetGlobalNetworkConfig(params).then(() => {
-                        addNewPluginTab(codecParams)
-                        m.destroy()
-                      })
-                    }}
-                    onCancel={() => m.destroy()}
-                  />
-                </>
-              ),
-            })
+            const renderThirdPartyConfig = (destroy: () => void) => (
+              <>
+                <div className={styles['ai-describe']}>{t('UILayout.selectAiTypeForApiKey')}</div>
+                <NewThirdPartyApplicationConfig
+                  isOnlyShowAiType={true}
+                  onAdd={(data) => {
+                    const newParams = handleAIConfig(
+                      {
+                        AppConfigs: obj.AppConfigs,
+                        AiApiPriority: obj.AiApiPriority,
+                      },
+                      data,
+                    )
+                    if (!newParams) {
+                      yakitNotify('error', t('UILayout.onFuzzerModalParamsError'))
+                      return
+                    }
+                    const params: GlobalNetworkConfig = { ...obj, ...newParams }
+                    apiSetGlobalNetworkConfig(params).then(() => {
+                      addNewPluginTab(codecParams)
+                      destroy()
+                    })
+                  }}
+                  onCancel={destroy}
+                />
+              </>
+            )
+            if (RENYAN_SHELL_ENABLED) {
+              let modal: ReturnType<typeof showRuiYanModal>
+              modal = showRuiYanModal({
+                title: t('UILayout.addThirdPartyApp'),
+                width: 720,
+                footer: null,
+                closeOnBackdrop: false,
+                content: renderThirdPartyConfig(() => modal.destroy()),
+              })
+            } else {
+              let modal: ReturnType<typeof showYakitModal>
+              modal = showYakitModal({
+                title: (modalT) => modalT('UILayout.addThirdPartyApp'),
+                width: 600,
+                footer: null,
+                closable: true,
+                maskClosable: false,
+                content: renderThirdPartyConfig(() => modal.destroy()),
+              })
+            }
           }
         })
       } catch (error) {
@@ -1757,13 +1767,37 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
             })}
           >
             {RENYAN_SHELL_ENABLED ? (
-              <RenyanWindowChrome
-                system={system}
-                currentProjectId={currentProject?.Id ? currentProject.Id + '' : ''}
-                pageChildrenShow={pageShowHome}
-                draggable={drop}
-                onToggleWindowSize={maxScreen}
-              />
+              <>
+                <RenyanWindowChrome
+                  system={system}
+                  currentProjectId={currentProject?.Id ? currentProject.Id + '' : ''}
+                  pageChildrenShow={pageShowHome}
+                  draggable={drop}
+                  onToggleWindowSize={maxScreen}
+                />
+                {!isJudgeLicense && (
+                  <div className={styles['renyan-command-bridge']}>
+                    <HelpDoc system={system} presentation="ruiyan" />
+                    {engineLink && (
+                      <>
+                        <UIOpSetting
+                          headless={true}
+                          engineMode={engineMode || 'remote'}
+                          onEngineModeChange={handleOperations}
+                          typeCallback={handleOperations}
+                          mcp={mcp}
+                        />
+                        <UIOpNotice
+                          presentation="drawer"
+                          isEngineLink={engineLink}
+                          isRemoteMode={isRemoteEngine}
+                          onLogin={() => emiter.emit('onUIOpSettingMenuSelect', RENYAN_SHELL_EVENTS.openLogin)}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
             ) : system === 'Darwin' ? (
               <div className={classNames(styles['header-body'], styles['mac-header-body'])}>
                 {/* 遮住底部边框线 */}
@@ -1980,7 +2014,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
               <YakitSpin spinning={switchEngineLoading}>
                 {isJudgeLicense ? (
                   <EnterpriseJudgeLogin setJudgeLicense={setJudgeLicense} setJudgeLogin={(v: boolean) => {}} />
-                ) : showProjectManage ? (
+                ) : showProjectManage && !RENYAN_SHELL_ENABLED ? (
                   <SoftwareSettings
                     engineMode={engineMode || 'local'}
                     onEngineModeChange={handleOperations}
@@ -1991,6 +2025,29 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
                   props.children
                 )}
               </YakitSpin>
+            )}
+            {RENYAN_SHELL_ENABLED && engineLink && !isJudgeLicense && (
+              <RuiYanModal
+                open={showProjectManage}
+                width={960}
+                title="项目管理与导入导出"
+                description="管理项目、切换数据源以及执行项目导入导出"
+                onClose={softwareSettingFinish}
+                closeOnBackdrop={false}
+                bodyClassName={styles['renyan-project-modal-body']}
+                footer={
+                  <RuiYanButton variant="secondary" onClick={softwareSettingFinish}>
+                    关闭
+                  </RuiYanButton>
+                }
+              >
+                <ProjectManage
+                  engineMode={engineMode || 'local'}
+                  onEngineModeChange={handleOperations}
+                  onFinish={softwareSettingFinish}
+                  projectListRefreshTrigger={projectListRefreshTrigger}
+                />
+              </RuiYanModal>
             )}
 
             {engineLink && (yaklangKillPss || yakitDownload) && (
@@ -2028,7 +2085,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
             />
           </div>
           {!isJudgeLicense && (
-            <RenyanStatusBar engineLink={engineLink} engineMode={engineMode} engineUpdateStatus={engineUpdateStatus} />
+            <RenyanStatusBar engineLink={engineLink} projectName={projectName} teamConnected={userInfo.isLogin} />
           )}
         </div>
       </div>

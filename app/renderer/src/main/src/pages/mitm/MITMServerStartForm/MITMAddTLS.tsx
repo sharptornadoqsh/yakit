@@ -1,5 +1,5 @@
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
 import { YakEditor } from '@/utils/editors'
 import { yakitFailed } from '@/utils/notification'
 import { StringToUint8Array } from '@/utils/str'
@@ -19,38 +19,43 @@ const MITMAddTLS: React.FC<AddTLSProps> = React.memo((props) => {
   const { visible, setVisible, certs, setCerts } = props
   const { t } = useI18nNamespaces(['mitm'])
   const cerFormRef = useRef<any>()
+  const onSubmit = () => {
+    cerFormRef.current.validateFields().then((values) => {
+      const params: ClientCertificate = {
+        CerName: values.CerName,
+        CaCertificates:
+          values.CaCertificates && values.CaCertificates.length > 0 ? [StringToUint8Array(values.CaCertificates)] : [],
+        CrtPem: StringToUint8Array(values.CrtPem),
+        KeyPem: StringToUint8Array(values.KeyPem),
+      }
+      if (certs.findIndex((ele) => ele.CerName === params.CerName) !== -1) {
+        yakitFailed(t('MITMAddTLS.name_exists'))
+        return
+      }
+      setCerts([...certs, params])
+      setVisible(false)
+      cerFormRef.current.resetFields()
+    })
+  }
   return (
-    <YakitModal
+    <RuiYanModal
       title={t('MITMAddTLS.add_client_tls')}
-      visible={visible}
-      onCancel={() => setVisible(false)}
-      closable={true}
-      onOk={() => {
-        cerFormRef.current.validateFields().then((values) => {
-          const params: ClientCertificate = {
-            CerName: values.CerName,
-            CaCertificates:
-              values.CaCertificates && values.CaCertificates.length > 0
-                ? [StringToUint8Array(values.CaCertificates)]
-                : [],
-            CrtPem: StringToUint8Array(values.CrtPem),
-            KeyPem: StringToUint8Array(values.KeyPem),
-          }
-          if (certs.findIndex((ele) => ele.CerName === params.CerName) !== -1) {
-            yakitFailed(t('MITMAddTLS.name_exists'))
-            return
-          }
-          setCerts([...certs, params])
-          setVisible(false)
-          cerFormRef.current.resetFields()
-        })
-      }}
-      zIndex={1001}
-      width="50%"
-      bodyStyle={{ padding: 0 }}
+      description="录入客户端证书、私钥、根证书与限定主机"
+      open={visible}
+      onClose={() => setVisible(false)}
+      width={720}
+      closeOnBackdrop={false}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" onClick={() => setVisible(false)}>
+            取消
+          </RuiYanButton>
+          <RuiYanButton onClick={onSubmit}>保存证书</RuiYanButton>
+        </>
+      }
     >
       <InputCertificateForm ref={cerFormRef} formProps={{ layout: 'vertical', style: { padding: '24px 16px' } }} />
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 

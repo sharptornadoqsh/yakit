@@ -13,7 +13,7 @@ import { YakitMenu } from '@/components/yakitUI/YakitMenu/YakitMenu'
 import { YakitSwitch } from '@/components/yakitUI/YakitSwitch/YakitSwitch'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { MITMConsts } from '../MITMConsts'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
 import { defHost, defPort, maskProxyPassword } from '../MITMServerStartForm/MITMServerStartForm'
 import { PageNodeItemProps, usePageInfo } from '@/store/pageInfo'
 import { shallow } from 'zustand/shallow'
@@ -738,19 +738,22 @@ const DownStreamAgentModal: React.FC<DownStreamAgentModalProp> = React.memo((pro
 
   return (
     <>
-      <YakitModal
-        visible={downStreamAgentModalVisible}
+      <RuiYanModal
+        open={downStreamAgentModalVisible}
         title={t('ProxyConfig.downstream_agent')}
-        width={506}
-        maskClosable={false}
-        destroyOnClose={true}
-        closable
-        centered
-        okText={t('YakitButton.confirm')}
-        onCancel={onClose}
-        onOk={onOKFun}
-        bodyStyle={{ padding: 0 }}
-        zIndex={999} //默认1000 会导致路由配置弹窗被盖住
+        width={720}
+        closeOnBackdrop={false}
+        onClose={onClose}
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={onClose}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton variant="primary" onClick={onOKFun}>
+              {t('YakitButton.confirm')}
+            </RuiYanButton>
+          </>
+        }
       >
         <div style={{ padding: 15 }}>
           <Form
@@ -813,7 +816,7 @@ const DownStreamAgentModal: React.FC<DownStreamAgentModalProp> = React.memo((pro
             </Form.Item>
           </Form>
         </div>
-      </YakitModal>
+      </RuiYanModal>
       <ProxyRulesConfig visible={agentConfigModalVisible} onClose={() => setAgentConfigModalVisible(false)} />
     </>
   )

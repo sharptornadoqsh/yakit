@@ -6,13 +6,12 @@ import { useMemoizedFn } from 'ahooks'
 import { StringToUint8Array, Uint8ArrayToString } from '@/utils/str'
 import { saveABSFileToOpen } from '@/utils/openWebsite'
 import { yakitFailed } from '@/utils/notification'
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
-import { Divider, Form, Modal, Space, Upload } from 'antd'
+import { RuiYanButton, RuiYanDrawer, showRuiYanModal } from '@/components/renyanUI'
+import { Divider, Form, Space, Upload } from 'antd'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
-import { ExportIcon, OutlinePlusIcon, PlusCircleIcon, RemoveIcon, SaveIcon, TrashIcon } from '@/assets/newIcon'
+import { ExportIcon, OutlinePlusIcon, PlusCircleIcon, SaveIcon, TrashIcon } from '@/assets/newIcon'
 import { YakitCheckbox } from '@/components/yakitUI/YakitCheckbox/YakitCheckbox'
-import { ExclamationCircleOutlined } from '@ant-design/icons'
 import { YakitSwitch } from '@/components/yakitUI/YakitSwitch/YakitSwitch'
 import { YakitAutoComplete } from '@/components/yakitUI/YakitAutoComplete/YakitAutoComplete'
 import { useWatch } from 'antd/lib/form/Form'
@@ -189,34 +188,35 @@ const MITMFormAdvancedConfiguration: React.FC<MITMFormAdvancedConfigurationProps
         SNI: formValue.OverwriteSNI ? formValue.SNI : '',
       }
       if (!isEqual(oldValue, newValue)) {
-        Modal.confirm({
+        let modal: ReturnType<typeof showRuiYanModal>
+        modal = showRuiYanModal({
           title: t('YakitModal.friendlyReminder'),
-          icon: <ExclamationCircleOutlined />,
           content: t('MITMFormAdvancedConfiguration.saveAndCloseConfirm'),
-          okText: t('YakitButton.save'),
-          cancelText: t('YakitButton.doNotSave'),
-          closable: true,
-          closeIcon: (
-            <div
-              onClick={(e) => {
-                e.stopPropagation()
-                Modal.destroyAll()
-              }}
-              className="modal-remove-icon"
-            >
-              <RemoveIcon />
-            </div>
+          width: 480,
+          closeOnBackdrop: false,
+          footer: (
+            <>
+              <RuiYanButton
+                variant="secondary"
+                onClick={() => {
+                  setVisible(false)
+                  jumpPage && ipcRenderer.invoke('open-route-page', { route: YakitRoute.Beta_ConfigNetwork })
+                  modal.destroy()
+                }}
+              >
+                {t('YakitButton.doNotSave')}
+              </RuiYanButton>
+              <RuiYanButton
+                onClick={() => {
+                  onSaveSetting()
+                  jumpPage && ipcRenderer.invoke('open-route-page', { route: YakitRoute.Beta_ConfigNetwork })
+                  modal.destroy()
+                }}
+              >
+                {t('YakitButton.save')}
+              </RuiYanButton>
+            </>
           ),
-          onOk: () => {
-            onSaveSetting()
-            jumpPage && ipcRenderer.invoke('open-route-page', { route: YakitRoute.Beta_ConfigNetwork })
-          },
-          onCancel: () => {
-            setVisible(false)
-            jumpPage && ipcRenderer.invoke('open-route-page', { route: YakitRoute.Beta_ConfigNetwork })
-          },
-          cancelButtonProps: { size: 'small', className: 'modal-cancel-button' },
-          okButtonProps: { size: 'small', className: 'modal-ok-button' },
         })
       } else {
         setVisible(false)
@@ -225,32 +225,27 @@ const MITMFormAdvancedConfiguration: React.FC<MITMFormAdvancedConfigurationProps
     })
 
     return (
-      <YakitDrawer
-        className={styles['advanced-configuration-drawer']}
-        visible={visible}
+      <RuiYanDrawer
+        open={visible}
         onClose={() => onClose()}
-        width="max(700px, 40%)"
-        title={
-          <div className={styles['advanced-configuration-drawer-title']}>
-            <div className={styles['advanced-configuration-drawer-title-text']}>
-              {t('MITMFormAdvancedConfiguration.advancedConfig')}
-            </div>
-            <div className={styles['advanced-configuration-drawer-title-btns']}>
-              <YakitButton
-                type="outline2"
-                onClick={() => {
-                  setVisible(false)
-                }}
-              >
-                {t('YakitButton.cancel')}
-              </YakitButton>
-              <YakitButton type="primary" onClick={() => onSaveSetting()}>
-                {t('YakitButton.save')}
-              </YakitButton>
-            </div>
-          </div>
+        width={640}
+        title={t('MITMFormAdvancedConfiguration.advancedConfig')}
+        description="统一管理代理解析、身份校验、协议兼容与证书策略"
+        bodyClassName={styles['advanced-configuration-drawer']}
+        footer={
+          <>
+            <RuiYanButton
+              variant="secondary"
+              onClick={() => {
+                setVisible(false)
+              }}
+            >
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton onClick={() => onSaveSetting()}>{t('YakitButton.save')}</RuiYanButton>
+          </>
         }
-        maskClosable={false}
+        closeOnBackdrop={false}
       >
         <Form labelCol={{ span: 8 }} wrapperCol={{ span: 16 }} form={form}>
           <Form.Item
@@ -605,7 +600,7 @@ const MITMFormAdvancedConfiguration: React.FC<MITMFormAdvancedConfigurationProps
           />
           <MITMCertificateDownloadModal visible={downloadVisible} setVisible={setDownloadVisible} />
         </React.Suspense>
-      </YakitDrawer>
+      </RuiYanDrawer>
     )
   }),
 )

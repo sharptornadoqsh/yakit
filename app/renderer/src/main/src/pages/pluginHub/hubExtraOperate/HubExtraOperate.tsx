@@ -22,7 +22,7 @@ import { yakitNotify } from '@/utils/notification'
 import { AddPluginMenuContent, HubButton, HubOperateHint, RemovePluginMenuContent } from './funcTemplate'
 import { getRemoteValue } from '@/utils/kv'
 import { RemotePluginGV } from '@/enums/plugin'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
+import { showRuiYanModal } from '@/components/renyanUI'
 import {
   apiDeletePluginMine,
   apiDeleteYakScriptByIds,
@@ -405,17 +405,11 @@ export const HubExtraOperate: React.FC<HubExtraOperateProps> = memo(
       activeOperate.current = ''
       if (!online) return
       if (online.is_private) {
-        const m = showYakitModal({
-          title: (modalT) => modalT('HubExtraOperate.basicCheck'),
-          type: 'white',
-          width: '50%',
-          centered: true,
-          maskClosable: false,
-          closable: true,
+        const m = showRuiYanModal({
+          title: t('HubExtraOperate.basicCheck'),
+          width: 720,
+          closeOnBackdrop: false,
           footer: null,
-          mask: false,
-          destroyOnClose: true,
-          bodyStyle: { padding: 0 },
           content: (
             <CodeScoreModule
               type={online.type || ''}
@@ -429,9 +423,6 @@ export const HubExtraOperate: React.FC<HubExtraOperateProps> = memo(
               }}
             />
           ),
-          onCancel: () => {
-            m.destroy()
-          },
         })
       } else {
         onUpdatePrivate(online)
@@ -441,12 +432,10 @@ export const HubExtraOperate: React.FC<HubExtraOperateProps> = memo(
     const handleAddMenu = useMemoizedFn(() => {
       activeOperate.current = ''
       if (!local) return
-      const m = showYakitModal({
-        title: (modalT) => modalT('HubExtraOperate.addToMenuTitle', { id: local.Id }),
+      const m = showRuiYanModal({
+        title: t('HubExtraOperate.addToMenuTitle', { id: local.Id }),
+        width: 480,
         content: <AddPluginMenuContent onCancel={() => m.destroy()} script={local} />,
-        onCancel: () => {
-          m.destroy()
-        },
         footer: null,
       })
     })
@@ -454,13 +443,11 @@ export const HubExtraOperate: React.FC<HubExtraOperateProps> = memo(
     const handleRemoveMenu = useMemoizedFn(async () => {
       activeOperate.current = ''
       if (!local) return
-      const m = showYakitModal({
-        title: (modalT) => modalT('HubExtraOperate.removeFromMenuTitle'),
+      showRuiYanModal({
+        title: t('HubExtraOperate.removeFromMenuTitle'),
+        width: 480,
         footer: null,
         content: <RemovePluginMenuContent pluginName={local.ScriptName} />,
-        onCancel: () => {
-          m.destroy()
-        },
       })
     })
 
@@ -477,11 +464,10 @@ export const HubExtraOperate: React.FC<HubExtraOperateProps> = memo(
     const openExportModal = useMemoizedFn(async (names: string[]) => {
       if (exportModal) return
       try {
-        let m = showYakitModal({
-          title: (modalT) => modalT('HubExtraOperate.exportPlugin'),
-          width: isRemoteEngine ? 500 : 550,
-          closable: true,
-          maskClosable: false,
+        let m = showRuiYanModal({
+          title: t('HubExtraOperate.exportPlugin'),
+          width: 720,
+          closeOnBackdrop: false,
           footer: null,
           content: (
             <div style={{ padding: isRemoteEngine ? '0 0 12px' : '12px 0' }}>

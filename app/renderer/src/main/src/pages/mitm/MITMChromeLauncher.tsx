@@ -1,21 +1,13 @@
 import React, { CSSProperties, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { Alert, Form, Space, Tooltip, Typography, Modal } from 'antd'
+import { Alert, Form, Space, Tooltip, Typography } from 'antd'
 import { failed, info, yakitNotify } from '../../utils/notification'
-import { CheckOutlined, CloseOutlined, CloudUploadOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, CloudUploadOutlined } from '@ant-design/icons'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { useDebounceFn, useMemoizedFn } from 'ahooks'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import style from './MITMPage.module.scss'
-import {
-  BanIcon,
-  ChromeFrameSvgIcon,
-  ChromeSvgIcon,
-  PencilAltIcon,
-  PlusIcon,
-  RemoveIcon,
-  TrashIcon,
-} from '@/assets/newIcon'
+import { BanIcon, ChromeFrameSvgIcon, ChromeSvgIcon, PencilAltIcon, PlusIcon, TrashIcon } from '@/assets/newIcon'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { CacheDropDownGV, RemoteGV } from '@/yakitGV'
 import { YakitCheckbox } from '@/components/yakitUI/YakitCheckbox/YakitCheckbox'
@@ -349,47 +341,56 @@ const MITMChromeLauncher: React.FC<MITMChromeLauncherProp> = (props) => {
         </div>
         <div className={style['chrome-start-desc']}>{t('MITMChromeLauncher.preset_params_desc')}</div>
         {chromeLauncherParamsVisible && (
-          <YakitModal
+          <RuiYanModal
             title={t('MITMChromeLauncher.browser_params_config')}
-            visible={chromeLauncherParamsVisible}
-            onCancel={() => setChromeLauncherParamsVisible(false)}
-            closable={true}
-            maskClosable={false}
-            mask={false}
-            width="55%"
-            bodyStyle={{ padding: 0 }}
-            onOk={() => {
-              if (chromeLauncherParamsSetRef.current.tempEditItem) {
-                yakitNotify('info', t('MITMChromeLauncher.unsaved_edits'))
-                return
-              }
+            open={chromeLauncherParamsVisible}
+            onClose={() => setChromeLauncherParamsVisible(false)}
+            closeOnBackdrop={false}
+            width={960}
+            footer={
+              <>
+                <RuiYanButton variant="secondary" onClick={() => setChromeLauncherParamsVisible(false)}>
+                  {t('YakitButton.cancel')}
+                </RuiYanButton>
+                <RuiYanButton
+                  variant="primary"
+                  onClick={() => {
+                    if (chromeLauncherParamsSetRef.current.tempEditItem) {
+                      yakitNotify('info', t('MITMChromeLauncher.unsaved_edits'))
+                      return
+                    }
 
-              const values = chromeLauncherParamsSetRef.current.data
-                .map((item) => item['parameterName'])
-                .filter((item) => item)
-              const arr = values.filter((value, index) => values.indexOf(value) !== index)
-              if (arr.length) {
-                yakitNotify('info', `${t('MITMChromeLauncher.duplicate_param_name')} ${arr.join(',')}`)
-                return
-              }
+                    const values = chromeLauncherParamsSetRef.current.data
+                      .map((item) => item['parameterName'])
+                      .filter((item) => item)
+                    const arr = values.filter((value, index) => values.indexOf(value) !== index)
+                    if (arr.length) {
+                      yakitNotify('info', `${t('MITMChromeLauncher.duplicate_param_name')} ${arr.join(',')}`)
+                      return
+                    }
 
-              const flag = chromeLauncherParamsSetRef.current.data.some(
-                (value) => value.parameterName === '' && value.variableValues,
-              )
-              if (flag) {
-                yakitNotify('info', t('MITMChromeLauncher.missing_param_name'))
-                return
-              }
+                    const flag = chromeLauncherParamsSetRef.current.data.some(
+                      (value) => value.parameterName === '' && value.variableValues,
+                    )
+                    if (flag) {
+                      yakitNotify('info', t('MITMChromeLauncher.missing_param_name'))
+                      return
+                    }
 
-              const saveChromeLauncherParamsArr = chromeLauncherParamsSetRef.current.data.filter(
-                (item) => item['parameterName'] && !['--proxy-server'].includes(item['parameterName']),
-              )
-              setRemoteValue(RemoteGV.ChromeLauncherParams, JSON.stringify(saveChromeLauncherParamsArr))
-              setChromeLauncherParamsVisible(false)
-            }}
+                    const saveChromeLauncherParamsArr = chromeLauncherParamsSetRef.current.data.filter(
+                      (item) => item['parameterName'] && !['--proxy-server'].includes(item['parameterName']),
+                    )
+                    setRemoteValue(RemoteGV.ChromeLauncherParams, JSON.stringify(saveChromeLauncherParamsArr))
+                    setChromeLauncherParamsVisible(false)
+                  }}
+                >
+                  {t('YakitButton.confirm')}
+                </RuiYanButton>
+              </>
+            }
           >
             <ChromeLauncherParamsSet ref={chromeLauncherParamsSetRef} googleChromePluginPath={googleChromePluginPath} />
-          </YakitModal>
+          </RuiYanModal>
         )}
       </Form.Item>
     </Form>
@@ -433,34 +434,33 @@ const ChromeLauncherButton: React.FC<ChromeLauncherButtonProp> = React.memo((pro
 
   const clickChromeLauncher = useMemoizedFn(() => {
     if (repRuleFlag) {
-      Modal.confirm({
+      let modal: ReturnType<typeof showRuiYanModal>
+      modal = showRuiYanModal({
         title: t('YakitModal.friendlyReminder'),
-        icon: <ExclamationCircleOutlined />,
         content: t('MITMChromeLauncher.warning_content'),
-        okText: t('YakitButton.confirm'),
-        cancelText: t('MITMChromeLauncher.go_configure'),
-        closable: true,
-        centered: true,
-        closeIcon: (
-          <div
-            onClick={(e) => {
-              e.stopPropagation()
-              Modal.destroyAll()
-            }}
-            className="modal-remove-icon"
-          >
-            <RemoveIcon />
-          </div>
+        width: 480,
+        footer: (
+          <>
+            <RuiYanButton
+              variant="secondary"
+              onClick={() => {
+                onSetVisible?.(true)
+                modal.destroy()
+              }}
+            >
+              {t('MITMChromeLauncher.go_configure')}
+            </RuiYanButton>
+            <RuiYanButton
+              variant="primary"
+              onClick={() => {
+                setChromeVisible(true)
+                modal.destroy()
+              }}
+            >
+              {t('YakitButton.confirm')}
+            </RuiYanButton>
+          </>
         ),
-        onOk: () => {
-          setChromeVisible(true)
-        },
-        onCancel: () => {
-          onSetVisible && onSetVisible(true)
-          Modal.destroyAll()
-        },
-        cancelButtonProps: { size: 'small', className: 'modal-cancel-button' },
-        okButtonProps: { size: 'small', className: 'modal-ok-button' },
       })
       return
     }
@@ -498,14 +498,12 @@ const ChromeLauncherButton: React.FC<ChromeLauncherButtonProp> = React.memo((pro
         </YakitButton>
       )}
       {chromeVisible && (
-        <YakitModal
+        <RuiYanModal
           title={t('MITMChromeLauncher.confirm_start_no_config_chrome_params')}
-          visible={chromeVisible}
-          onCancel={() => setChromeVisible(false)}
-          closable={true}
-          width="max(850px, 50%)"
+          open={chromeVisible}
+          onClose={() => setChromeVisible(false)}
+          width={960}
           footer={null}
-          bodyStyle={{ padding: 0 }}
         >
           <MITMChromeLauncher
             host={host}
@@ -521,7 +519,7 @@ const ChromeLauncherButton: React.FC<ChromeLauncherButtonProp> = React.memo((pro
               }
             }}
           />
-        </YakitModal>
+        </RuiYanModal>
       )}
     </>
   )
@@ -605,52 +603,42 @@ const ChromeLauncherParamsSet: React.FC<ChromeLauncherParamsSetProps> = React.fo
   }, [])
 
   const resetToDefault = useMemoizedFn(() => {
-    // 显示确认对话框
-    Modal.confirm({
+    let modal: ReturnType<typeof showRuiYanModal>
+    modal = showRuiYanModal({
       title: t('MITMChromeLauncher.confirm_restore_default_params'),
-      icon: <ExclamationCircleOutlined />,
       content: t('MITMChromeLauncher.restore_default_params_content'),
-      okText: t('YakitButton.confirm'),
-      cancelText: t('YakitButton.cancel'),
-      closable: true,
-      centered: true,
-      closeIcon: (
-        <div
-          onClick={(e) => {
-            e.stopPropagation()
-            Modal.destroyAll()
-          }}
-          className="modal-remove-icon"
-        >
-          <RemoveIcon />
-        </div>
+      width: 480,
+      footer: (
+        <>
+          <RuiYanButton variant="secondary" onClick={() => modal.destroy()}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton
+            variant="primary"
+            onClick={() => {
+              let defaultParams = [...chromeLauncherParamsArr]
+              defaultParams = handleChromeLauncherParams(defaultParams, googleChromePluginPath)
+
+              setData(defaultParams)
+              if (searchVal) {
+                const filteredData = defaultParams.filter((item) =>
+                  item.parameterName.toLocaleLowerCase().includes(searchVal.toLocaleLowerCase()),
+                )
+                setSearchData(filteredData)
+              }
+
+              tempEditItem.current = undefined
+              setTempEditId(undefined)
+              setCurrentItem(undefined)
+              setRemoteValue(RemoteGV.ChromeLauncherParams, JSON.stringify(defaultParams))
+              yakitNotify('success', t('MITMChromeLauncher.restore_default_params_success'))
+              modal.destroy()
+            }}
+          >
+            {t('YakitButton.confirm')}
+          </RuiYanButton>
+        </>
       ),
-      onOk: () => {
-        // 重置为默认参数
-        let defaultParams = [...chromeLauncherParamsArr]
-
-        // 应用handleChromeLauncherParams函数，确保扩展参数被正确处理
-        defaultParams = handleChromeLauncherParams(defaultParams, googleChromePluginPath)
-
-        setData(defaultParams)
-        if (searchVal) {
-          const filteredData = defaultParams.filter((item) =>
-            item.parameterName.toLocaleLowerCase().includes(searchVal.toLocaleLowerCase()),
-          )
-          setSearchData(filteredData)
-        }
-
-        // 清除临时编辑状态
-        tempEditItem.current = undefined
-        setTempEditId(undefined)
-        setCurrentItem(undefined)
-
-        // 保存到远程
-        setRemoteValue(RemoteGV.ChromeLauncherParams, JSON.stringify(defaultParams))
-        yakitNotify('success', t('MITMChromeLauncher.restore_default_params_success'))
-      },
-      cancelButtonProps: { size: 'small', className: 'modal-cancel-button' },
-      okButtonProps: { size: 'small', className: 'modal-ok-button' },
     })
   })
 

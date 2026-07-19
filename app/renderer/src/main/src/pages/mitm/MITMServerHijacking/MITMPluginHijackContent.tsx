@@ -63,7 +63,7 @@ import { YakitHint } from '@/components/yakitUI/YakitHint/YakitHint'
 import { YakitCheckbox } from '@/components/yakitUI/YakitCheckbox/YakitCheckbox'
 import { YakitRoute } from '@/enums/yakitRoute'
 import { YakitTabsProps } from '@/components/yakitSideTab/YakitSideTabType'
-import { YakitSideTab } from '@/components/yakitSideTab/YakitSideTab'
+import { RuiYanSegmented } from '@/components/renyanUI'
 import { HoldGRPCStreamInfo } from '@/hook/useHoldGRPCStream/useHoldGRPCStreamType'
 import { ManualHijackTypeProps } from '../MITMManual/MITMManualType'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
@@ -992,15 +992,15 @@ export const MITMPluginHijackContent: React.FC<MITMPluginHijackContentProps> = R
   return (
     <div className={styles['mitm-plugin-hijack-content']} ref={hijackTabsRef}>
       <div className={styles['mitm-hijack-tab-wrap']}>
-        <YakitSideTab
-          yakitTabs={MITMHijackTab}
-          activeKey={curTabKey}
-          onActiveKey={onActiveKey}
-          show={openTabsFlag}
-          setShow={onSetOpenTabsFlag}
-          barHint={() => ''}
-          t={t}
-          key={i18n.language}
+        <RuiYanSegmented
+          className={styles['mitm-plugin-segmented']}
+          items={MITMHijackTab.map((item) => ({
+            value: item.value,
+            label: typeof item.label === 'function' ? item.label() : t(item.label),
+          }))}
+          value={curTabKey}
+          onChange={onActiveKey}
+          label="规则与插件视图"
         />
         <div
           className={classNames(styles['mitm-hijack-tab-cont-item'])}

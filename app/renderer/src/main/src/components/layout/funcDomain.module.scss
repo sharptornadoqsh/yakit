@@ -426,6 +426,14 @@
   }
 }
 
+.renyan-notice-drawer-body {
+  padding: 0;
+
+  .ui-op-plus-wrapper {
+    width: 100%;
+  }
+}
+
 .version-update-wrapper {
   box-sizing: border-box;
   width: 100%;
@@ -829,4 +837,14 @@
 }
 .task-notification-wrap {
   top: 15vh;
+}
+
+.renyan-diagnostics-list {
+  display: grid;
+  gap: 12px;
+
+  button {
+    justify-content: flex-start;
+    width: 100%;
+  }
 }

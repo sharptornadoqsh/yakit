@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { PluginExecuteExtraFormValue } from '../operator/localPluginExecuteDetailHeard/LocalPluginExecuteDetailHeardType'
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
+import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
 import { useMemoizedFn } from 'ahooks'
 import { Form, FormInstance } from 'antd'
 import styles from './PluginBatchExecutor.module.scss'
@@ -59,12 +59,13 @@ const PluginBatchExecuteExtraParamsDrawer: React.FC<PluginBatchExecuteExtraParam
     })
   })
   return (
-    <YakitDrawer
-      className={styles['plugin-batch-execute-extra-params-drawer']}
-      visible={visible}
+    <RuiYanDrawer
+      open={visible}
       onClose={onClose}
-      width="max(700px, 40%)"
+      width={640}
       title="额外参数"
+      description="设置批量插件任务的请求与执行参数"
+      footer={<RuiYanButton onClick={onClose}>保存并关闭</RuiYanButton>}
     >
       <Form size="small" labelWrap={true} labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} form={form}>
         <PluginBatchExecuteExtraParams
@@ -75,7 +76,7 @@ const PluginBatchExecuteExtraParamsDrawer: React.FC<PluginBatchExecuteExtraParam
         />
         <div className={styles['to-end']}>已经到底啦～</div>
       </Form>
-    </YakitDrawer>
+    </RuiYanDrawer>
   )
 })
 export default PluginBatchExecuteExtraParamsDrawer

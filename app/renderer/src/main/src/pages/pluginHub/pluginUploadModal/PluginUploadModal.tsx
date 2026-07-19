@@ -6,7 +6,6 @@ import { Radio, Upload } from 'antd'
 import { YakitPluginOnlineDetail } from '@/pages/plugins/online/PluginsOnlineType'
 import { apiFetchOnlinePluginInfo } from '@/pages/plugins/utils'
 import { YakScript } from '@/pages/invoker/schema'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import YakitSteps from '@/pages/plugins/local/YakitSteps/YakitSteps'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
@@ -22,6 +21,7 @@ import { PluginImageTextarea } from '@/pages/pluginEditor/pluginImageTextarea/Pl
 import { PluginImageTextareaRefProps } from '@/pages/pluginEditor/pluginImageTextarea/PluginImageTextareaType'
 import { httpDeleteOSSResource, httpUploadFile } from '@/apiUtils/http'
 import { OutlineLoadingIcon, OutlineTrashIcon } from '@/assets/icon/outline'
+import { RuiYanModal } from '@/components/renyanUI'
 
 import classNames from 'classnames'
 import '../../plugins/plugins.scss'
@@ -300,15 +300,14 @@ export const PluginUploadModal: React.FC<PluginUploadModalProps> = memo((props) 
   }, [onlinePlugin, current, isPrivate, pluginLoading])
 
   return (
-    <YakitModal
-      bodyStyle={{ padding: 0 }}
-      type="white"
+    <RuiYanModal
+      open={visible}
+      width={720}
       title="上传插件"
-      centered={true}
-      footer={null}
-      maskClosable={false}
-      visible={visible}
-      onCancel={handleCancel}
+      description="确认公开范围、完成自动检测并提交插件信息"
+      closeOnBackdrop={false}
+      bodyClassName={styles['plugin-upload-modal-body']}
+      onClose={handleCancel}
     >
       <div
         className={styles['plugin-upload-modal']}
@@ -332,7 +331,7 @@ export const PluginUploadModal: React.FC<PluginUploadModalProps> = memo((props) 
           </>
         )}
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 

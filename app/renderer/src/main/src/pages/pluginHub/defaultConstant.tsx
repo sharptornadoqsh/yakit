@@ -12,33 +12,34 @@ import { YakitPluginOnlineDetail } from '../plugins/online/PluginsOnlineType'
 import { ExportYakScriptStreamRequest } from '../plugins/local/PluginsLocalType'
 import { defaultFilter, defaultSearch } from '../plugins/builtInData'
 import { convertLocalPluginsRequestParams } from '../plugins/utils'
-import { YakitTabsProps } from '@/components/yakitSideTab/YakitSideTabType'
 
-export const HubSideBarList: YakitTabsProps[] = [
+interface HubNavigationItem {
+  value: PluginSourceType
+  label: string | (() => ReactNode)
+  icon?: ReactNode
+}
+
+export const HubSideBarList: HubNavigationItem[] = [
   {
     value: 'online',
     label: 'PluginHubList.online',
     icon: <OutlineOnlinePluginIcon />,
-    hint: () => '插件商店',
   },
-  { value: 'own', label: 'PluginHubList.own', icon: <OutlineOwnPluginIcon />, hint: () => '我的插件' },
+  { value: 'own', label: 'PluginHubList.own', icon: <OutlineOwnPluginIcon /> },
   {
     value: 'local',
     label: 'PluginHubList.local',
     icon: <OutlineLocalPluginIcon />,
-    hint: () => '本地插件',
   },
   {
     value: 'setting',
     label: 'PluginHubList.setting',
     icon: <OutlineAdjustmentsIcon />,
-    hint: () => '配置',
   },
   {
     value: 'recycle',
     label: 'PluginHubList.recycle',
     icon: <OutlineTrashSecondIcon />,
-    hint: () => '回收站',
   },
 ]
 

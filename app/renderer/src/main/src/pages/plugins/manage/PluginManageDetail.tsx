@@ -52,7 +52,7 @@ import useListenWidth from '@/pages/pluginHub/hooks/useListenWidth'
 import { HubButton } from '@/pages/pluginHub/hubExtraOperate/funcTemplate'
 import useAdmin from '@/hook/useAdmin'
 import emiter from '@/utils/eventBus/eventBus'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanModal } from '@/components/renyanUI'
 import { YakitPluginSupplement } from '@/pages/pluginEditor/base'
 import { DownloadingState } from '@/yakitGVDefine'
 import { PluginLog } from '@/pages/pluginHub/pluginLog/PluginLog'
@@ -1110,18 +1110,13 @@ export const PluginManageDetail: React.FC<PluginManageDetailProps> = memo(
 
         {/* 源码评分机制 */}
         {plugin && scoreHint && (
-          <YakitModal
+          <RuiYanModal
             title={t('PluginManageDetail.pluginBasicDetection')}
-            type="white"
-            width={'50%'}
-            centered={true}
-            maskClosable={false}
-            closable={true}
-            visible={scoreHint}
-            footer={null}
-            destroyOnClose={true}
-            onCancel={handleCancelScoreHint}
-            bodyStyle={{ padding: 0 }}
+            description="基于当前真实插件源码执行基础质量检测"
+            width={960}
+            closeOnBackdrop={false}
+            open={scoreHint}
+            onClose={handleCancelScoreHint}
           >
             <CodeScoreModule
               type={plugin.type}
@@ -1139,7 +1134,7 @@ export const PluginManageDetail: React.FC<PluginManageDetailProps> = memo(
                 </YakitButton>
               }
             />
-          </YakitModal>
+          </RuiYanModal>
         )}
 
         {/* 图片预览 */}

@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Badge, Modal, Tooltip, Avatar, Form, Divider } from 'antd'
+import { Badge, Tooltip, Avatar, Form, Divider } from 'antd'
 import { RiskStateSvgIcon, UISettingSvgIcon, UnLoginSvgIcon, UpdateSvgIcon, VersionUpdateSvgIcon } from './icons'
 import { YakitEllipsis } from '../basics/YakitEllipsis'
 import { useCreation, useDebounceEffect, useDebounceFn, useMemoizedFn, useUpdateEffect } from 'ahooks'
-import { showModal } from '@/utils/showModal'
 import { failed, info, success, yakitFailed, warn, yakitNotify } from '@/utils/notification'
 import { ConfigPrivateDomain } from '../ConfigPrivateDomain/ConfigPrivateDomain'
 import { ConfigGlobalReverse } from '@/utils/basic'
@@ -41,13 +40,12 @@ import { LocalGV } from '@/yakitGV'
 import { getLocalValue, setLocalValue } from '@/utils/kv'
 import { showPcapPermission } from '@/utils/ConfigPcapPermission'
 import { GithubSvgIcon, TerminalIcon } from '@/assets/newIcon'
-import { YakitModal } from '../yakitUI/YakitModal/YakitModal'
 import { YakitInput } from '../yakitUI/YakitInput/YakitInput'
 import { NetWorkApi } from '@/services/fetch'
 import { API } from '@/services/swagger/resposeType'
 import { addToTab } from '@/pages/MainTabs'
 import { DatabaseUpdateModal } from '@/pages/cve/CVETable'
-import { ExclamationCircleOutlined, LoadingOutlined } from '@ant-design/icons'
+import { LoadingOutlined } from '@ant-design/icons'
 import {
   DynamicControl,
   SelectControlType,
@@ -62,7 +60,8 @@ import { YakitRoute } from '@/enums/yakitRoute'
 import { RouteToPageProps } from '@/pages/layout/publicMenu/PublicMenu'
 import { useRunNodeStore } from '@/store/runNode'
 import emiter from '@/utils/eventBus/eventBus'
-import { RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
+import { RENYAN_SHELL_ENABLED, RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
+import { RuiYanButton, RuiYanDrawer, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 import { useTemporaryProjectStore } from '@/store/temporaryProject'
 import { visitorsStatisticsFun } from '@/utils/visitorsStatistics'
 import { serverPushStatus } from '@/utils/duplex/duplex'
@@ -808,20 +807,19 @@ export const FuncDomain: React.FC<FuncDomainProp> = React.memo((props) => {
       .isScreenRecorderReady({})
       .then((data: { Ok: boolean; Reason: string }) => {
         if (data.Ok) {
-          const m = showYakitModal({
-            title: (modalT) => modalT('FuncDomain.screenRecordingNotice'),
-            footer: null,
-            type: 'white',
-            width: 520,
+          let modal: ReturnType<typeof showRuiYanModal>
+          modal = showRuiYanModal({
+            title: t('FuncDomain.screenRecordingNotice'),
+            width: 720,
             content: (
               <ScrecorderModal
                 onClose={() => {
-                  m.destroy()
+                  modal.destroy()
                 }}
                 token={screenRecorderInfo.token}
                 onStartCallback={() => {
                   setRecording(true)
-                  m.destroy()
+                  modal.destroy()
                 }}
               />
             ),
@@ -874,34 +872,40 @@ export const FuncDomain: React.FC<FuncDomainProp> = React.memo((props) => {
   const onUserMenuClick = useMemoizedFn((key: string) => {
     if (key === 'sign-out') {
       if (dynamicStatus.isDynamicStatus || dynamicStatus.isDynamicSelfStatus) {
-        Modal.confirm({
+        let modal: ReturnType<typeof showRuiYanModal>
+        modal = showRuiYanModal({
           title: t('YakitModal.friendlyReminder'),
-          icon: <ExclamationCircleOutlined />,
           content: t('FuncDomain.signOutRemoteConfirm'),
-          cancelText: t('YakitButton.cancel'),
-          okText: t('YakitButton.exit'),
-          onOk() {
-            if (dynamicStatus.isDynamicStatus) {
-              yakitNetwork.logoutDynamicControl({
-                loginOut: true,
-              })
-            }
-            if (dynamicStatus.isDynamicSelfStatus) {
-              yakitNetwork.killDynamicControl().finally(() => {
-                setStoreUserInfo(defaultUserInfo)
-                loginOut(userInfo)
-                setTimeout(() => success(t('FuncDomain.signOutSuccess')), 500)
-              })
-              // 立即退出界面
-              yakitNetwork.exitDynamicControlPage()
-            }
-          },
-          onCancel() {},
-          cancelButtonProps: {
-            size: 'small',
-            className: 'modal-cancel-button',
-          },
-          okButtonProps: { size: 'small', className: 'modal-ok-button' },
+          width: 480,
+          closeOnBackdrop: false,
+          footer: (
+            <>
+              <RuiYanButton variant="secondary" onClick={() => modal.destroy()}>
+                {t('YakitButton.cancel')}
+              </RuiYanButton>
+              <RuiYanButton
+                onClick={() => {
+                  if (dynamicStatus.isDynamicStatus) {
+                    yakitNetwork.logoutDynamicControl({
+                      loginOut: true,
+                    })
+                  }
+                  if (dynamicStatus.isDynamicSelfStatus) {
+                    yakitNetwork.killDynamicControl().finally(() => {
+                      setStoreUserInfo(defaultUserInfo)
+                      loginOut(userInfo)
+                      setTimeout(() => success(t('FuncDomain.signOutSuccess')), 500)
+                    })
+                    // 立即退出界面
+                    yakitNetwork.exitDynamicControlPage()
+                  }
+                  modal.destroy()
+                }}
+              >
+                {t('YakitButton.exit')}
+              </RuiYanButton>
+            </>
+          ),
         })
       } else {
         setStoreUserInfo(defaultUserInfo)
@@ -1097,60 +1101,55 @@ export const FuncDomain: React.FC<FuncDomainProp> = React.memo((props) => {
         />
       )}
 
-      <YakitModal
-        visible={passwordShow}
-        closable={passwordClose}
-        title={t('Main.setPassword')}
-        destroyOnClose={true}
-        maskClosable={false}
-        bodyStyle={{ padding: '10px 24px 24px 24px' }}
-        width={520}
-        onCancel={() => setPasswordShow(false)}
-        footer={null}
-      >
-        <SetPassword onCancel={() => setPasswordShow(false)} userInfo={userInfo} />
-      </YakitModal>
+      {passwordShow ? (
+        <RuiYanModal
+          open={true}
+          closable={passwordClose}
+          title={t('Main.setPassword')}
+          width={480}
+          onClose={() => passwordClose && setPasswordShow(false)}
+          closeOnBackdrop={false}
+        >
+          <SetPassword onCancel={() => setPasswordShow(false)} userInfo={userInfo} />
+        </RuiYanModal>
+      ) : null}
 
-      <YakitModal
-        visible={uploadModalShow}
-        title={t('FuncDomain.uploadData')}
-        destroyOnClose={true}
-        maskClosable={false}
-        bodyStyle={{ padding: '10px 24px 24px 24px' }}
-        width={520}
-        onCancel={() => setUploadModalShow(false)}
-        footer={null}
-      >
-        <SelectUpload onCancel={() => setUploadModalShow(false)} />
-      </YakitModal>
+      {uploadModalShow ? (
+        <RuiYanModal
+          open={true}
+          title={t('FuncDomain.uploadData')}
+          width={480}
+          onClose={() => setUploadModalShow(false)}
+          closeOnBackdrop={false}
+        >
+          <SelectUpload onCancel={() => setUploadModalShow(false)} />
+        </RuiYanModal>
+      ) : null}
 
-      <YakitModal
-        visible={robotControlModal}
-        title={
-          <div className={robotControlStyles['robot-modal-title']}>
-            <OutlineDevicemobileIcon
-              className={robotControlStyles['mobile-control-title-icon']}
-              style={{ color: getMobileControlIconColor(imControlBadge.color) }}
-            />
-            {t('FuncDomain.mobileControl')}
-          </div>
-        }
-        subTitle={t('RobotControl.subTitle')}
-        type="white"
-        size="large"
-        destroyOnClose={true}
-        maskClosable={false}
-        bodyStyle={{ padding: '8px 16px 16px' }}
-        width={900}
-        onCancel={() => setRobotControlModal(false)}
-        footer={null}
-      >
-        <RobotControl
-          onCancel={() => setRobotControlModal(false)}
-          onRuntimeStatusChange={refreshIMControlStatus}
-          runtimeStatus={imControlStatus}
-        />
-      </YakitModal>
+      {robotControlModal ? (
+        <RuiYanModal
+          open={true}
+          title={
+            <div className={robotControlStyles['robot-modal-title']}>
+              <OutlineDevicemobileIcon
+                className={robotControlStyles['mobile-control-title-icon']}
+                style={{ color: getMobileControlIconColor(imControlBadge.color) }}
+              />
+              {t('FuncDomain.mobileControl')}
+            </div>
+          }
+          description={t('RobotControl.subTitle')}
+          width={960}
+          onClose={() => setRobotControlModal(false)}
+          closeOnBackdrop={false}
+        >
+          <RobotControl
+            onCancel={() => setRobotControlModal(false)}
+            onRuntimeStatusChange={refreshIMControlStatus}
+            runtimeStatus={imControlStatus}
+          />
+        </RuiYanModal>
+      ) : null}
       <DynamicControl
         mainTitle={t('FuncDomain.remoteControl')}
         secondTitle={t('FuncDomain.selectRole')}
@@ -1265,15 +1264,20 @@ const RunNodeModal: React.FC<RunNodeContProp> = (props) => {
   })
 
   return (
-    <YakitModal
+    <RuiYanModal
       title={t('RunNodeModal.runNode')}
-      width={600}
-      maskClosable={false}
-      closable={true}
-      visible={visible}
-      okText={t('YakitButton.confirm')}
-      onCancel={onCloseModal}
-      onOk={onOKFun}
+      width={720}
+      open={visible}
+      onClose={onCloseModal}
+      closeOnBackdrop={false}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" onClick={onCloseModal}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton onClick={onOKFun}>{t('YakitButton.confirm')}</RuiYanButton>
+        </>
+      }
     >
       <div>
         <div style={{ fontSize: 12, color: '#85899e', marginBottom: 10 }}>
@@ -1315,17 +1319,18 @@ const RunNodeModal: React.FC<RunNodeContProp> = (props) => {
           </Form.Item>
         </Form>
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 }
 
-interface UIOpSettingProp {
+export interface UIOpSettingProp {
   /** 当前引擎模式 */
   engineMode: YaklangEngineMode
   /** yaklang引擎切换启动模式 */
   onEngineModeChange: (type: YaklangEngineMode) => any
   typeCallback: (type: YakitSettingCallbackType) => any
   mcp: mcpStreamHooks
+  headless?: boolean
 }
 
 /** @name 菜单模式切换 目前只有Yakit 社区版有 */
@@ -1576,8 +1581,8 @@ const GetUIOpSettingMenu = () => {
   ].filter((item) => item)
 }
 
-const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
-  const { engineMode, onEngineModeChange, typeCallback, mcp } = props
+export const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
+  const { engineMode, onEngineModeChange, typeCallback, mcp, headless = false } = props
 
   const [runNodeModalVisible, setRunNodeModalVisible] = useState<boolean>(false)
   const [show, setShow] = useState<boolean>(false)
@@ -1588,6 +1593,7 @@ const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
   const { setConfigManagementActiveTab } = useConfigManagementTab()
   const { delTemporaryProject } = useTemporaryProjectStore()
   const [configMcpModalVisible, setConfigMcpModalVisible] = useState<boolean>(false)
+  const [diagnosticsVisible, setDiagnosticsVisible] = useState<boolean>(false)
   /** 当前主题 */
   const { setTheme } = useTheme()
   const { softMode, setSoftMode } = useSoftMode()
@@ -1624,6 +1630,16 @@ const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
           warn(t('UIOpSetting.remoteModeCannotModify'))
           return
         }
+        if (RENYAN_SHELL_ENABLED) {
+          let modal: ReturnType<typeof showRuiYanModal>
+          modal = showRuiYanModal({
+            title: t('UIOpSetting.configPrivateDomain'),
+            width: i18n.language.startsWith('zh') ? 480 : 720,
+            closeOnBackdrop: false,
+            content: <ConfigPrivateDomain onClose={() => modal.destroy()} />,
+          })
+          return modal
+        }
         const m = showYakitModal({
           title: (modalT) => modalT('UIOpSetting.configPrivateDomain'),
           type: 'white',
@@ -1643,16 +1659,15 @@ const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
         emiter.emit('menuOpenPage', JSON.stringify({ route: YakitRoute.ConfigManagement }))
         return
       case 'reverse':
-        showYakitModal({
-          type: 'white',
-          title: (modalT) => modalT('UIOpSetting.configGlobalReverse'),
-          width: 800,
+        showRuiYanModal({
+          title: t('UIOpSetting.configGlobalReverse'),
+          width: 960,
+          closeOnBackdrop: false,
           content: (
             <div style={{ width: 800 }}>
               <ConfigGlobalReverse />
             </div>
           ),
-          footer: null,
         })
         return
       case 'agent':
@@ -1703,6 +1718,9 @@ const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
         return
       case 'diagnose-network':
         addToTab('**diagnose-network')
+        return
+      case 'renyan-diagnostics':
+        setDiagnosticsVisible(true)
         return
       case 'config-network':
         addToTab('**config-network')
@@ -1809,20 +1827,22 @@ const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
 
   return (
     <>
-      <YakitPopover
-        overlayClassName={classNames(styles['ui-op-dropdown'], styles['ui-op-setting-dropdown'])}
-        placement={'bottom'}
-        content={menu}
-        visible={show}
-        onVisibleChange={(visible) => setShow(visible)}
-        trigger="click"
-      >
-        <div className={styles['ui-op-btn-wrapper']}>
-          <div className={classNames(styles['op-btn-body'], { [styles['op-btn-body-hover']]: show })}>
-            <UISettingSvgIcon className={show ? styles['icon-hover-style'] : styles['icon-style']} />
+      {!headless && (
+        <YakitPopover
+          overlayClassName={classNames(styles['ui-op-dropdown'], styles['ui-op-setting-dropdown'])}
+          placement={'bottom'}
+          content={menu}
+          visible={show}
+          onVisibleChange={(visible) => setShow(visible)}
+          trigger="click"
+        >
+          <div className={styles['ui-op-btn-wrapper']}>
+            <div className={classNames(styles['op-btn-body'], { [styles['op-btn-body-hover']]: show })}>
+              <UISettingSvgIcon className={show ? styles['icon-hover-style'] : styles['icon-style']} />
+            </div>
           </div>
-        </div>
-      </YakitPopover>
+        </YakitPopover>
+      )}
       <DatabaseUpdateModal
         available={available}
         visible={dataBaseUpdateVisible}
@@ -1831,6 +1851,33 @@ const UIOpSetting: React.FC<UIOpSettingProp> = React.memo((props) => {
       />
       <RunNodeModal runNodeModalVisible={runNodeModalVisible} onClose={() => setRunNodeModalVisible(false)} />
       {configMcpModalVisible && <ConfigMcpModal mcp={mcp} onClose={() => setConfigMcpModalVisible(false)} />}
+      <RuiYanDrawer
+        open={diagnosticsVisible}
+        width={480}
+        title="日志诊断"
+        description="执行网络诊断，或打开本机日志目录"
+        onClose={() => setDiagnosticsVisible(false)}
+        footer={
+          <RuiYanButton variant="secondary" onClick={() => setDiagnosticsVisible(false)}>
+            关闭
+          </RuiYanButton>
+        }
+      >
+        <div className={styles['renyan-diagnostics-list']}>
+          <RuiYanButton
+            variant="primary"
+            onClick={() => {
+              setDiagnosticsVisible(false)
+              addToTab('**diagnose-network')
+            }}
+          >
+            网络诊断
+          </RuiYanButton>
+          <RuiYanButton onClick={() => grpcOpenEngineLogFolder()}>打开引擎日志目录</RuiYanButton>
+          <RuiYanButton onClick={() => grpcOpenRenderLogFolder()}>打开渲染端日志目录</RuiYanButton>
+          <RuiYanButton onClick={() => grpcOpenPrintLogFolder()}>打开调试日志目录</RuiYanButton>
+        </div>
+      </RuiYanDrawer>
       <YakitHint
         visible={reclaimHint}
         title={t('HomeCom.reclaimDatabaseSpaceTitle')}
@@ -2326,10 +2373,11 @@ const MoreYaklangVersion: React.FC<MoreYaklangVersionProps> = React.memo((props)
   )
 })
 
-interface UIOpNoticeProp {
+export interface UIOpNoticeProp {
   isEngineLink: boolean
   isRemoteMode: boolean
   onLogin: () => void
+  presentation?: 'popover' | 'drawer'
 }
 
 export interface UpdateContentProp {
@@ -2355,8 +2403,8 @@ interface SetUpdateContentProp extends FetchUpdateContentProp {
   source?: VersionSource
 }
 
-const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
-  const { isEngineLink, isRemoteMode, onLogin } = props
+export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
+  const { isEngineLink, isRemoteMode, onLogin, presentation = 'popover' } = props
   const { t } = useI18nNamespaces(['layout', 'yakitUi'])
 
   const { userInfo } = useStore()
@@ -2977,70 +3025,65 @@ const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
     debugTaskEvent.startT()
   }, [userInfo.isLogin])
 
-  return (
-    <YakitPopover
-      overlayClassName={classNames(styles['ui-op-dropdown'], styles['ui-op-plus-dropdown'])}
-      placement={'bottomRight'}
-      trigger={'click'}
-      content={notice}
-      visible={show}
-      onVisibleChange={(visible) => {
-        if (isShowEnpriTraceUpdateVisible) return
-        if (editShow.visible) setShow(false)
-        else setShow(visible)
-      }}
-    >
-      <div className={styles['ui-op-btn-wrapper']}>
-        <div className={classNames(styles['op-btn-body'], { [styles['op-btn-body-hover']]: show })}>
-          <Badge dot={isUpdate}>
-            <VersionUpdateSvgIcon className={show ? styles['icon-hover-style'] : styles['icon-style']} />
-          </Badge>
-        </div>
+  const trigger = (
+    <div className={styles['ui-op-btn-wrapper']}>
+      <div className={classNames(styles['op-btn-body'], { [styles['op-btn-body-hover']]: show })}>
+        <Badge dot={isUpdate}>
+          <VersionUpdateSvgIcon className={show ? styles['icon-hover-style'] : styles['icon-style']} />
+        </Badge>
       </div>
-      <YakitModal
+    </div>
+  )
+
+  const supplementalOverlays = (
+    <>
+      <RuiYanModal
+        open={editShow.visible}
+        width={720}
         title={
           editShow.type === 'yakit'
             ? `${getReleaseEditionName()} ${yakitLastVersion} 更新通知`
             : `RuiYan Engine ${yaklangLastVersion} 更新通知`
         }
-        centered={true}
-        closable={true}
-        type="white"
-        size="large"
-        visible={editShow.visible}
-        cancelButtonProps={{ loading: editLoading }}
-        okButtonProps={{ loading: editLoading }}
-        onCancel={() => setEditShow({ visible: false, type: 'yakit' })}
-        onOk={onSubmitEdit}
-        bodyStyle={{ padding: '16px 24px' }}
+        onClose={() => setEditShow({ visible: false, type: 'yakit' })}
+        closeOnBackdrop={false}
+        footer={
+          <>
+            <RuiYanButton
+              variant="secondary"
+              disabled={editLoading}
+              onClick={() => setEditShow({ visible: false, type: 'yakit' })}
+            >
+              取消
+            </RuiYanButton>
+            <RuiYanButton loading={editLoading} onClick={onSubmitEdit}>
+              保存
+            </RuiYanButton>
+          </>
+        }
       >
-        <div>
-          <YakitInput.TextArea
-            rows={10}
-            value={editInfo}
-            onChange={(e) => setEditInfo(e.target.value)}
-          ></YakitInput.TextArea>
-        </div>
-      </YakitModal>
+        <YakitInput.TextArea
+          rows={10}
+          value={editInfo}
+          onChange={(e) => setEditInfo(e.target.value)}
+        ></YakitInput.TextArea>
+      </RuiYanModal>
 
-      <YakitModal
-        type="white"
-        size="large"
-        visible={isShowEnpriTraceUpdateVisible}
+      <RuiYanModal
+        open={isShowEnpriTraceUpdateVisible}
+        width={480}
         title="检测到 内网版 EnpriTrace 版本升级"
-        children={`检测到有新版本${yakitLastIntranetVersion}，请立即更新`}
-        onCancel={() => {
+        onClose={() => {
           setShowEnpriTraceUpdateVisible(false)
         }}
-        maskClosable={false}
+        closeOnBackdrop={false}
         footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, width: '100%' }}>
-            <YakitButton size="max" type="outline1" onClick={() => yakitShell.openYakitPath()}>
+          <>
+            <RuiYanButton variant="secondary" onClick={() => yakitShell.openYakitPath()}>
               打开路径
-            </YakitButton>
-            <YakitButton
+            </RuiYanButton>
+            <RuiYanButton
               loading={intranetHintLoading}
-              size="max"
               onClick={() => {
                 setIntranetHintLoading(true)
                 yakitShell
@@ -3057,10 +3100,12 @@ const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
               }}
             >
               立即更新
-            </YakitButton>
-          </div>
+            </RuiYanButton>
+          </>
         }
-      />
+      >
+        检测到有新版本{yakitLastIntranetVersion}，请立即更新
+      </RuiYanModal>
 
       {/* 任务通知 */}
       <YakitHint
@@ -3072,7 +3117,7 @@ const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
         cancelButtonProps={taskModalInfo.cancelButtonProps}
         okButtonProps={{ loading: taskModalInfo.loading }}
         wrapClassName={styles['task-notification-wrap']}
-        width={600}
+        width={720}
       />
       {/* 创建任务重名 */}
       <YakitHint
@@ -3084,9 +3129,68 @@ const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
         onOk={debugTaskEvent.coverP}
         onCancel={debugTaskEvent.waitP}
         wrapClassName={styles['task-notification-wrap']}
-        width={600}
+        width={720}
       />
-    </YakitPopover>
+    </>
+  )
+
+  return (
+    <>
+      {presentation === 'drawer' ? (
+        <RuiYanDrawer
+          open={show}
+          width={640}
+          title="引擎"
+          description="查看当前引擎版本并执行可用更新"
+          onClose={() => setShow(false)}
+          bodyClassName={classNames(styles['renyan-notice-drawer-body'], styles['ui-op-plus-dropdown'])}
+          footer={
+            <RuiYanButton variant="secondary" onClick={() => setShow(false)}>
+              关闭
+            </RuiYanButton>
+          }
+        >
+          <div className={styles['ui-op-plus-wrapper']}>
+            <div className={styles['ui-op-notice-body']}>
+              <div className={styles['notice-version-wrapper']}>
+                <div className={styles['version-wrapper']}>
+                  <UIOpUpdateYaklang
+                    version={yaklangVersion}
+                    lastVersion={yaklangLastVersion}
+                    localVersion={yaklangLocalVersion}
+                    moreYaklangVersionList={moreYaklangVersionList}
+                    isRemoteMode={isRemoteMode}
+                    onDownload={onDownload}
+                    role={userInfo.role}
+                    updateContent={communityYaklang}
+                    onUpdateEdit={UpdateContentEdit}
+                    onNoticeShow={setShow}
+                    isUpdate={lowerYaklangLastVersion}
+                    isUpdateYakit={false}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </RuiYanDrawer>
+      ) : (
+        <YakitPopover
+          overlayClassName={classNames(styles['ui-op-dropdown'], styles['ui-op-plus-dropdown'])}
+          placement={'bottomRight'}
+          trigger={'click'}
+          content={notice}
+          visible={show}
+          onVisibleChange={(visible) => {
+            if (isShowEnpriTraceUpdateVisible) return
+            if (editShow.visible) setShow(false)
+            else setShow(visible)
+          }}
+        >
+          {trigger}
+        </YakitPopover>
+      )}
+      {supplementalOverlays}
+    </>
   )
 })
 
@@ -3255,8 +3359,9 @@ const UIOpRisk: React.FC<UIOpRiskProp> = React.memo((props) => {
       .query({ Id: info.Id })
       .then((res: Risk) => {
         if (!res) return
-        const m = showYakitModal({
-          width: '80%',
+        let modal: ReturnType<typeof showRuiYanModal>
+        modal = showRuiYanModal({
+          width: 960,
           title: '详情',
           content: (
             <div style={{ overflow: 'auto', maxHeight: '70vh' }}>
@@ -3267,9 +3372,7 @@ const UIOpRisk: React.FC<UIOpRiskProp> = React.memo((props) => {
               )}
             </div>
           ),
-          onOk: () => {
-            m.destroy()
-          },
+          footer: <RuiYanButton onClick={() => modal.destroy()}>确定</RuiYanButton>,
         })
       })
       .catch(() => {})
@@ -3494,14 +3597,16 @@ const UIOpIRifyRisk: React.FC<UIOpRiskProp> = React.memo((props) => {
     }).then((res) => {
       if (!res || res.Data.length === 0) return
       setShow(false)
-      let m = showModal({
-        width: '80%',
+      let modal: ReturnType<typeof showRuiYanModal>
+      modal = showRuiYanModal({
+        width: 960,
         title: '详情',
         content: (
           <div style={{ overflow: 'auto', maxHeight: '70vh' }}>
-            <YakitAuditRiskDetails info={res.Data[0]} isShowExtra={true} isExtraClick={() => m.destroy()} />
+            <YakitAuditRiskDetails info={res.Data[0]} isShowExtra={true} isExtraClick={() => modal.destroy()} />
           </div>
         ),
+        footer: <RuiYanButton onClick={() => modal.destroy()}>确定</RuiYanButton>,
       })
     })
   })
@@ -3797,12 +3902,11 @@ const ScreenAndScreenshot: React.FC<ScreenAndScreenshotProps> = React.memo((prop
             [ele.Field]: value,
           }
         })
-        let m = showYakitModal({
+        let modal: ReturnType<typeof showRuiYanModal>
+        modal = showRuiYanModal({
           title: '性能采样',
-          width: 400,
-          closable: true,
-          centered: true,
-          maskClosable: false,
+          width: 480,
+          closeOnBackdrop: false,
           content: (
             <PerformanceSampleForm
               onPerformanceParams={(params) => {
@@ -3812,45 +3916,57 @@ const ScreenAndScreenshot: React.FC<ScreenAndScreenshotProps> = React.memo((prop
               requiredParams={requiredParams}
             ></PerformanceSampleForm>
           ),
-          okButtonProps: { icon: <SolidPlayIcon /> },
-          onOkText: '开始检测',
-          onOk: () => {
-            const yakExecutorParams: YakExecutorParam[] = []
-            initRequiredFormValue['timeout'] = Number(performanceParamsRef.current.timeout) || 0
-            if (!initRequiredFormValue['timeout']) {
-              yakitNotify('error', '检测时间必须大于0')
-              return
-            }
-            const executeParams: DebugPluginRequest = {
-              Code: '',
-              PluginType: samplingPlugin.Type,
-              Input: '',
-              HTTPRequestTemplate: {} as HTTPRequestBuilderParams,
-              ExecParams: yakExecutorParams,
-              PluginName: samplingPlugin.ScriptName,
-            }
-            executeParams.ExecParams = getYakExecutorParam({ ...initRequiredFormValue })
-            setPerformanceSamplingLog([])
-            debugPluginStreamEvent.reset()
-            apiDebugPlugin({
-              params: executeParams,
-              token: performanceSamplingInfo.token,
-              pluginCustomParams: samplingPlugin.Params,
-            }).then(() => {
-              debugPluginStreamEvent.start()
-              setSampling(true)
-              m.destroy()
-              performanceModalRef.current = null
-              performanceModalLoading.current = false
-            })
-          },
-          onCancel: () => {
-            m.destroy()
-            performanceModalRef.current = null
-            performanceModalLoading.current = false
-          },
+          footer: (
+            <>
+              <RuiYanButton
+                variant="secondary"
+                onClick={() => {
+                  modal.destroy()
+                  performanceModalRef.current = null
+                  performanceModalLoading.current = false
+                }}
+              >
+                取消
+              </RuiYanButton>
+              <RuiYanButton
+                icon={<SolidPlayIcon />}
+                onClick={() => {
+                  const yakExecutorParams: YakExecutorParam[] = []
+                  initRequiredFormValue['timeout'] = Number(performanceParamsRef.current.timeout) || 0
+                  if (!initRequiredFormValue['timeout']) {
+                    yakitNotify('error', '检测时间必须大于0')
+                    return
+                  }
+                  const executeParams: DebugPluginRequest = {
+                    Code: '',
+                    PluginType: samplingPlugin.Type,
+                    Input: '',
+                    HTTPRequestTemplate: {} as HTTPRequestBuilderParams,
+                    ExecParams: yakExecutorParams,
+                    PluginName: samplingPlugin.ScriptName,
+                  }
+                  executeParams.ExecParams = getYakExecutorParam({ ...initRequiredFormValue })
+                  setPerformanceSamplingLog([])
+                  debugPluginStreamEvent.reset()
+                  apiDebugPlugin({
+                    params: executeParams,
+                    token: performanceSamplingInfo.token,
+                    pluginCustomParams: samplingPlugin.Params,
+                  }).then(() => {
+                    debugPluginStreamEvent.start()
+                    setSampling(true)
+                    modal.destroy()
+                    performanceModalRef.current = null
+                    performanceModalLoading.current = false
+                  })
+                }}
+              >
+                开始检测
+              </RuiYanButton>
+            </>
+          ),
         })
-        performanceModalRef.current = m
+        performanceModalRef.current = modal
       })
       .catch(() => {
         performanceModalLoading.current = false
@@ -3998,16 +4114,16 @@ const CrashLogModal: React.FC<CrashLogModalProps> = (props) => {
   })
 
   return (
-    <YakitModal
+    <RuiYanModal
       title="崩溃日志采集"
-      width={'70%'}
-      visible={!!runtimeId}
-      destroyOnClose
-      onCancel={onCancel}
+      width={960}
+      open={!!runtimeId}
+      onClose={onCancel}
+      closeOnBackdrop={false}
       footer={
-        <div className={styles['crash-log-footer']}>
-          <YakitButton onClick={onCancel}>取消</YakitButton>
-        </div>
+        <RuiYanButton variant="secondary" onClick={onCancel}>
+          取消
+        </RuiYanButton>
       }
     >
       <div className={styles['crash-log-wrapper']}>
@@ -4027,7 +4143,7 @@ const CrashLogModal: React.FC<CrashLogModalProps> = (props) => {
           pluginExecuteResultWrapper={styles['plugin-execute-result-wrapper']}
         />
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 }
 

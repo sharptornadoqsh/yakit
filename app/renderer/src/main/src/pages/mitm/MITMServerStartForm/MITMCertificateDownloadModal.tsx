@@ -1,6 +1,6 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import styles from './MITMServerStartForm.module.scss'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { YakEditor } from '@/utils/editors'
 import { CaCertData } from '../MITMServerHijacking/MITMServerHijacking'
@@ -41,23 +41,27 @@ export const MITMCertificateDownloadModal: React.FC<MITMCertificateDownloadModal
     saveABSFileToOpen(fileName, caCerts.CaCerts)
   })
   return (
-    <YakitModal
-      visible={visible}
-      onCancel={() => setVisible(false)}
-      closable={true}
+    <RuiYanModal
+      open={visible}
+      onClose={() => setVisible(false)}
       title={t('MITMCertificateDownloadModal.download_cert')}
+      description="查看当前证书内容并保存到本地，代理访问说明位于操作区"
       width={720}
-      className={styles['mitm-certificate-download-modal']}
-      okText={t('MITMCertificateDownloadModal.download_and_open')}
-      footerExtra={
-        <div className={styles['certificate-download-modal-footer']}>
-          {t('MITMCertificateDownloadModal.after_proxy_visit')}
-          <YakitTag enableCopy copyText="http://mitm" iconColor="var(--Colors-Use-Main-Primary)" />
-          {t('MITMCertificateDownloadModal.auto_download_cert')}
-        </div>
+      bodyClassName={styles['mitm-certificate-download-modal']}
+      footer={
+        <>
+          <div className={styles['certificate-download-modal-footer']}>
+            {t('MITMCertificateDownloadModal.after_proxy_visit')}
+            <YakitTag enableCopy copyText="http://mitm" iconColor="var(--Colors-Use-Main-Primary)" />
+            {t('MITMCertificateDownloadModal.auto_download_cert')}
+          </div>
+          <RuiYanButton variant="secondary" onClick={() => setVisible(false)}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton onClick={() => onDown()}>{t('MITMCertificateDownloadModal.download_and_open')}</RuiYanButton>
+        </>
       }
-      onOk={() => onDown()}
-      bodyStyle={{ padding: 8 }}
+      closeOnBackdrop={false}
     >
       <YakitCard
         title={
@@ -101,7 +105,7 @@ export const MITMCertificateDownloadModal: React.FC<MITMCertificateDownloadModal
           <YakEditor bytes={true} valueBytes={caCerts.CaCerts} />
         </div>
       </YakitCard>
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 

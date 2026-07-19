@@ -1,4 +1,4 @@
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
+import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import styles from './PluginExecuteExtraParams.module.scss'
 import { useMemoizedFn } from 'ahooks'
@@ -168,15 +168,16 @@ const PluginExecuteExtraParams: React.FC<PluginExecuteExtraParamsProps> = React.
       form.setFieldsValue({ ...restValue })
     })
     return (
-      <YakitDrawer
-        className={styles['plugin-execute-extra-params-drawer']}
-        visible={visible}
+      <RuiYanDrawer
+        open={visible}
         onClose={onClose}
-        width="max(700px, 40%)"
+        width={640}
         title="额外参数"
+        description="设置单个插件任务的请求与执行参数"
+        footer={<RuiYanButton onClick={onClose}>保存并关闭</RuiYanButton>}
       >
         {pluginParamsNodeByPluginType(pluginType)}
-      </YakitDrawer>
+      </RuiYanDrawer>
     )
   }),
 )

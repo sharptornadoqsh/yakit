@@ -1,8 +1,8 @@
 import { useControllableValue, useCreation, useDebounceFn, useMemoizedFn } from 'ahooks'
 import React, { ForwardedRef, forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import styles from './PluginBatchExecutor.module.scss'
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
+import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
 import { ColumnsTypeProps, SortProps } from '@/components/TableVirtualResize/TableVirtualResizeType'
 import { formatTimestamp } from '@/utils/timeUtil'
 import { TableVirtualResize } from '@/components/TableVirtualResize/TableVirtualResize'
@@ -53,29 +53,29 @@ const HybridScanTaskListDrawer: React.FC<HybridScanTaskListDrawerProps> = React.
     }, 300)
   })
   return (
-    <YakitDrawer
-      visible={visible}
+    <RuiYanDrawer
+      open={visible}
       onClose={onClose}
-      width="45%"
+      width={640}
       title="任务列表"
-      extra={
+      description="查看真实批量扫描任务状态与历史结果"
+      footer={
         <>
           {selectedRowKeys.length === 0 ? (
             <YakitPopconfirm title="该操作会清空下面所有数据" onConfirm={onRemove}>
-              <YakitButton loading={removeLoading} type="primary" danger>
+              <RuiYanButton loading={removeLoading} variant="secondary">
                 清空
-              </YakitButton>
+              </RuiYanButton>
             </YakitPopconfirm>
           ) : (
             <YakitPopconfirm title="该操作会删除勾选数据" onConfirm={onRemove}>
-              <YakitButton loading={removeLoading} type="primary" danger>
+              <RuiYanButton loading={removeLoading} variant="secondary">
                 删除
-              </YakitButton>
+              </RuiYanButton>
             </YakitPopconfirm>
           )}
         </>
       }
-      bodyStyle={{ overflow: 'hidden' }}
     >
       <HybridScanTaskList
         visible={visible}
@@ -85,7 +85,7 @@ const HybridScanTaskListDrawer: React.FC<HybridScanTaskListDrawerProps> = React.
         setSelectedRowKeys={setSelectedRowKeys}
         hybridScanTaskSource={hybridScanTaskSource}
       />
-    </YakitDrawer>
+    </RuiYanDrawer>
   )
 })
 export default HybridScanTaskListDrawer

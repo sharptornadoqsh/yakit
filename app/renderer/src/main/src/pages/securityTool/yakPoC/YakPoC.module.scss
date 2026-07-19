@@ -3,9 +3,10 @@
 
 .yak-poc-execute-wrapper {
   @include securityTool.execute-title('yak-poc');
-  border: 1px solid #cbdadc;
-  border-radius: 3px;
-  background: var(--Colors-Use-Basic-Background);
+  min-width: 0;
+  border: 1px solid var(--ruiyan-color-border);
+  border-radius: var(--ruiyan-radius-lg);
+  background: var(--ruiyan-color-surface);
   .yak-poc-executor-body {
     padding: 0 12px 16px;
     &-cont {
@@ -39,42 +40,115 @@
   flex: 1;
   height: 100%;
   overflow: hidden;
-  padding: 8px;
-  gap: 8px;
-  background-color: #eef4f4;
-  .yakpoc-tab-wrap {
+  padding: 12px;
+  gap: 12px;
+  background-color: var(--ruiyan-color-background);
+
+  .detection-workflow {
     width: 100%;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(120px, 1fr));
     flex-shrink: 0;
-    overflow: hidden;
-    border: 1px solid #cbdadc;
-    border-radius: 3px;
-    background: var(--Colors-Use-Basic-Background);
+    overflow-x: auto;
+    padding: 6px;
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-lg);
+    background: var(--ruiyan-color-surface);
   }
+
+  .workflow-step {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 120px;
+    gap: 8px;
+    padding: 8px 12px;
+    color: var(--ruiyan-color-text-tertiary);
+    border-radius: var(--ruiyan-radius-sm);
+    transition:
+      color 160ms ease,
+      background-color 160ms ease;
+
+    &:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 9px;
+      right: 0;
+      bottom: 9px;
+      width: 1px;
+      background: var(--ruiyan-color-border);
+    }
+  }
+
+  .workflow-step-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    color: var(--ruiyan-color-text-tertiary);
+    font-size: 10px;
+    font-weight: 700;
+    border: 1px solid var(--ruiyan-color-border-strong);
+    border-radius: var(--ruiyan-radius-pill);
+  }
+
+  .workflow-step-label {
+    overflow: hidden;
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workflow-step-active {
+    color: var(--ruiyan-color-primary);
+    background: var(--ruiyan-color-primary-soft);
+
+    .workflow-step-index {
+      color: var(--ruiyan-color-surface);
+      background: var(--ruiyan-color-primary);
+      border-color: var(--ruiyan-color-primary);
+    }
+  }
+
+  .workflow-step-complete {
+    color: var(--ruiyan-color-text-secondary);
+
+    .workflow-step-index {
+      color: var(--ruiyan-color-primary);
+      border-color: var(--ruiyan-color-primary);
+    }
+  }
+
   .yak-poc-body {
     display: flex;
     flex: 1;
     width: 100%;
     min-height: 0;
-    gap: 8px;
+    gap: 12px;
     overflow: hidden;
   }
   .left-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
     height: 100%;
     overflow: hidden;
-    border: 1px solid #cbdadc;
-    border-radius: 3px;
-    background: var(--Colors-Use-Basic-Background);
-    padding: 12px 8px;
-    width: 33.33333%;
-    max-width: 432px;
-    min-width: 320px;
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-lg);
+    background: var(--ruiyan-color-surface);
+    padding: 12px;
+    width: 280px;
+    min-width: 280px;
     .left-header-search {
       @extend %display-flex-center;
-      justify-content: space-between;
+      align-items: flex-start;
+      flex-direction: column;
       padding: 0 4px;
+      gap: 8px;
       .header-type-wrapper {
         @extend %display-flex-center;
         align-items: center;
@@ -96,8 +170,10 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    border-right: 1px solid var(--Colors-Use-Neutral-Border);
-    padding: 12px 8px;
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-lg);
+    background: var(--ruiyan-color-surface);
+    padding: 12px;
     gap: 8px;
     flex-shrink: 0;
     .midden-heard {
@@ -121,6 +197,17 @@
         }
       }
     }
+    .midden-stage-heading {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      gap: 8px;
+      padding-bottom: 8px;
+      color: var(--ruiyan-color-text);
+      font-size: 12px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--ruiyan-color-border);
+    }
     .plugin-list-by-group-wrapper {
       display: flex;
       flex: 1;
@@ -131,6 +218,20 @@
       display: none;
     }
   }
+}
+
+.stage-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 6px;
+  color: var(--ruiyan-color-primary);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: var(--ruiyan-radius-pill);
+  background: var(--ruiyan-color-primary-soft);
 }
 .plugin-execute-log-wrapper {
   display: flex;

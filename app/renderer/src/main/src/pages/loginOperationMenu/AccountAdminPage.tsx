@@ -20,14 +20,12 @@ import classNames from 'classnames'
 import { YakitPopconfirm } from '@/components/yakitUI/YakitPopconfirm/YakitPopconfirm'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
 import { Avatar, Form, Tooltip } from 'antd'
 import { useControllableValue, useCreation, useDebounceFn, useMemoizedFn, useThrottleFn, useUpdateEffect } from 'ahooks'
 import { TableVirtualResize } from '@/components/TableVirtualResize/TableVirtualResize'
 import { ColumnsTypeProps } from '@/components/TableVirtualResize/TableVirtualResizeType'
 import moment from 'moment'
 import { useCampare } from '@/hook/useCompare/useCompare'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { unReadable } from '../dynamicControl/DynamicControl'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import styles from './AccountAdminPage.module.scss'
@@ -35,13 +33,24 @@ import { setClipboardText } from '@/utils/clipboard'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useStore } from '@/store'
 import {
-  RuiYanDetailPanel,
-  RuiYanEmptyState,
+  RuiYanButton,
+  RuiYanDrawer,
   RuiYanErrorState,
+  RuiYanModal,
   RuiYanPanel,
-  RuiYanSplitPane,
   RuiYanStatusBadge,
+  showRuiYanModal,
 } from '@/components/renyanUI'
+
+const showPasswordUpdatedModal = () =>
+  showRuiYanModal({
+    title: '密码已更新',
+    description: '请通过既定安全渠道向用户交付登录凭据。',
+    width: 480,
+    content: <RuiYanStatusBadge tone="success">更新成功</RuiYanStatusBadge>,
+    closeOnBackdrop: false,
+  })
+
 interface QueryAccountAdminRequest {
   departmentId?: number
   keywords: string
@@ -84,6 +93,7 @@ export const AccountAdminPage: React.FC<AccountAdminPageProp> = (props) => {
   const [selectedAccount, setSelectedAccount] = useState<API.UrmUserList>()
 
   const onSelectDepartmentId = useMemoizedFn((departmentId) => {
+    setSelectedAccount(undefined)
     setTableQuery((prevQuery) => ({
       ...prevQuery,
       departmentId: departmentId === -1 ? 0 : departmentId,
@@ -114,83 +124,84 @@ export const AccountAdminPage: React.FC<AccountAdminPageProp> = (props) => {
           </div>
         }
       >
-        <RuiYanSplitPane
-          className={styles['account-workspace']}
-          firstSize="72%"
-          first={
-            <YakitResizeBox
-              isVer={false}
-              lineDirection="left"
-              firstNode={
-                <OrganizationAdmin
-                  selectDepartmentId={tableQuery.departmentId === 0 ? -1 : tableQuery.departmentId}
-                  onSelectDepartmentId={onSelectDepartmentId}
-                  onSetSelectTitle={setSelectTitle}
-                  treeCount={treeCount}
-                  treeReduceCount={treeReduceCount}
-                />
-              }
-              firstRatio="30%"
-              firstMinSize="400px"
-              firstNodeStyle={{ padding: 0 }}
-              secondNode={
-                <AccountList
-                  selectTitle={selectTitle}
-                  onSetSelectTitle={setSelectTitle}
-                  query={tableQuery}
-                  onSetQuery={setTableQuery}
-                  onSetTreeCount={setTreeCount}
-                  onSetTreeReduceCount={setTreeReduceCount}
-                  onSelectAccount={setSelectedAccount}
-                />
-              }
-              secondRatio="70%"
-              secondMinSize="500px"
-            />
+        <div className={styles['account-workspace']}>
+          <YakitResizeBox
+            isVer={false}
+            lineDirection="left"
+            firstNode={
+              <OrganizationAdmin
+                selectDepartmentId={tableQuery.departmentId === 0 ? -1 : tableQuery.departmentId}
+                onSelectDepartmentId={onSelectDepartmentId}
+                onSetSelectTitle={setSelectTitle}
+                treeCount={treeCount}
+                treeReduceCount={treeReduceCount}
+              />
+            }
+            firstRatio="30%"
+            firstMinSize="400px"
+            firstNodeStyle={{ padding: 0 }}
+            secondNode={
+              <AccountList
+                selectTitle={selectTitle}
+                onSetSelectTitle={setSelectTitle}
+                query={tableQuery}
+                onSetQuery={setTableQuery}
+                onSetTreeCount={setTreeCount}
+                onSetTreeReduceCount={setTreeReduceCount}
+                onSelectAccount={setSelectedAccount}
+              />
+            }
+            secondRatio="70%"
+            secondMinSize="500px"
+          />
+        </div>
+        <RuiYanDrawer
+          open={Boolean(selectedAccount)}
+          title="用户详情"
+          description={selectedAccount ? `${selectedAccount.user_name} · ${selectedAccount.uid}` : undefined}
+          width={480}
+          onClose={() => setSelectedAccount(undefined)}
+          footer={
+            <RuiYanButton variant="secondary" onClick={() => setSelectedAccount(undefined)}>
+              关闭
+            </RuiYanButton>
           }
-          second={
-            <RuiYanDetailPanel className={styles['account-detail']} title="用户详情">
-              {selectedAccount ? (
-                <div className={styles['account-detail-content']}>
-                  <div className={styles['account-detail-identity']}>
-                    <Avatar src={selectedAccount.head_img}>
-                      {selectedAccount.user_name.slice(0, 1).toUpperCase()}
-                    </Avatar>
-                    <div>
-                      <strong>{selectedAccount.nickName || selectedAccount.user_name}</strong>
-                      <small>{selectedAccount.user_name}</small>
-                    </div>
-                    <RuiYanStatusBadge tone="info">{selectedAccount.role_name || '默认角色'}</RuiYanStatusBadge>
-                  </div>
-                  <dl className={styles['account-detail-list']}>
-                    <div>
-                      <dt>用户标识</dt>
-                      <dd>{selectedAccount.uid}</dd>
-                    </div>
-                    <div>
-                      <dt>所属组织</dt>
-                      <dd>
-                        {[selectedAccount.department_parent_name, selectedAccount.department_name]
-                          .filter(Boolean)
-                          .join(' / ') || '未分配'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>来源平台</dt>
-                      <dd>{selectedAccount.from_platform || '未报告'}</dd>
-                    </div>
-                    <div>
-                      <dt>创建时间</dt>
-                      <dd>{moment.unix(selectedAccount.created_at).format('YYYY-MM-DD HH:mm')}</dd>
-                    </div>
-                  </dl>
+        >
+          {selectedAccount ? (
+            <div className={styles['account-detail-content']}>
+              <div className={styles['account-detail-identity']}>
+                <Avatar src={selectedAccount.head_img}>{selectedAccount.user_name.slice(0, 1).toUpperCase()}</Avatar>
+                <div>
+                  <strong>{selectedAccount.nickName || selectedAccount.user_name}</strong>
+                  <small>{selectedAccount.user_name}</small>
                 </div>
-              ) : (
-                <RuiYanEmptyState compact title="选择用户查看详情" description="详情仅展示服务返回的真实账号字段。" />
-              )}
-            </RuiYanDetailPanel>
-          }
-        />
+                <RuiYanStatusBadge tone="info">{selectedAccount.role_name || '默认角色'}</RuiYanStatusBadge>
+              </div>
+              <dl className={styles['account-detail-list']}>
+                <div>
+                  <dt>用户标识</dt>
+                  <dd>{selectedAccount.uid}</dd>
+                </div>
+                <div>
+                  <dt>所属组织</dt>
+                  <dd>
+                    {[selectedAccount.department_parent_name, selectedAccount.department_name]
+                      .filter(Boolean)
+                      .join(' / ') || '未分配'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>来源平台</dt>
+                  <dd>{selectedAccount.from_platform || '未报告'}</dd>
+                </div>
+                <div>
+                  <dt>创建时间</dt>
+                  <dd>{moment.unix(selectedAccount.created_at).format('YYYY-MM-DD HH:mm')}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : null}
+        </RuiYanDrawer>
       </RuiYanPanel>
     </div>
   )
@@ -585,9 +596,10 @@ const OrganizationAdmin: React.FC<OrganizationAdminProps> = (props) => {
             icon={<OutlinePlusIcon />}
             type="text"
             onClick={() => {
-              const m = showYakitModal({
-                title: (modalT) => modalT('OrganizationAdmin.addFirstLevelDepartment'),
-                width: 500,
+              const m = showRuiYanModal({
+                title: t('OrganizationAdmin.addFirstLevelDepartment'),
+                description: '创建顶级组织并刷新当前组织树',
+                width: 480,
                 content: (
                   <CreateOrganizationForm
                     onClose={() => {
@@ -610,7 +622,7 @@ const OrganizationAdmin: React.FC<OrganizationAdminProps> = (props) => {
                     }}
                   />
                 ),
-                footer: null,
+                closeOnBackdrop: false,
               })
             }}
           ></YakitButton>
@@ -706,9 +718,10 @@ const OrganizationAdmin: React.FC<OrganizationAdminProps> = (props) => {
                             if (selectDepartmentId !== key) {
                               onSelectDepartmentId(key)
                             }
-                            const m = showYakitModal({
-                              title: (modalT) => modalT('OrganizationAdmin.addSecondLevelDepartment'),
-                              width: 500,
+                            const m = showRuiYanModal({
+                              title: t('OrganizationAdmin.addSecondLevelDepartment'),
+                              description: '在当前组织下创建子级组织',
+                              width: 480,
                               content: (
                                 <CreateOrganizationForm
                                   onClose={() => {
@@ -730,7 +743,7 @@ const OrganizationAdmin: React.FC<OrganizationAdminProps> = (props) => {
                                   parentId={key}
                                 />
                               ),
-                              footer: null,
+                              closeOnBackdrop: false,
                             })
                           }}
                         ></YakitButton>
@@ -931,7 +944,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
       width: 170,
       fixed: 'right',
       render: (_, record: API.UrmUserList) => (
-        <div className={styles['table-action-icon']}>
+        <div className={styles['table-action-icon']} onClick={(e) => e.stopPropagation()}>
           <OutlinePencilaltIcon
             className={styles['action-icon']}
             onClick={() => {
@@ -1058,28 +1071,9 @@ const AccountList: React.FC<AccountListProps> = (props) => {
         uid,
       },
     })
-      .then((res) => {
+      .then(() => {
         update(1)
-        const { user_name, password } = res
-        showYakitModal({
-          title: '账号信息',
-          content: (
-            <div style={{ padding: 15 }}>
-              <div style={{ color: 'var(--Colors-Use-Neutral-Text-1-Title)' }}>
-                用户名：<span>{user_name}</span>
-              </div>
-              <div style={{ color: 'var(--Colors-Use-Neutral-Text-1-Title)' }}>
-                密码：<span>{password}</span>
-              </div>
-              <div style={{ textAlign: 'center', marginTop: 10 }}>
-                <YakitButton type="primary" onClick={() => setClipboardText(`用户名：${user_name}\n密码：${password}`)}>
-                  复制
-                </YakitButton>
-              </div>
-            </div>
-          ),
-          footer: null,
-        })
+        showPasswordUpdatedModal()
       })
       .catch((err) => {
         yakitNotify('error', '重置账号失败：' + err)
@@ -1276,17 +1270,16 @@ const AccountList: React.FC<AccountListProps> = (props) => {
           onChangeCheckboxSingle,
         }}
       ></TableVirtualResize>
-      <YakitModal
-        visible={creatCountVisible}
+      <RuiYanModal
+        open={creatCountVisible}
         title={editInfoRef.current ? '编辑账号' : '创建账号'}
-        destroyOnClose={true}
-        maskClosable={false}
-        width={600}
-        onCancel={() => {
+        description="配置用户身份、所属组织和角色，提交操作继续使用当前账号服务接口。"
+        closeOnBackdrop={false}
+        width={720}
+        onClose={() => {
           setCreatCountVisible(false)
           editInfoRef.current = undefined
         }}
-        footer={null}
       >
         <AccountForm
           editInfo={editInfoRef.current}
@@ -1311,7 +1304,7 @@ const AccountList: React.FC<AccountListProps> = (props) => {
             }
           }}
         />
-      </YakitModal>
+      </RuiYanModal>
     </div>
   )
 }
@@ -1526,32 +1519,10 @@ const AccountForm: React.FC<AccountFormProps> = (props) => {
         url: 'urm',
         data: params,
       })
-        .then((res: API.NewUrmResponse) => {
-          const { user_name, password } = res
+        .then(() => {
           onCancel()
           refresh(departmentId)
-          showYakitModal({
-            title: '账号信息',
-            content: (
-              <div style={{ padding: 15 }}>
-                <div style={{ color: 'var(--Colors-Use-Neutral-Text-1-Title)' }}>
-                  用户名：<span>{user_name}</span>
-                </div>
-                <div style={{ color: 'var(--Colors-Use-Neutral-Text-1-Title)' }}>
-                  密码：<span>{password}</span>
-                </div>
-                <div style={{ textAlign: 'center', marginTop: 10 }}>
-                  <YakitButton
-                    type="primary"
-                    onClick={() => setClipboardText(`用户名：${user_name}\n密码：${password}`)}
-                  >
-                    复制
-                  </YakitButton>
-                </div>
-              </div>
-            ),
-            footer: null,
-          })
+          showPasswordUpdatedModal()
         })
         .catch((err) => {
           yakitNotify('error', '创建账号失败：' + (err?.message || err))
@@ -1567,7 +1538,7 @@ const AccountForm: React.FC<AccountFormProps> = (props) => {
   }
 
   return (
-    <Form labelCol={{ span: 5 }} wrapperCol={{ span: 16 }} form={form} onFinish={onFinish}>
+    <Form className={styles['operation-form']} layout="vertical" form={form} onFinish={onFinish}>
       <Form.Item name="user_name" label="用户名" rules={[{ required: true, message: '该项为必填' }]}>
         <YakitInput placeholder="请输入用户名" allowClear />
       </Form.Item>
@@ -1606,10 +1577,11 @@ const AccountForm: React.FC<AccountFormProps> = (props) => {
           ))}
         </YakitSelect>
       </Form.Item>
-      <div style={{ textAlign: 'center' }}>
-        <YakitButton style={{ width: 200 }} type="primary" htmlType="submit" loading={loading}>
+      <div className={styles['operation-actions']}>
+        <RuiYanButton onClick={onCancel}>取消</RuiYanButton>
+        <RuiYanButton variant="primary" type="submit" loading={loading}>
           确认
-        </YakitButton>
+        </RuiYanButton>
       </div>
     </Form>
   )

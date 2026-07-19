@@ -1,6 +1,6 @@
 import React, { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { useMemoizedFn, useSize, useUpdateEffect } from 'ahooks'
-import { OutlineIdentificationIcon, OutlinePuzzleIcon, OutlineTagIcon, OutlineXIcon } from '@/assets/icon/outline'
+import { useMemoizedFn, useUpdateEffect } from 'ahooks'
+import { OutlineIdentificationIcon, OutlinePuzzleIcon, OutlineTagIcon } from '@/assets/icon/outline'
 import { SolidBanIcon } from '@/assets/icon/solid'
 import {
   PluginBaseInfoFormProps,
@@ -10,14 +10,12 @@ import {
 } from './PluginLogType'
 import { API } from '@/services/swagger/resposeType'
 import { Form } from 'antd'
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { YakitTagColor } from '@/components/yakitUI/YakitTag/YakitTagType'
 import { YakitDiffEditor } from '@/components/yakitUI/YakitDiffEditor/YakitDiffEditor'
 import { yakitNotify } from '@/utils/notification'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { pluginConvertMergeToUIs } from '@/pages/pluginEditor/utils/convert'
@@ -40,13 +38,14 @@ import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import { YakitSwitch } from '@/components/yakitUI/YakitSwitch/YakitSwitch'
 import emiter from '@/utils/eventBus/eventBus'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { RuiYanButton, RuiYanDrawer, RuiYanModal } from '@/components/renyanUI'
 
 import classNames from 'classnames'
 import styles from './PluginLog.module.scss'
 
 /** 日志-申请修改插件信息的详情组件 */
 export const PluginLogMergeDetail: React.FC<PluginLogMergeDetailProps> = memo((props) => {
-  const { getContainer, uuid, id, visible, callback } = props
+  const { uuid, id, visible, callback } = props
   const { t } = useI18nNamespaces(['pluginHub', 'yakitUi'])
 
   // 关闭
@@ -55,11 +54,6 @@ export const PluginLogMergeDetail: React.FC<PluginLogMergeDetailProps> = memo((p
   })
 
   /** ---------- 控制抽屉组件尺寸 Start ---------- */
-  const getContainerSize = useSize(getContainer)
-  // 抽屉展示高度
-  const showHeight = useMemo(() => {
-    return getContainerSize?.height || 800
-  }, [getContainerSize])
   /** ---------- 控制抽屉组件尺寸 End ---------- */
 
   const [activeTab, setActiveTab] = useState<string>('diff')
@@ -344,48 +338,38 @@ export const PluginLogMergeDetail: React.FC<PluginLogMergeDetailProps> = memo((p
 
   return (
     <>
-      <YakitDrawer
-        getContainer={getContainer}
-        placement="bottom"
-        mask={false}
-        closable={false}
-        keyboard={false}
-        height={showHeight}
-        visible={visible}
-        className={styles['plugin-log-merge-detail-drawer']}
-        title={
-          <YakitRadioButtons
-            size="large"
-            buttonStyle="solid"
-            value={activeTab}
-            options={[
-              { value: 'diff', label: t('PluginLogMergeDetail.sourceDiff') },
-              { value: 'baseInfo', label: t('PluginLogMergeDetail.baseInfoDiff') },
-              { value: 'debug', label: t('PluginLogMergeDetail.pluginDebug') },
-            ]}
-            onChange={(e) => setActiveTab(e.target.value)}
-          />
-        }
-        extra={
-          <div className={styles['header-extra-wrapper']}>
-            <YakitButton
-              type="outline1"
-              colors="danger"
-              loading={modifyLoading}
-              icon={<SolidBanIcon />}
-              onClick={onOpenNoPass}
-            >
-              {t('PluginLogMergeDetail.cancelMerge')}
-            </YakitButton>
-            <YakitButton colors="success" loading={modifyLoading} icon={<OutlinePuzzleIcon />} onClick={onOpenPass}>
-              {t('PluginLogMergeDetail.mergeCode')}
-            </YakitButton>
-
-            <YakitButton type="text2" icon={<OutlineXIcon />} onClick={onCancel} />
-          </div>
-        }
+      <RuiYanDrawer
+        open={visible}
+        width={640}
+        title="插件合并"
+        description={plugin?.ScriptName || t('PluginLogMergeDetail.sourceDiff')}
+        closeOnBackdrop={false}
         onClose={onCancel}
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={onCancel}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton variant="secondary" loading={modifyLoading} icon={<SolidBanIcon />} onClick={onOpenNoPass}>
+              {t('PluginLogMergeDetail.cancelMerge')}
+            </RuiYanButton>
+            <RuiYanButton loading={modifyLoading} icon={<OutlinePuzzleIcon />} onClick={onOpenPass}>
+              {t('PluginLogMergeDetail.mergeCode')}
+            </RuiYanButton>
+          </>
+        }
       >
+        <YakitRadioButtons
+          size="large"
+          buttonStyle="solid"
+          value={activeTab}
+          options={[
+            { value: 'diff', label: t('PluginLogMergeDetail.sourceDiff') },
+            { value: 'baseInfo', label: t('PluginLogMergeDetail.baseInfoDiff') },
+            { value: 'debug', label: t('PluginLogMergeDetail.pluginDebug') },
+          ]}
+          onChange={(e) => setActiveTab(e.target.value)}
+        />
         <YakitSpin spinning={loading}>
           <div className={styles['plugin-log-merge-detail-wrapper']}>
             <div
@@ -429,19 +413,24 @@ export const PluginLogMergeDetail: React.FC<PluginLogMergeDetailProps> = memo((p
             {activeTab === 'debug' && <PluginDebugBody plugin={plugin} newCode={newCode} setNewCode={setNewCode} />}
           </div>
         </YakitSpin>
-      </YakitDrawer>
+      </RuiYanDrawer>
 
-      <YakitModal
+      <RuiYanModal
+        open={noPass}
         title={t('PluginLogMergeDetail.noMergeReasonTitle')}
-        type="white"
-        width={448}
-        centered={true}
-        maskClosable={false}
-        closable={true}
-        visible={noPass}
-        okButtonProps={{ loading: modifyReasonLoading }}
-        onCancel={onCancelNoPass}
-        onOk={submitNoPass}
+        width={480}
+        closeOnBackdrop={false}
+        onClose={onCancelNoPass}
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={onCancelNoPass}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton variant="primary" loading={modifyReasonLoading} onClick={submitNoPass}>
+              {t('YakitButton.ok')}
+            </RuiYanButton>
+          </>
+        }
       >
         <Form form={noPassForm}>
           <Form.Item
@@ -457,20 +446,21 @@ export const PluginLogMergeDetail: React.FC<PluginLogMergeDetailProps> = memo((p
             />
           </Form.Item>
         </Form>
-      </YakitModal>
+      </RuiYanModal>
 
-      <YakitModal
+      <RuiYanModal
+        open={pass}
         title={t('PluginLogMergeDetail.modifySourceScore')}
-        type="white"
-        width={506}
-        centered={true}
-        maskClosable={false}
-        closable={false}
-        destroyOnClose={true}
-        visible={pass}
-        okButtonProps={{ style: { display: 'none' } }}
-        footer={score === 1 ? undefined : null}
-        onCancel={onCancelPass}
+        width={720}
+        closeOnBackdrop={false}
+        onClose={onCancelPass}
+        footer={
+          score === 1 ? (
+            <RuiYanButton variant="secondary" onClick={onCancelPass}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+          ) : undefined
+        }
       >
         <CodeScoreModule
           type={pluginType || 'yak'}
@@ -488,7 +478,7 @@ export const PluginLogMergeDetail: React.FC<PluginLogMergeDetailProps> = memo((p
           }
           callback={onCallbackScore}
         />
-      </YakitModal>
+      </RuiYanModal>
     </>
   )
 })
@@ -846,18 +836,18 @@ export const PluginLogCodeDiff: React.FC<PluginLogCodeDiffProps> = memo((props) 
   })
 
   return (
-    <YakitModal
-      type="white"
+    <RuiYanModal
+      open={visible}
       title={t('PluginLogMergeDetail.codeDiff')}
-      centered={true}
-      visible={visible}
-      closable={true}
-      maskClosable={false}
-      keyboard={false}
-      width="75%"
-      cancelText={t('YakitButton.close')}
-      onCancel={onCancel}
-      okButtonProps={{ style: { display: 'none' } }}
+      width={960}
+      closeOnBackdrop={false}
+      bodyClassName={styles['plugin-log-code-diff-modal-body']}
+      onClose={onCancel}
+      footer={
+        <RuiYanButton variant="secondary" onClick={onCancel}>
+          {t('YakitButton.close')}
+        </RuiYanButton>
+      }
     >
       <div className={styles['plugin-log-diff-code']}>
         <YakitSpin spinning={loading} tip={t('PluginLogMergeDetail.loadingDiffCode')}>
@@ -871,6 +861,6 @@ export const PluginLogCodeDiff: React.FC<PluginLogCodeDiffProps> = memo((props) 
           />
         </YakitSpin>
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 })

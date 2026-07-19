@@ -1,9 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react'
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
 import { PluginOperationGroupListRefProps, PluginOperationGroupList } from './PluginOperationGroupList'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { SolidPlusIcon } from '@/assets/icon/solid'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
+import { RuiYanButton, RuiYanDrawer, showRuiYanModal } from '@/components/renyanUI'
 import { Form, Tooltip } from 'antd'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import {
@@ -36,14 +35,10 @@ export const PluginGroupDrawer: React.FC<PluginFroupMagDrawerProp> = (props) => 
 
   // 新增分组
   const addNewGroup = () => {
-    let m = showYakitModal({
+    const m = showRuiYanModal({
       title: '新增分组',
-      width: 500,
-      footer: null,
-      closable: true,
-      maskClosable: false,
-      centered: true,
-      destroyOnClose: true,
+      width: 480,
+      closeOnBackdrop: false,
       content: (
         <Form
           form={form}
@@ -53,70 +48,67 @@ export const PluginGroupDrawer: React.FC<PluginFroupMagDrawerProp> = (props) => 
           onSubmitCapture={(e) => {
             e.preventDefault()
           }}
-          style={{ margin: '24px 0' }}
+          style={{ margin: '8px 0' }}
         >
           <Form.Item label={'组名'} rules={[{ required: true, message: '请填写组名' }]} name={'groupName'}>
             <YakitInput />
           </Form.Item>
-          <div className={styles['add-new-group-btns']}>
-            <YakitButton
-              type="outline2"
-              onClick={() => {
-                form.setFieldsValue({ groupName: '' })
-                m.destroy()
-              }}
-            >
-              取消
-            </YakitButton>
-            <YakitButton
-              type={'primary'}
-              onClick={() => {
-                form.validateFields().then((res) => {
-                  const index = pluginOperationGroupListRef.current?.groupList.findIndex(
-                    (item) => item.name === res.groupName,
-                  )
-                  if (index !== -1) {
-                    yakitNotify('info', '新增组名已存在')
-                  } else {
-                    if (groupType === 'local') {
-                      apiFetchAddYakScriptGroupLocal(res.groupName).then(() => {
-                        m.destroy()
-                        pluginOperationGroupListRef.current?.getGroupList()
-                        pluginOperationGroupListRef.current?.setChangeGroupListFlag(true)
-                      })
-                    } else if (judgeOnlineStatus) {
-                      apiFetchAddYakScriptGroupOnline(res.groupName).then(() => {
-                        m.destroy()
-                        pluginOperationGroupListRef.current?.getGroupList()
-                        pluginOperationGroupListRef.current?.setChangeGroupListFlag(true)
-                      })
-                    }
-                  }
-                })
-              }}
-            >
-              确定
-            </YakitButton>
-          </div>
         </Form>
       ),
-      modalAfterClose: () => {
-        form.setFieldsValue({ groupName: '' })
-      },
+      footer: (
+        <>
+          <RuiYanButton
+            variant="secondary"
+            onClick={() => {
+              form.setFieldsValue({ groupName: '' })
+              m.destroy()
+            }}
+          >
+            取消
+          </RuiYanButton>
+          <RuiYanButton
+            onClick={() => {
+              form.validateFields().then((res) => {
+                const index = pluginOperationGroupListRef.current?.groupList.findIndex(
+                  (item) => item.name === res.groupName,
+                )
+                if (index !== -1) {
+                  yakitNotify('info', '新增组名已存在')
+                } else if (groupType === 'local') {
+                  apiFetchAddYakScriptGroupLocal(res.groupName).then(() => {
+                    form.setFieldsValue({ groupName: '' })
+                    m.destroy()
+                    pluginOperationGroupListRef.current?.getGroupList()
+                    pluginOperationGroupListRef.current?.setChangeGroupListFlag(true)
+                  })
+                } else if (judgeOnlineStatus) {
+                  apiFetchAddYakScriptGroupOnline(res.groupName).then(() => {
+                    form.setFieldsValue({ groupName: '' })
+                    m.destroy()
+                    pluginOperationGroupListRef.current?.getGroupList()
+                    pluginOperationGroupListRef.current?.setChangeGroupListFlag(true)
+                  })
+                }
+              })
+            }}
+          >
+            确定
+          </RuiYanButton>
+        </>
+      ),
     })
   }
 
   return (
-    <YakitDrawer
-      visible={visible}
+    <RuiYanDrawer
+      open={visible}
       onClose={() => onClose(pluginOperationGroupListRef.current?.changeGroupListFlag === true)}
-      width="500px"
-      title={
-        <div className={styles['group-drawer-title']}>
-          <div className={styles['group-drawer-title-left']}>
-            插件组管理
-            <span className={styles['plugin-groups-number']}>{groupLen}</span>
-          </div>
+      width={480}
+      title="插件组管理"
+      description={`共 ${groupLen} 个分组`}
+    >
+      {visible ? (
+        <>
           <div className={styles['group-drawer-title-right']}>
             {groupType === 'local' && (
               <>
@@ -125,11 +117,11 @@ export const PluginGroupDrawer: React.FC<PluginFroupMagDrawerProp> = (props) => 
                     type="text"
                     colors="danger"
                     onClick={() => {
-                      const m = showYakitModal({
+                      const m = showRuiYanModal({
                         title: '重置',
-                        onOkText: '确认',
-                        centered: true,
-                        onOk: () => {
+                        width: 480,
+                        confirmText: '确认',
+                        onConfirm: () => {
                           m.destroy()
                           setResetLoading(true)
                           apiFetchResetYakScriptGroup({ Token: userInfo.token })
@@ -141,12 +133,7 @@ export const PluginGroupDrawer: React.FC<PluginFroupMagDrawerProp> = (props) => 
                               setResetLoading(false)
                             })
                         },
-                        content: (
-                          <div style={{ margin: 15 }}>重置将删除本地所有分组，并重新下载所有线上插件，是否重置？</div>
-                        ),
-                        onCancel: () => {
-                          m.destroy()
-                        },
+                        content: <div>重置将删除本地所有分组，并重新下载所有线上插件，是否重置？</div>,
                       })
                     }}
                     disabled={resetLoading}
@@ -161,21 +148,18 @@ export const PluginGroupDrawer: React.FC<PluginFroupMagDrawerProp> = (props) => 
               新增分组
             </YakitButton>
           </div>
-        </div>
-      }
-    >
-      {visible ? (
-        <div className={styles['group-drawer-cont-wrapper']}>
-          <YakitSpin spinning={resetLoading} tip="重置中...">
-            <PluginOperationGroupList
-              ref={pluginOperationGroupListRef}
-              groupType={groupType}
-              judgeOnlineStatus={judgeOnlineStatus}
-              onGroupLen={setGroupLen}
-            ></PluginOperationGroupList>
-          </YakitSpin>
-        </div>
+          <div className={styles['group-drawer-cont-wrapper']}>
+            <YakitSpin spinning={resetLoading} tip="重置中...">
+              <PluginOperationGroupList
+                ref={pluginOperationGroupListRef}
+                groupType={groupType}
+                judgeOnlineStatus={judgeOnlineStatus}
+                onGroupLen={setGroupLen}
+              ></PluginOperationGroupList>
+            </YakitSpin>
+          </div>
+        </>
       ) : null}
-    </YakitDrawer>
+    </RuiYanDrawer>
   )
 }

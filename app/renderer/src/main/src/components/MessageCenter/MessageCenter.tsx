@@ -47,6 +47,8 @@ import {
   ProjectsResponse,
 } from '@/pages/softwareSettings/ProjectManage'
 import { YakitHint } from '../yakitUI/YakitHint/YakitHint'
+import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
 import moment from 'moment'
 const { ipcRenderer } = window.require('electron')
 
@@ -511,7 +513,7 @@ export const MessageCenter: React.FC<MessageCenterProps> = (props) => {
         cancelButtonProps={taskModalInfo.cancelButtonProps}
         okButtonProps={{ loading: taskModalInfo.loading }}
         wrapClassName={styles['task-notification-wrap']}
-        width={600}
+        width={720}
       />
       {/* 创建任务重名 */}
       <YakitHint
@@ -523,7 +525,7 @@ export const MessageCenter: React.FC<MessageCenterProps> = (props) => {
         onOk={debugTaskEvent.coverP}
         onCancel={debugTaskEvent.waitP}
         wrapClassName={styles['task-notification-wrap']}
-        width={600}
+        width={720}
       />
     </>
   )
@@ -692,7 +694,7 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
           cancelButtonProps={taskModalInfo.cancelButtonProps}
           okButtonProps={{ loading: taskModalInfo.loading }}
           wrapClassName={styles['task-notification-wrap']}
-          width={600}
+          width={720}
         />
         {/* 创建任务重名 */}
         <YakitHint
@@ -704,7 +706,7 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
           onOk={debugTaskEvent.coverP}
           onCancel={debugTaskEvent.waitP}
           wrapClassName={styles['task-notification-wrap']}
-          width={600}
+          width={720}
         />
       </div>
     )
@@ -738,6 +740,63 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
     })
   })
 
+  const messageTabs = (
+    <YakitTabs
+      activeKey={activeKey}
+      onChange={(v: any) => setActiveKey(v)}
+      tabBarStyle={{ marginBottom: 5 }}
+      className={styles['message-center-tab']}
+      tabBarExtraContent={
+        <>
+          {activeKey === 'unread' && dataSorce.length > 0 && (
+            <YakitButton type="outline2" loading={taskLoading} onClick={onRedAllMessage}>
+              {t('MessageCenter.markAllRead')}
+            </YakitButton>
+          )}
+          {activeKey === 'all' && dataSorce.length > 0 && (
+            <YakitButton type="outline1" colors="danger" onClick={onClearAllMessage}>
+              {t('YakitButton.clearAll')}
+            </YakitButton>
+          )}
+        </>
+      }
+    >
+      <YakitTabs.YakitTabPane
+        tab={
+          <div className={styles['info-tab']}>
+            {t('MessageCenter.unread')}
+            {typeof noRedDataTotal === 'number' && <div className={styles['info-tab-dot']}>{noRedDataTotal}</div>}
+          </div>
+        }
+        key={'unread'}
+      >
+        {virtualList()}
+      </YakitTabs.YakitTabPane>
+      <YakitTabs.YakitTabPane tab={t('MessageCenter.all')} key={'all'}>
+        {virtualList()}
+      </YakitTabs.YakitTabPane>
+    </YakitTabs>
+  )
+
+  if (RENYAN_SHELL_ENABLED) {
+    return (
+      <RuiYanDrawer
+        open={visible}
+        width={480}
+        title={t('MessageCenter.title')}
+        description="集中查看未读消息与全部通知"
+        onClose={() => setVisible(false)}
+        footer={
+          <RuiYanButton variant="secondary" onClick={() => setVisible(false)}>
+            关闭
+          </RuiYanButton>
+        }
+      >
+        <div className={styles['message-center-layout']}>{messageTabs}</div>
+      </RuiYanDrawer>
+    )
+  }
+
   return (
     <Resizable
       style={{ position: 'absolute' }}
@@ -768,41 +827,7 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
             <YakitButton size="small" type="text2" icon={<RemoveIcon />} onClick={() => setVisible(false)} />
           </div>
         </div>
-        <YakitTabs
-          activeKey={activeKey}
-          onChange={(v: any) => setActiveKey(v)}
-          tabBarStyle={{ marginBottom: 5 }}
-          className={styles['message-center-tab']}
-          tabBarExtraContent={
-            <>
-              {activeKey === 'unread' && dataSorce.length > 0 && (
-                <YakitButton type="outline2" loading={taskLoading} onClick={onRedAllMessage}>
-                  {t('MessageCenter.markAllRead')}
-                </YakitButton>
-              )}
-              {activeKey === 'all' && dataSorce.length > 0 && (
-                <YakitButton type="outline1" colors="danger" onClick={onClearAllMessage}>
-                  {t('YakitButton.clearAll')}
-                </YakitButton>
-              )}
-            </>
-          }
-        >
-          <YakitTabs.YakitTabPane
-            tab={
-              <div className={styles['info-tab']}>
-                {t('MessageCenter.unread')}
-                {typeof noRedDataTotal === 'number' && <div className={styles['info-tab-dot']}>{noRedDataTotal}</div>}
-              </div>
-            }
-            key={'unread'}
-          >
-            {virtualList()}
-          </YakitTabs.YakitTabPane>
-          <YakitTabs.YakitTabPane tab={t('MessageCenter.all')} key={'all'}>
-            {virtualList()}
-          </YakitTabs.YakitTabPane>
-        </YakitTabs>
+        {messageTabs}
       </div>
     </Resizable>
   )

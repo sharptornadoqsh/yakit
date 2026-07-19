@@ -10,8 +10,8 @@ import { YakitGetOnlinePlugin } from '@/pages/mitm/MITMServerHijacking/MITMPlugi
 import { registerShortcutKeyHandle, unregisterShortcutKeyHandle } from '@/utils/globalShortcutKey/utils'
 import { ShortcutKeyPage } from '@/utils/globalShortcutKey/events/pageMaps'
 import { YakitRoute } from '@/enums/yakitRoute'
+import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
 
-import classNames from 'classnames'
 import '../../plugins/plugins.scss'
 import styles from './PluginHub.module.scss'
 
@@ -59,14 +59,14 @@ const PluginHub: React.FC<PluginHubProps> = memo((props) => {
   const [autoOpenDetailTab, setAutoOpenDetailTab] = useState<string>()
 
   const [isDetail, setIsDetail] = useState<boolean>(false)
+  const [selectedDetail, setSelectedDetail] = useState<PluginToDetailInfo>()
   const handlePluginDetail = useMemoizedFn((info: PluginToDetailInfo) => {
+    setSelectedDetail(info)
     if (!isDetail) {
       setIsDetail(true)
     }
     sendPluginDetail(info)
   })
-  // 回收站页面时，隐藏详情页
-  const [hiddenDetail, setHiddenDetail] = useState<boolean>(false)
 
   /** ---------- 详情组件逻辑 Start ---------- */
   const detailRef = useRef<PluginHubDetailRefProps>(null)
@@ -81,37 +81,50 @@ const PluginHub: React.FC<PluginHubProps> = memo((props) => {
   const onBack = useMemoizedFn(() => {
     setIsDetail(false)
   })
+  const handleHiddenDetailPage = useMemoizedFn((hidden: boolean) => {
+    if (hidden) onBack()
+  })
   /** ---------- 详情组件逻辑 End ---------- */
 
   return (
     <div ref={wrapper} id={wrapperId} className={styles['yakit-plugin-hub']}>
-      <section
-        className={classNames(styles['list'], { [styles['out-list']]: hiddenDetail || !isDetail })}
-        data-pane="plugin-catalog"
-      >
+      <section className={styles['list']} data-pane="plugin-catalog">
         <PluginHubList
           rootElementId={wrapperId}
           active={active}
           setActive={setActive}
-          isDetail={isDetail}
+          isDetail={false}
           toPluginDetail={handlePluginDetail}
-          setHiddenDetailPage={setHiddenDetail}
+          setHiddenDetailPage={handleHiddenDetailPage}
           setAutoOpenDetailTab={setAutoOpenDetailTab}
         />
       </section>
 
-      {isDetail && (
-        <aside className={classNames(styles['detail'], { [styles['hidden']]: hiddenDetail })} data-pane="plugin-detail">
+      <RuiYanDrawer
+        open={isDetail}
+        width={640}
+        title="插件详情"
+        description={selectedDetail?.name || '查看插件信息、执行能力与操作记录'}
+        bodyClassName={styles['detail-drawer-body']}
+        onClose={onBack}
+        footer={
+          <RuiYanButton variant="secondary" onClick={onBack}>
+            关闭
+          </RuiYanButton>
+        }
+      >
+        {isDetail && (
           <PluginHubDetail
             ref={detailRef}
             rootElementId={wrapperId}
             active={active}
             onBack={onBack}
+            embedded={true}
             autoOpenDetailTab={autoOpenDetailTab}
             setAutoOpenDetailTab={setAutoOpenDetailTab}
           />
-        </aside>
-      )}
+        )}
+      </RuiYanDrawer>
 
       {/* mitm 新增 cli 参数，需要提示用户自动更新一遍本地插件内容 */}
       <YakitHint

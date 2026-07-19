@@ -80,60 +80,17 @@ export const DataCompare: React.FC<DataCompareProps> = (props) => {
         className={styles['compare-command-bar']}
         leading={
           <div className={styles['compare-heading']}>
-            <span>DIFF / 04</span>
             <strong>{t('DataCompare.comparer')}</strong>
+          </div>
+        }
+        actions={
+          <div className={styles['compare-summary']}>
             <small>{mode === 'text' ? '文本差异' : '字节差异'}</small>
             <small>
               左 {summary.leftLength} / 右 {summary.rightLength} {summary.unit}
             </small>
             <small>差异位置 {summary.differenceCount}</small>
           </div>
-        }
-        actions={
-          <>
-            <div className={styles['compare-mode-switch']} role="group" aria-label="差异模式">
-              <RuiYanButton
-                variant={mode === 'text' ? 'primary' : 'ghost'}
-                size="small"
-                onClick={() => changeMode('text')}
-              >
-                文本
-              </RuiYanButton>
-              <RuiYanButton
-                variant={mode === 'bytes' ? 'primary' : 'ghost'}
-                size="small"
-                onClick={() => changeMode('bytes')}
-              >
-                字节
-              </RuiYanButton>
-            </div>
-            <span className={styles['command-divider']} />
-            <RuiYanButton
-              variant="ghost"
-              size="small"
-              onClick={() => codeComparisonRef.current?.onNavigate('previous')}
-            >
-              上一处
-            </RuiYanButton>
-            <RuiYanButton variant="ghost" size="small" onClick={() => codeComparisonRef.current?.onNavigate('next')}>
-              下一处
-            </RuiYanButton>
-            <span className={styles['command-divider']} />
-            <RuiYanButton size="small" onClick={swapContent}>
-              交换
-            </RuiYanButton>
-            <RuiYanButton size="small" onClick={clearContent}>
-              清空
-            </RuiYanButton>
-            <RuiYanButton
-              variant={noWrap ? 'secondary' : 'primary'}
-              size="small"
-              icon={<RuiYanIcon name="packet" />}
-              onClick={() => codeComparisonRef.current?.onChangeLineConversion()}
-            >
-              换行
-            </RuiYanButton>
-          </>
         }
       />
       <div className={styles['compare-editor']}>
@@ -151,6 +108,49 @@ export const DataCompare: React.FC<DataCompareProps> = (props) => {
           initialLanguage={mode === 'bytes' ? 'plaintext' : 'yak'}
           useStoredCompareData={mode === 'text' && editorVersion === 0}
         />
+      </div>
+      <div className={styles['compare-action-bar']}>
+        <div className={styles['compare-mode-switch']} role="group" aria-label="差异模式">
+          <RuiYanButton
+            variant={mode === 'text' ? 'secondary' : 'ghost'}
+            size="small"
+            aria-pressed={mode === 'text'}
+            onClick={() => changeMode('text')}
+          >
+            文本
+          </RuiYanButton>
+          <RuiYanButton
+            variant={mode === 'bytes' ? 'secondary' : 'ghost'}
+            size="small"
+            aria-pressed={mode === 'bytes'}
+            onClick={() => changeMode('bytes')}
+          >
+            字节
+          </RuiYanButton>
+        </div>
+        <div className={styles['compare-actions']}>
+          <RuiYanButton variant="ghost" size="small" onClick={() => codeComparisonRef.current?.onNavigate('previous')}>
+            上一处
+          </RuiYanButton>
+          <RuiYanButton variant="ghost" size="small" onClick={() => codeComparisonRef.current?.onNavigate('next')}>
+            下一处
+          </RuiYanButton>
+          <span className={styles['command-divider']} />
+          <RuiYanButton size="small" onClick={swapContent}>
+            交换
+          </RuiYanButton>
+          <RuiYanButton size="small" onClick={clearContent}>
+            清空
+          </RuiYanButton>
+          <RuiYanButton
+            variant={noWrap ? 'secondary' : 'primary'}
+            size="small"
+            icon={<RuiYanIcon name="packet" />}
+            onClick={() => codeComparisonRef.current?.onChangeLineConversion()}
+          >
+            换行
+          </RuiYanButton>
+        </div>
       </div>
     </div>
   )

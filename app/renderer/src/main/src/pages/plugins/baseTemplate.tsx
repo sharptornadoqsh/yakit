@@ -42,7 +42,7 @@ import { CopyComponents, YakitTag } from '@/components/yakitUI/YakitTag/YakitTag
 import { YakitSwitch } from '@/components/yakitUI/YakitSwitch/YakitSwitch'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import { useDebounceFn, useGetState, useMemoizedFn, useControllableValue, useUpdateEffect } from 'ahooks'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { PluginBaseParamProps, PluginSettingParamProps, YakRiskInfoProps } from './pluginsType'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
@@ -608,13 +608,13 @@ export const PluginModifyInfo: React.FC<PluginModifyInfoProps> = memo(
           </div>
         </Form.Item>
 
-        <YakitModal
+        <RuiYanModal
           title="漏洞描述"
-          type="white"
-          closable={true}
-          footer={null}
-          visible={riskShow}
-          onCancel={onCancelRisk}
+          description="展示插件声明的漏洞说明与修复建议"
+          width={720}
+          open={riskShow}
+          onClose={onCancelRisk}
+          footer={<RuiYanButton onClick={onCancelRisk}>关闭</RuiYanButton>}
         >
           <div className={styles['risk-info-modal']}>
             {bugInfo.map((item) => {
@@ -647,7 +647,7 @@ export const PluginModifyInfo: React.FC<PluginModifyInfoProps> = memo(
               )
             })}
           </div>
-        </YakitModal>
+        </RuiYanModal>
       </Form>
     )
   }),

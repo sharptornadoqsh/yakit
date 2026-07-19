@@ -2,7 +2,6 @@ import React, { ForwardedRef, forwardRef, memo, useEffect, useImperativeHandle, 
 import { useDebounceFn, useMemoizedFn, useUpdateEffect } from 'ahooks'
 import { OutlineOpenIcon } from '@/assets/icon/outline'
 import { SolidPlayIcon } from '@/assets/icon/solid'
-import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { YakitTagColor } from '@/components/yakitUI/YakitTag/YakitTagType'
 import { YakitEditor } from '@/components/yakitUI/YakitEditor/YakitEditor'
@@ -73,8 +72,6 @@ export const EditorCode: React.FC<EditorCodeProps> = memo(
       setVisible(false)
       onExpand(true)
     })
-
-    const [activeTab, setActiveTab] = useState<string>('code')
 
     /** ---------- 代码和参数数据的更新 Start ---------- */
     const [content, setContent, getContent] = useGetSetState<string>('')
@@ -450,7 +447,6 @@ export const EditorCode: React.FC<EditorCodeProps> = memo(
 
             debugPluginStreamEvent.reset()
             setRuntimeId('')
-            setActiveTab('execResult')
             if (type === 'codec') {
               const codecInfo = await onCodeToInfo({ type: type, code: getContent() || '' })
               if ((codecInfo?.Tags || []).includes('AI工具')) {
@@ -505,15 +501,7 @@ export const EditorCode: React.FC<EditorCodeProps> = memo(
                 </div>
               </Tooltip>
             )}
-            <YakitRadioButtons
-              buttonStyle="solid"
-              value={activeTab}
-              options={[
-                { value: 'code', label: '源码' },
-                { value: 'execResult', label: '执行结果' },
-              ]}
-              onChange={(e) => setActiveTab(e.target.value)}
-            />
+            <span className={styles['workspace-title']}>插件工作台</span>
           </div>
 
           <div className={styles['header-title']}>
@@ -531,41 +519,45 @@ export const EditorCode: React.FC<EditorCodeProps> = memo(
         <div className={styles['editor-code-container']}>
           <div className={styles['editor-code-tab-body']}>
             <div className={styles['editor-operation-and-execution']}>
-              <div
-                tabIndex={activeTab !== 'code' ? -1 : 1}
-                className={classNames(styles['editor-code-pane-show'], {
-                  [styles['editor-code-pane-hidden']]: activeTab !== 'code',
-                })}
-              >
-                <YakitEditor type={type} value={content} setValue={setContent} />
-              </div>
+              <section className={styles['code-workspace']} aria-label="代码编辑">
+                <div className={styles['pane-heading']}>
+                  <span>代码编辑</span>
+                  <span className={styles['pane-caption']}>编辑内容会继续用于保存、参数解析与调试执行</span>
+                </div>
+                <div className={styles['editor-code-pane-show']}>
+                  <YakitEditor type={type} value={content} setValue={setContent} />
+                </div>
+              </section>
 
-              <div
-                tabIndex={activeTab !== 'execResult' ? -1 : 1}
-                className={classNames(styles['editor-code-pane-show'], styles['editor-code-tab-execute'], {
-                  [styles['editor-code-pane-hidden']]: activeTab !== 'execResult',
-                })}
-              >
-                {runtimeId ? (
-                  <>
-                    {streamInfo.progressState.length > 1 && (
-                      <div className={styles['plugin-executing-progress']}>
-                        {streamInfo.progressState.map((ele, index) => (
-                          <React.Fragment key={ele.id}>
-                            {index !== 0 && <Divider type="vertical" style={{ margin: 0, top: 2 }} />}
-                            <PluginExecuteProgress percent={ele.progress} name={ele.id} />
-                          </React.Fragment>
-                        ))}
+              <section className={styles['execution-workspace']} aria-label="运行日志与结果">
+                <div className={styles['pane-heading']}>
+                  <span>运行日志 / 结果</span>
+                  <span className={styles['execution-status']}>
+                    {isExecuting ? '调试执行中' : runtimeId ? '执行已结束' : '等待执行'}
+                  </span>
+                </div>
+                <div className={styles['editor-code-tab-execute']}>
+                  {runtimeId ? (
+                    <>
+                      {streamInfo.progressState.length > 1 && (
+                        <div className={styles['plugin-executing-progress']}>
+                          {streamInfo.progressState.map((ele, index) => (
+                            <React.Fragment key={ele.id}>
+                              {index !== 0 && <Divider type="vertical" style={{ margin: 0, top: 2 }} />}
+                              <PluginExecuteProgress percent={ele.progress} name={ele.id} />
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      )}
+                      <div className={styles['result-body']}>
+                        <PluginExecuteResult streamInfo={streamInfo} runtimeId={runtimeId} loading={isExecuting} />
                       </div>
-                    )}
-                    <div className={styles['result-body']}>
-                      <PluginExecuteResult streamInfo={streamInfo} runtimeId={runtimeId} loading={isExecuting} />
-                    </div>
-                  </>
-                ) : (
-                  <YakitEmpty style={{ marginTop: 60 }} description={'点击【执行】以开始'} />
-                )}
-              </div>
+                    </>
+                  ) : (
+                    <YakitEmpty style={{ marginTop: 24 }} description="点击右侧【执行】后在此查看实时日志与结果" />
+                  )}
+                </div>
+              </section>
             </div>
 
             <div className={styles['editor-params']}>

@@ -12,7 +12,6 @@ import emiter from '@/utils/eventBus/eventBus'
 import { useStore } from '@/store'
 import { PluginEnvVariables } from '../pluginEnvVariables/PluginEnvVariables'
 import { PluginSearchParams } from '@/pages/plugins/baseTemplateType'
-import { YakitSideTab } from '@/components/yakitSideTab/YakitSideTab'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 
 import classNames from 'classnames'
@@ -35,7 +34,7 @@ interface PluginHubListProps {
 }
 /** @name 插件中心 */
 export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
-  const { t, i18n } = useI18nNamespaces(['pluginHub'])
+  const { t } = useI18nNamespaces(['pluginHub'])
   const { rootElementId, isDetail, toPluginDetail, setHiddenDetailPage, setAutoOpenDetailTab } = props
 
   const userinfo = useStore((s) => s.userInfo)
@@ -115,6 +114,7 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
     }
 
     if (type !== active) {
+      setHiddenDetailPage(true)
       if (!rendered.current.has(type)) {
         rendered.current.add(type)
       }
@@ -183,6 +183,11 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
     setSearchParams(searchParams)
     onSetActive(type, true)
   })
+  const onNavigationChange = useMemoizedFn((type: PluginSourceType) => {
+    setSearchParams(undefined)
+    if (type !== active) setShow(true)
+    onSetActive(type)
+  })
 
   useEffect(() => {
     emiter.on('openPluginHubListAndDetail', handleOpenHubListAndDetail)
@@ -194,38 +199,41 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
   }, [])
   /** ---------- 通信监听 Start ---------- */
 
-  const barHint = useMemoizedFn((key: string) => {
-    const item = HubSideBarList.find((item) => item.value === key)
-    if (key !== active) {
-      return t('PluginHubList.clickToEnter', { target: item ? item.hint?.() || '' : t('PluginHubList.list') })
-    } else {
-      if (noDetailTabs.current.includes(key as PluginSourceType)) return ''
-      if (key === 'own' && !isLogin) return ''
-      if (isDetail) {
-        return !show ? t('PluginHubList.expandDetailList') : t('PluginHubList.collapseDetailList')
-      } else {
-        return !show ? t('PluginHubList.expandAdvancedFilter') : t('PluginHubList.collapseAdvancedFilter')
-      }
-    }
-  })
-
   return (
     <div className={styles['plugin-hub-list']}>
-      <div className={styles['side-bar-list']}>
-        <YakitSideTab
-          key={i18n.language}
-          yakitTabs={HubSideBarList}
-          activeKey={active}
-          onActiveKey={(v) => {
-            setSearchParams(undefined)
-            onSetActive(v as PluginSourceType)
-          }}
-          show={show}
-          setShow={setShow}
-          barHint={barHint}
-          t={t}
-        />
-      </div>
+      <nav className={styles['hub-navigation']} aria-label={t('PluginHubList.list')}>
+        <div className={styles['hub-navigation-tabs']} role="tablist">
+          {HubSideBarList.map((item) => {
+            const type = item.value as PluginSourceType
+            const label = typeof item.label === 'string' ? t(item.label) : item.label()
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={active === type}
+                className={classNames(styles['hub-navigation-tab'], {
+                  [styles['hub-navigation-tab-active']]: active === type,
+                })}
+                onClick={() => onNavigationChange(type)}
+              >
+                {item.icon}
+                <span>{label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {!noDetailTabs.current.includes(active) && !(active === 'own' && !isLogin) && (
+          <button
+            type="button"
+            className={classNames(styles['filter-toggle'], { [styles['filter-toggle-active']]: show })}
+            onClick={() => setShow((value) => !value)}
+          >
+            {show ? t('PluginHubList.collapseAdvancedFilter') : t('PluginHubList.expandAdvancedFilter')}
+          </button>
+        )}
+      </nav>
 
       <div className={styles['hub-list-body']}>
         {rendered.current.has('online') && (

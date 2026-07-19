@@ -32,7 +32,6 @@ export interface RuiYanCommand {
 
 export interface RuiYanTopCommandBarProps {
   productName?: string
-  productCaption?: string
   searchItems: readonly RuiYanSearchItem[]
   onSearchSelect: (key: string) => void
   commands: readonly RuiYanCommand[]
@@ -44,8 +43,7 @@ export interface RuiYanTopCommandBarProps {
 }
 
 export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
-  productName = '睿眼自动化渗透系统',
-  productCaption = 'RUIYAN SECURITY CONSOLE',
+  productName = '睿眼',
   searchItems,
   onSearchSelect,
   commands,
@@ -90,10 +88,7 @@ export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
         <span className={styles['brand-mark']}>
           <img src={productIcon} alt="" />
         </span>
-        <span className={styles['brand-text']}>
-          <strong>{productName}</strong>
-          <span>{productCaption}</span>
-        </span>
+        <strong className={styles['brand-text']}>{productName}</strong>
       </div>
       <div className={styles['top-search']}>
         <RuiYanIcon name="search" />
@@ -206,7 +201,6 @@ export const RuiYanPrimaryNav: React.FC<RuiYanPrimaryNavProps> = ({ groups, acti
         </button>
       ))}
     </div>
-    <div className={styles['primary-footer']}>RUIYAN</div>
   </nav>
 )
 
@@ -214,7 +208,6 @@ export interface RuiYanSecondaryNavProps {
   group: RenyanMenuItem
   activeKeys: readonly string[]
   onSelect: (item: RenyanMenuItem) => void
-  defaultCollapsed?: boolean
 }
 
 const getItemIcon = (item: RenyanMenuItem): RuiYanIconName => {
@@ -223,76 +216,33 @@ const getItemIcon = (item: RenyanMenuItem): RuiYanIconName => {
   return 'panel'
 }
 
-export const RuiYanSecondaryNav: React.FC<RuiYanSecondaryNavProps> = ({
-  group,
-  activeKeys,
-  onSelect,
-  defaultCollapsed = false,
-}) => {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed)
-
-  useEffect(() => setCollapsed(defaultCollapsed), [defaultCollapsed])
-
-  useEffect(() => {
-    const shell = document.querySelector<HTMLElement>('.ruiyan-app-shell')
-    shell?.style.setProperty('--ruiyan-secondary-width', collapsed ? '64px' : '224px')
-    return () => {
-      shell?.style.removeProperty('--ruiyan-secondary-width')
-    }
-  }, [collapsed])
-
-  const renderItem = (item: RenyanMenuItem, tertiary = false) => {
-    const navigable = isRenyanMenuItemNavigable(item)
-    const active = activeKeys.includes(item.key)
-    const badge = item.deliveryStatus === 'planned' ? '规划' : !item.route && !item.action ? '页内' : undefined
-    return (
-      <React.Fragment key={item.key}>
-        <button
-          type="button"
-          className={classNames(
-            styles['secondary-item'],
-            tertiary && styles['tertiary-item'],
-            active && styles['secondary-active'],
-          )}
-          disabled={!navigable}
-          aria-current={active ? 'page' : undefined}
-          title={collapsed ? item.title : undefined}
-          onClick={() => navigable && onSelect(item)}
-        >
-          {!tertiary ? <RuiYanIcon name={getItemIcon(item)} /> : null}
-          <span className={styles['secondary-label']}>{item.title}</span>
-          {badge ? <span className={styles['secondary-badge']}>{badge}</span> : null}
-        </button>
-        {!collapsed && item.children.length > 0 ? (
-          <div className={styles['tertiary-list']}>{item.children.map((child) => renderItem(child, true))}</div>
-        ) : null}
-      </React.Fragment>
-    )
-  }
+export const RuiYanSecondaryNav: React.FC<RuiYanSecondaryNavProps> = ({ group, activeKeys, onSelect }) => {
+  const items = group.children.filter(isRenyanMenuItemNavigable)
 
   return (
-    <aside className={classNames(styles['secondary-nav'], collapsed && styles['secondary-collapsed'])}>
+    <aside className={styles['secondary-nav']}>
       <header className={styles['secondary-header']}>
-        <div className={styles['secondary-heading']}>
-          <span>{String(group.order).padStart(2, '0')} / MODULE</span>
-          <strong>{group.title}</strong>
-        </div>
-        <button
-          type="button"
-          className={styles['collapse-button']}
-          aria-label={collapsed ? '展开二级导航' : '收起二级导航'}
-          onClick={() => setCollapsed((value) => !value)}
-        >
-          <RuiYanIcon name="chevron" />
-        </button>
+        <strong>{group.title}</strong>
       </header>
       <div className={styles['secondary-scroll']}>
         <div className={styles['secondary-list']}>
-          {group.route || group.action ? renderItem(group) : null}
-          {group.children.map((item) => renderItem(item))}
+          {items.map((item) => {
+            const active = activeKeys.includes(item.key)
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={classNames(styles['secondary-item'], active && styles['secondary-active'])}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => onSelect(item)}
+              >
+                <RuiYanIcon name={getItemIcon(item)} />
+                <span className={styles['secondary-label']}>{item.title}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
-      <footer className={styles['secondary-footer']}>本地运行环境</footer>
     </aside>
   )
 }

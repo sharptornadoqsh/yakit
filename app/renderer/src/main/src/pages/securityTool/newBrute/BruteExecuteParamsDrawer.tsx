@@ -1,4 +1,4 @@
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
+import { RuiYanButton, RuiYanDrawer } from '@/components/renyanUI'
 import React, { useEffect, useState } from 'react'
 import styles from './BruteExecuteParamsDrawer.module.scss'
 import { BruteExecuteExtraFormValue } from './NewBruteType'
@@ -40,18 +40,21 @@ const BruteExecuteParamsDrawer: React.FC<BruteExecuteParamsDrawerProps> = React.
     })
   })
   return (
-    <YakitDrawer
-      className={styles['brute-execute-extra-params-drawer']}
-      visible={visible}
+    <RuiYanDrawer
+      bodyClassName={styles['brute-execute-extra-params-drawer']}
+      open={visible}
       onClose={onClose}
-      width="max(700px, 60%)"
+      width={640}
       title={t('BruteExecuteContent.extraParams')}
+      description="配置字典来源、并发数量、停止条件与执行间隔"
+      closeOnBackdrop={false}
+      footer={<RuiYanButton onClick={onSaveSetting}>{t('YakitButton.save')}</RuiYanButton>}
     >
       <Form size="small" labelWrap={true} labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} form={form}>
         <BruteSettings visible={visible} form={form} />
         <div className={styles['to-end']}>{t('YakitEmpty.end_of_list')}</div>
       </Form>
-    </YakitDrawer>
+    </RuiYanDrawer>
   )
 })
 export default BruteExecuteParamsDrawer

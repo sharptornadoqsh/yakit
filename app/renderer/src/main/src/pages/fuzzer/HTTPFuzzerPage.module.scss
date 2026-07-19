@@ -3,6 +3,8 @@
   display: flex;
   height: 100%;
   position: relative;
+  min-height: 0;
+  background: #f6f8fc;
   .http-query-advanced-config-body {
     display: flex;
     flex-direction: column;
@@ -15,8 +17,13 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 12px;
-  background-color: var(--Colors-Use-Basic-Background);
+  padding: 0;
+  background: #f6f8fc;
+
+  > :global(.resize-box) {
+    flex: 1;
+    min-height: 0;
+  }
   :global {
     .ant-result-warning .ant-result-icon > .anticon {
       color: var(--Colors-Use-Warning-Primary);
@@ -31,11 +38,18 @@
   .fuzzer-heard {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    min-height: 52px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border: 1px solid #e6eaf0;
+    border-radius: 10px;
+    background: #ffffff;
     &-left {
       display: flex;
       align-items: center;
       // height: 36px;
-      padding-bottom: 12px;
+      padding-bottom: 0;
       gap: 4px;
       flex-wrap: wrap;
       .fuzzer-heard-force {
@@ -84,6 +98,54 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
+    }
+  }
+}
+
+.fuzzer-history-strip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    strong {
+      color: #1f2937;
+      font-size: 12px;
+    }
+
+    span {
+      color: #64748b;
+      font-size: 11px;
+    }
+  }
+}
+
+.fuzzer-advanced-drawer {
+  height: 100%;
+  min-height: 520px;
+  overflow: auto;
+
+  :global {
+    .ant-form-item-label {
+      display: block;
+      width: 100%;
+      text-align: left;
+    }
+
+    .ant-form-item-label > label {
+      height: auto;
+      color: #1f2937;
     }
   }
 }
@@ -406,18 +468,13 @@
 }
 
 .http-traffic-analysis-overlay {
-  transform: translateY(0) !important;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
-  &:global(.ant-drawer-bottom.ant-drawer-open.no-mask) {
-    transform: unset;
-  }
-  :global {
-    .ant-drawer-body {
-      padding: 0;
-      overflow: hidden;
-    }
-    .ant-drawer-header-title {
-      flex-direction: row-reverse;
-    }
-  }
+.response-extractor-dialog {
+  min-height: min(680px, 72vh);
+  padding: 0;
+  overflow: hidden;
 }

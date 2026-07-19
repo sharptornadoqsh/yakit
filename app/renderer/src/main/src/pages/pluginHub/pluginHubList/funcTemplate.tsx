@@ -44,7 +44,7 @@ import {
   apiReductionRecyclePlugin,
   apiUpdatePluginPrivateMine,
 } from '@/pages/plugins/utils'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
+import { showRuiYanModal } from '@/components/renyanUI'
 import { useStore } from '@/store'
 import { RollingLoadList, RollingLoadListProps } from '@/components/RollingLoadList/RollingLoadList'
 import { YakEditor } from '@/utils/editors'
@@ -1128,17 +1128,11 @@ export const OwnOptFooterExtra: React.FC<OwnOptFooterExtraProps> = memo((props) 
 
     setStateLoading(true)
     if (info.is_private) {
-      const m = showYakitModal({
-        title: (modalT) => modalT('OwnOptFooterExtra.pluginBasicDetection'),
-        type: 'white',
-        width: '50%',
-        centered: true,
-        maskClosable: false,
-        closable: true,
+      const m = showRuiYanModal({
+        title: t('OwnOptFooterExtra.pluginBasicDetection'),
+        width: 720,
+        closeOnBackdrop: false,
         footer: null,
-        mask: false,
-        destroyOnClose: true,
-        bodyStyle: { padding: 0 },
         content: (
           <CodeScoreModule
             type={info.type || ''}
@@ -1154,8 +1148,7 @@ export const OwnOptFooterExtra: React.FC<OwnOptFooterExtraProps> = memo((props) 
             }}
           />
         ),
-        onCancel: () => {
-          m.destroy()
+        onClose: () => {
           setStateLoading(false)
         },
       })

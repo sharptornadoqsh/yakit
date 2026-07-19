@@ -56,7 +56,7 @@ import { RemoteGV } from '@/yakitGV'
 import { NoPromptHint } from '../utilsUI/UtilsTemplate'
 import { RemotePluginGV } from '@/enums/plugin'
 import { SolidCloudpluginIcon, SolidPrivatepluginIcon, SolidYakOfficialPluginColorIcon } from '@/assets/icon/colors'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
+import { showRuiYanModal } from '@/components/renyanUI'
 import { PluginLocalUpload } from '@/pages/plugins/local/PluginLocalUpload'
 import {
   PluginLocalExport,
@@ -472,14 +472,16 @@ export const HubListLocal: React.FC<HubListLocalProps> = memo((props) => {
       yakitNotify('error', t('HubListLocal.builtinOrEmptySelection'))
       return
     }
-    const m = showYakitModal({
-      type: 'white',
-      title: (modalT) => modalT('HubListLocal.batchUpload'),
+    const m = showRuiYanModal({
+      title: t('HubListLocal.batchUpload'),
+      width: 720,
+      closeOnBackdrop: false,
       content: (
         <PluginLocalUpload
           pluginNames={list}
           onClose={() => {
             setBatchUploadLoading(false)
+            onCheck(false)
             m.destroy()
             setTimeout(() => {
               // 刷新我的列表
@@ -490,11 +492,10 @@ export const HubListLocal: React.FC<HubListLocalProps> = memo((props) => {
         />
       ),
       footer: null,
-      modalAfterClose: () => {
+      onClose: () => {
         setBatchUploadLoading(false)
         onCheck(false)
       },
-      getContainer: document.getElementById(`main-operator-page-body-${YakitRoute.Plugin_Hub}`) || undefined,
     })
   })
 
@@ -563,11 +564,10 @@ export const HubListLocal: React.FC<HubListLocalProps> = memo((props) => {
   const openExportModal = useMemoizedFn(async (names: string[]) => {
     if (exportModal) return
     try {
-      let m = showYakitModal({
-        title: (modalT) => modalT('HubListLocal.exportPlugin'),
-        width: isRemoteEngine ? 500 : 550,
-        closable: true,
-        maskClosable: false,
+      let m = showRuiYanModal({
+        title: t('HubListLocal.exportPlugin'),
+        width: 720,
+        closeOnBackdrop: false,
         footer: null,
         content: (
           <div style={{ padding: isRemoteEngine ? '0 0 12px' : '12px 0' }}>
@@ -614,7 +614,6 @@ export const HubListLocal: React.FC<HubListLocalProps> = memo((props) => {
             ></PluginLocalExportForm>
           </div>
         ),
-        getContainer: divRef.current || undefined,
       })
     } catch (error) {
       yakitNotify('error', error + '')

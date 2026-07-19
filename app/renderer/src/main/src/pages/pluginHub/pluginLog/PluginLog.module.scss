@@ -133,10 +133,6 @@
     margin-bottom: 30px;
   }
 }
-.plugin-log-del-comment-hit {
-  top: 30%;
-}
-
 .preview-reply {
   display: flex;
   flex-direction: column;
@@ -553,6 +549,12 @@
 }
 
 // ---------- PluginLogCodeDiff ----------
+.plugin-log-code-diff-modal-body {
+  padding: 0;
+  overflow: hidden;
+}
+
 .plugin-log-diff-code {
   height: 70vh;
+  max-height: calc(100vh - 168px);
 }

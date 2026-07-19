@@ -7,13 +7,21 @@ import { usePageInfo } from '@/store/pageInfo'
 import emiter from '@/utils/eventBus/eventBus'
 import {
   RENYAN_SHELL_EVENTS,
+  RENYAN_SETTINGS_SECTION_STORAGE_KEY,
   RenyanMenuItem,
   buildRenyanMenu,
   findRenyanMenuPath,
   flattenRenyanMenu,
   isRenyanMenuItemNavigable,
 } from '@/routes/renyanMenu'
-import { RuiYanPrimaryNav, RuiYanSecondaryNav, RuiYanTopCommandBar, type RuiYanCommand } from '@/components/renyanUI'
+import {
+  RuiYanPrimaryNav,
+  RuiYanSecondaryNav,
+  RuiYanTopCommandBar,
+  showRuiYanModal,
+  type RuiYanCommand,
+} from '@/components/renyanUI'
+import SetPassword from '@/pages/SetPassword'
 
 interface RenyanRouteSelection {
   route: YakitRoute
@@ -39,6 +47,16 @@ const useMenuTitle = () => {
 const activateMenuItem = (item: RenyanMenuItem, onMenuSelect: (route: RenyanRouteSelection) => void) => {
   if (!isRenyanMenuItemNavigable(item)) return
   if (item.route) {
+    if (item.settingsSection) {
+      try {
+        window.sessionStorage.setItem(RENYAN_SETTINGS_SECTION_STORAGE_KEY, item.settingsSection)
+      } catch (error) {}
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent(RENYAN_SHELL_EVENTS.selectSettingsSection, { detail: item.settingsSection }),
+        )
+      }, 0)
+    }
     onMenuSelect({ route: item.route })
     return
   }
@@ -54,7 +72,7 @@ const activateMenuItem = (item: RenyanMenuItem, onMenuSelect: (route: RenyanRout
       emiter.emit('onUIOpSettingMenuSelect', RENYAN_SHELL_EVENTS.openEngineUpdate)
       return
     case 'diagnostics':
-      emiter.emit('onUIOpSettingMenuSelect', 'engineLog')
+      emiter.emit('onUIOpSettingMenuSelect', 'renyan-diagnostics')
       return
     case 'about':
       emiter.emit('onUIOpSettingMenuSelect', RENYAN_SHELL_EVENTS.openAbout)
@@ -65,7 +83,7 @@ const activateMenuItem = (item: RenyanMenuItem, onMenuSelect: (route: RenyanRout
 }
 
 export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((props) => {
-  const { defaultExpand, onMenuSelect, setRouteToLabel } = props
+  const { onMenuSelect, setRouteToLabel } = props
   const { i18n } = useI18nNamespaces(['layout'])
   const menu = useMemo(() => buildRenyanMenu(), [])
   const getTitle = useMenuTitle()
@@ -73,15 +91,35 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
   const userInfo = useStore((state) => state.userInfo)
   const currentPath = useMemo(() => findRenyanMenuPath(currentRoute || '', menu), [currentRoute, menu])
   const [activeGroupKey, setActiveGroupKey] = useState(currentPath[0]?.key || menu[0]?.key || '')
+  const [activeSecondaryKey, setActiveSecondaryKey] = useState(currentPath[currentPath.length - 1]?.key || '')
 
   useEffect(() => {
-    if (currentPath[0]?.key) setActiveGroupKey(currentPath[0].key)
-  }, [currentPath])
+    if (currentRoute === YakitRoute.Beta_ConfigNetwork) {
+      let section: string | null = null
+      try {
+        section = window.sessionStorage.getItem(RENYAN_SETTINGS_SECTION_STORAGE_KEY)
+      } catch (error) {}
+      const sectionItem = flattenRenyanMenu(menu).find((item) => item.settingsSection === section)
+      if (sectionItem) {
+        setActiveGroupKey(sectionItem.group)
+        setActiveSecondaryKey(sectionItem.key)
+        return
+      }
+    }
+
+    const selectedItem = flattenRenyanMenu(menu).find((item) => item.key === activeSecondaryKey)
+    if (selectedItem?.route === currentRoute) return
+
+    if (currentPath[0]?.key) {
+      setActiveGroupKey(currentPath[0].key)
+      setActiveSecondaryKey(currentPath[currentPath.length - 1]?.key || '')
+    }
+  }, [currentPath, currentRoute, menu])
 
   useEffect(() => {
     const labels = new Map<string, string>()
     flattenRenyanMenu(menu).forEach((item) => {
-      if (item.route) labels.set(item.route, getTitle(item))
+      if (item.route && !labels.has(item.route)) labels.set(item.route, getTitle(item))
     })
     setRouteToLabel(labels)
   }, [i18n.language, menu, setRouteToLabel])
@@ -94,18 +132,39 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
 
   const activeGroup = menu.find((item) => item.key === activeGroupKey) || menu[0]
   const navigableItems = useMemo(() => flattenRenyanMenu(menu).filter(isRenyanMenuItemNavigable), [menu])
-  const activeKeys = currentPath.map((item) => item.key)
+  const activeKeys = activeSecondaryKey ? [activeSecondaryKey] : currentPath.map((item) => item.key)
 
   const selectGroup = (item: RenyanMenuItem) => {
     setActiveGroupKey(item.key)
     window.dispatchEvent(new CustomEvent(RENYAN_SHELL_EVENTS.selectNavigationGroup, { detail: item.key }))
-    const target = flattenRenyanMenu([item]).find((entry) => entry.route && isRenyanMenuItemNavigable(entry))
-    if (target) activateMenuItem(target, onMenuSelect)
+    const target = flattenRenyanMenu([item]).find(isRenyanMenuItemNavigable)
+    if (target) {
+      setActiveSecondaryKey(target.key)
+      activateMenuItem(target, onMenuSelect)
+    }
   }
 
-  const selectItem = (item: RenyanMenuItem) => activateMenuItem(item, onMenuSelect)
+  const selectItem = (item: RenyanMenuItem) => {
+    setActiveSecondaryKey(item.key)
+    activateMenuItem(item, onMenuSelect)
+  }
   const userName = userInfo.githubName || userInfo.wechatName || userInfo.qqName || userInfo.companyName || '本地用户'
   const teamName = userInfo.companyName || '本地工作区'
+
+  const openProfile = () => {
+    if (!userInfo.isLogin) {
+      emiter.emit('onUIOpSettingMenuSelect', RENYAN_SHELL_EVENTS.openLogin)
+      return
+    }
+    let modal: ReturnType<typeof showRuiYanModal>
+    modal = showRuiYanModal({
+      title: '账户与密码',
+      description: `${userName} · ${teamName}`,
+      width: 480,
+      closeOnBackdrop: false,
+      content: <SetPassword userInfo={userInfo} onCancel={() => modal.destroy()} />,
+    })
+  }
 
   const commands: readonly RuiYanCommand[] = [
     {
@@ -113,12 +172,6 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
       label: '新建任务',
       icon: 'plus',
       onClick: () => onMenuSelect({ route: YakitRoute.BatchExecutorPage }),
-    },
-    {
-      key: 'quick-replay',
-      label: '快速重放',
-      icon: 'replay',
-      onClick: () => onMenuSelect({ route: YakitRoute.HTTPFuzzer }),
     },
     {
       key: 'environment',
@@ -138,21 +191,20 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
         }))}
         onSearchSelect={(key) => {
           const item = navigableItems.find((entry) => entry.key === key)
-          if (item) activateMenuItem(item, onMenuSelect)
+          if (item) {
+            setActiveGroupKey(item.group)
+            setActiveSecondaryKey(item.key)
+            activateMenuItem(item, onMenuSelect)
+          }
         }}
         commands={commands}
         userName={userName}
         teamName={teamName}
         onNotifications={() => emiter.emit('openAllMessageNotification')}
-        onProfile={() => onMenuSelect({ route: YakitRoute.AccountAdminPage })}
+        onProfile={openProfile}
       />
       <RuiYanPrimaryNav groups={menu} activeGroupKey={activeGroup.key} onSelect={selectGroup} />
-      <RuiYanSecondaryNav
-        group={activeGroup}
-        activeKeys={activeKeys}
-        defaultCollapsed={!defaultExpand}
-        onSelect={selectItem}
-      />
+      <RuiYanSecondaryNav group={activeGroup} activeKeys={activeKeys} onSelect={selectItem} />
     </div>
   )
 })

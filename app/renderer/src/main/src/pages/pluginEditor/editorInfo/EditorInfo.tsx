@@ -17,7 +17,7 @@ import {
 import { YakitPluginBaseInfo } from '../base'
 import { failed, yakitNotify } from '@/utils/notification'
 import { YakitHint } from '@/components/yakitUI/YakitHint/YakitHint'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
+import { RuiYanButton, showRuiYanModal } from '@/components/renyanUI'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { getTempExampleList, TempExampleHelp, TempExampleInfo } from './TempExampleHelp'
 import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
@@ -314,15 +314,10 @@ export const EditorInfoForm: React.FC<EditorInfoFormProps> = memo(
         : getTempExampleList(t)
     }, [searchTempExampleVal, getTempExampleList])
     const onOpenHelpModal = (tempExampleItem: TempExampleInfo) => {
-      const m = showYakitModal({
-        title: (modalT) => modalT('EditorInfo.templateExamples'),
-        type: 'white',
-        width: '60vw',
-        centered: true,
-        cancelButtonProps: { style: { display: 'none' } },
-        onOkText: t('YakitButton.iKnow'),
-        onOk: () => m.destroy(),
-        bodyStyle: { padding: '8px 24px' },
+      const m = showRuiYanModal({
+        title: t('EditorInfo.templateExamples'),
+        width: 960,
+        footer: <RuiYanButton onClick={() => m.destroy()}>{t('YakitButton.iKnow')}</RuiYanButton>,
         content: <TempExampleHelp tempExampleItem={tempExampleItem} />,
       })
     }
@@ -336,15 +331,10 @@ export const EditorInfoForm: React.FC<EditorInfoFormProps> = memo(
         : qaDocumentLableList
     }, [searchQaDocumentVal, qaDocumentLableList])
     const onOpenQaDocModal = (label: string) => {
-      const m = showYakitModal({
-        title: (modalT) => modalT('EditorInfo.faq'),
-        type: 'white',
-        width: '60vw',
-        centered: true,
-        cancelButtonProps: { style: { display: 'none' } },
-        onOkText: t('YakitButton.iKnow'),
-        onOk: () => m.destroy(),
-        bodyStyle: { padding: '8px 24px' },
+      const m = showRuiYanModal({
+        title: t('EditorInfo.faq'),
+        width: 960,
+        footer: <RuiYanButton onClick={() => m.destroy()}>{t('YakitButton.iKnow')}</RuiYanButton>,
         content: <Qadocument label={label} />,
       })
     }

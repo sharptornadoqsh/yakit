@@ -1,16 +1,15 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { PluginDebugBodyProps, PluginDebugProps } from './PluginDebugType'
-import { YakitDrawer } from '@/components/yakitUI/YakitDrawer/YakitDrawer'
-import { useMemoizedFn, useSize, useUpdateEffect } from 'ahooks'
+import { useMemoizedFn, useUpdateEffect } from 'ahooks'
+import { RuiYanButton, RuiYanDrawer, RuiYanModal } from '@/components/renyanUI'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
-import { OutlinePuzzleIcon, OutlineRefreshIcon, OutlineXIcon } from '@/assets/icon/outline'
+import { OutlinePuzzleIcon, OutlineRefreshIcon } from '@/assets/icon/outline'
 import { YakitCard } from '@/components/yakitUI/YakitCard/YakitCard'
 import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { YakitEditor } from '@/components/yakitUI/YakitEditor/YakitEditor'
 import { GetPluginLanguage, pluginTypeToName } from '../builtInData'
 import { YakitTagColor } from '@/components/yakitUI/YakitTag/YakitTagType'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { YakitDiffEditor } from '@/components/yakitUI/YakitDiffEditor/YakitDiffEditor'
 import { CodeScoreModal } from '../funcTemplate'
 import { randomString } from '@/utils/randomUtil'
@@ -47,13 +46,7 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { delInvalidPluginExecuteParams } from '@/pages/pluginEditor/utils/convert'
 
 export const PluginDebug: React.FC<PluginDebugProps> = memo((props) => {
-  const { plugin, getContainer, visible, onClose, onMerge } = props
-
-  const getContainerSize = useSize(getContainer)
-  // 抽屉展示高度
-  const showHeight = useMemo(() => {
-    return getContainerSize?.height || 400
-  }, [getContainerSize])
+  const { plugin, visible, onClose, onMerge } = props
 
   /** 插件类型 */
   const pluginType = useMemo(() => {
@@ -110,41 +103,43 @@ export const PluginDebug: React.FC<PluginDebugProps> = memo((props) => {
 
   return (
     <>
-      <YakitDrawer
-        getContainer={getContainer}
-        placement="bottom"
-        mask={false}
-        closable={false}
-        keyboard={false}
-        height={showHeight}
-        visible={visible}
-        className={classNames(styles['plugin-debug-drawer'])}
-        title={<div className={styles['header-title']}>插件调试</div>}
-        extra={
-          <div className={styles['header-extra-wrapper']}>
-            <YakitButton icon={<OutlinePuzzleIcon />} onClick={onOpenDiff}>
+      <RuiYanDrawer
+        open={Boolean(visible)}
+        width={640}
+        bodyClassName={styles['plugin-debug-drawer']}
+        title="插件调试"
+        description="编辑插件代码、配置参数并查看真实执行结果"
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={onCancel}>
+              关闭
+            </RuiYanButton>
+            <RuiYanButton onClick={onOpenDiff}>
+              <OutlinePuzzleIcon />
               合并代码
-            </YakitButton>
-
-            <YakitButton type="text2" icon={<OutlineXIcon />} onClick={onCancel} />
-          </div>
+            </RuiYanButton>
+          </>
         }
         onClose={onCancel}
       >
         {visible && <PluginDebugBody plugin={plugin} newCode={content} setNewCode={setContent} />}
-      </YakitDrawer>
+      </RuiYanDrawer>
 
-      <YakitModal
+      <RuiYanModal
         title="代码对比"
-        type="white"
-        width="80%"
-        centered={true}
-        maskClosable={false}
-        closable={true}
-        visible={diffShow}
-        okText="合并"
-        onCancel={onCancelDiff}
-        onOk={onOkDiff}
+        description="比较原始代码与当前调试版本，确认后调用既有合并事件"
+        width={960}
+        closeOnBackdrop={false}
+        open={diffShow}
+        onClose={onCancelDiff}
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={onCancelDiff}>
+              取消
+            </RuiYanButton>
+            <RuiYanButton onClick={onOkDiff}>合并</RuiYanButton>
+          </>
+        }
       >
         <div className={styles['diff-code-modal']}>
           <YakitDiffEditor
@@ -156,7 +151,7 @@ export const PluginDebug: React.FC<PluginDebugProps> = memo((props) => {
             language={diffLanguage}
           />
         </div>
-      </YakitModal>
+      </RuiYanModal>
     </>
   )
 })

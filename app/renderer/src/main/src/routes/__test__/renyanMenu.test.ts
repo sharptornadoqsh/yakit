@@ -44,23 +44,23 @@ describe('睿眼菜单模型', () => {
       buildRenyanMenu().map((group) => [group.key, group.children.map((item) => item.title)]),
     )
 
-    expect(groups['workbench']).toEqual(['安全概览', '最近任务', '团队动态', '风险趋势'])
+    expect(groups['workbench']).toEqual(['安全概览', '最近任务', '风险趋势'])
     expect(groups['interactive-proxy']).toEqual(['代理控制台', '劫持会话', '拦截规则', '证书与代理设置'])
     expect(groups['traffic-center']).toEqual(['历史流量', '请求详情', '响应详情', '流量筛选'])
     expect(groups['vulnerability-detection']).toEqual(['通用检测', '专项检测', '检测任务', '风险结果'])
     expect(groups['brute-force']).toEqual(['爆破任务', '字典管理', '命中结果', '执行日志'])
     expect(groups['packet-tools']).toEqual(['报文重放', '报文差异', '编解码', '操作历史'])
     expect(groups['plugin-center']).toEqual(['插件仓库', '已安装插件', '本地插件', '插件开发', '插件日志', '插件配置'])
-    expect(groups['team-collaboration']).toEqual(['服务连接', '用户管理', '角色权限', '组织管理', '团队动态'])
+    expect(groups['team-collaboration']).toEqual(['服务连接', '用户管理', '角色权限', '组织管理'])
     expect(groups['project-security']).toEqual(['项目管理', '安全概览', '风险与漏洞', '扫描结果', '项目导入导出'])
     expect(groups['system-settings']).toEqual([
-      '引擎与更新',
+      '引擎',
       '网络与 DNS',
-      'TLS 客户端',
+      'TLS',
       '安全设置',
       '密码策略',
       '第三方应用',
-      '日志和诊断',
+      '日志诊断',
       '关于',
     ])
   })
@@ -121,6 +121,7 @@ describe('睿眼菜单模型', () => {
     expect(labels.get(YakitRoute.BatchExecutorPage)).toBe('通用检测')
     expect(labels.get(YakitRoute.Mod_Brute)).toBe('爆破任务')
     expect(labels.get(YakitRoute.DB_Risk)).toBe('风险与漏洞')
+    expect(labels.get(YakitRoute.Beta_ConfigNetwork)).toBe('网络与 DNS')
     expect(renyanRouteDisplayMap[YakitRoute.Codec]).toBe('编解码')
     expect(renyanRouteDisplayMap[YakitRoute.DataCompare]).toBe('报文差异')
   })

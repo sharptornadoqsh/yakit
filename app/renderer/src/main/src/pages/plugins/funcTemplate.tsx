@@ -36,7 +36,6 @@ import {
   useCreation,
 } from 'ahooks'
 import {
-  OutlineArrowscollapseIcon,
   OutlineCalendarIcon,
   OutlineClouddownloadIcon,
   OutlineDatabasebackupIcon,
@@ -88,7 +87,7 @@ import {
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { API } from '@/services/swagger/resposeType'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
 import { funcSearchType, pluginTypeToName } from './builtInData'
 import UnLogin from '@/assets/unLogin.png'
 import { v4 as uuidv4 } from 'uuid'
@@ -1784,21 +1783,16 @@ export const CodeScoreModal: React.FC<CodeScoreModalProps> = memo((props) => {
   })
 
   return (
-    <YakitModal
+    <RuiYanModal
       title={title || t('CodeScoreModal.plugin_basic_detection')}
-      type="white"
-      width={'50%'}
-      centered={true}
-      maskClosable={false}
-      closable={true}
-      visible={visible}
+      width={720}
+      closeOnBackdrop={false}
+      open={visible}
       footer={null}
-      destroyOnClose={true}
-      onCancel={onFailed}
-      bodyStyle={{ padding: 0 }}
+      onClose={onFailed}
     >
       {visible && <CodeScoreModule {...rest} isStart={visible} callback={moduleCallback} />}
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 
@@ -1853,29 +1847,24 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = memo((props) 
   }, [visible])
 
   return (
-    <YakitModal
+    <RuiYanModal
       title={t('FuncTemplate.sourceCode')}
-      subTitle={
+      description={
         <div className={styles['plugin-editor-modal-subtitle']}>
           <span>{t('FuncTemplate.sourceCodeDesc')}</span>
           <span>{t('FuncTemplate.escFullScreen')}</span>
         </div>
       }
-      type="white"
-      width="80%"
-      centered={true}
-      maskClosable={false}
-      closable={true}
-      closeIcon={<OutlineArrowscollapseIcon className={styles['plugin-editor-modal-close-icon']} />}
-      footer={null}
-      visible={visible}
-      onCancel={() => setVisible(content)}
-      bodyStyle={{ padding: 0 }}
+      width={960}
+      closeOnBackdrop={false}
+      open={visible}
+      onClose={() => setVisible(content)}
+      footer={<RuiYanButton onClick={() => setVisible(content)}>完成</RuiYanButton>}
     >
       <div className={styles['plugin-editor-modal-body']}>
         <YakitEditor type={language} value={content} setValue={setContent} />
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 
@@ -1898,24 +1887,19 @@ export const PluginDiffEditorModal: React.FC<PluginDiffEditorModalProps> = memo(
   }, [visible])
 
   return (
-    <YakitModal
+    <RuiYanModal
       title={t('FuncTemplate.sourceCode')}
-      subTitle={
+      description={
         <div className={styles['plugin-editor-modal-subtitle']}>
           <span>{t('FuncTemplate.sourceCodeDesc')}</span>
           <span>{t('FuncTemplate.escFullScreen')}</span>
         </div>
       }
-      type="white"
-      width="80%"
-      centered={true}
-      maskClosable={false}
-      closable={true}
-      closeIcon={<OutlineArrowscollapseIcon className={styles['plugin-editor-modal-close-icon']} />}
-      footer={null}
-      visible={visible}
-      onCancel={() => setVisible(content)}
-      bodyStyle={{ padding: 0 }}
+      width={960}
+      closeOnBackdrop={false}
+      open={visible}
+      onClose={() => setVisible(content)}
+      footer={<RuiYanButton onClick={() => setVisible(content)}>完成</RuiYanButton>}
     >
       <div className={styles['plugin-editor-modal-body']}>
         <YakitDiffEditor
@@ -1927,6 +1911,6 @@ export const PluginDiffEditorModal: React.FC<PluginDiffEditorModalProps> = memo(
           language={language}
         />
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 })

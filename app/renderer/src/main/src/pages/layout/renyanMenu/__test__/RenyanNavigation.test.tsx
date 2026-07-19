@@ -3,9 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { YakitRoute } from '@/enums/yakitRoute'
 import { RenyanNavigation } from '../RenyanNavigation'
 
+vi.mock('@/components/renyanUI/RuiYanUI.module.scss', () => ({
+  default: new Proxy({}, { get: (_, key) => String(key) }),
+}))
+
+vi.mock('@/components/renyanUI/RuiYanPage.module.scss', () => ({
+  default: new Proxy({}, { get: (_, key) => String(key) }),
+}))
+
 const testState = vi.hoisted(() => ({
   currentRoute: '' as YakitRoute | string,
 }))
+const emit = vi.hoisted(() => vi.fn())
 
 vi.mock('@/store/pageInfo', () => ({
   usePageInfo: (selector: (state: { currentPageTabRouteKey: YakitRoute | string }) => unknown) =>
@@ -27,12 +36,14 @@ vi.mock('@/i18n/useI18nNamespaces', () => ({
 }))
 
 vi.mock('@/utils/eventBus/eventBus', () => ({
-  default: { emit: vi.fn() },
+  default: { emit },
 }))
 
 describe('睿眼顶部导航', () => {
   beforeEach(() => {
     testState.currentRoute = YakitRoute.NewHome
+    emit.mockReset()
+    window.sessionStorage.clear()
   })
 
   it('活动路由变化时同步一级菜单高亮', () => {
@@ -53,5 +64,44 @@ describe('睿眼顶部导航', () => {
 
     expect(trafficAnalysis).toHaveAttribute('aria-current', 'page')
     expect(systemManagement).not.toHaveAttribute('aria-current')
+  })
+
+  it('二级导航保持单层结构且仅展示具有真实路由或事件的条目', () => {
+    const onMenuSelect = vi.fn()
+    render(<RenyanNavigation defaultExpand={true} onMenuSelect={onMenuSelect} setRouteToLabel={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '交互代理' }))
+
+    expect(screen.getByRole('button', { name: '代理控制台' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '劫持会话' })).toBeEnabled()
+    expect(screen.queryByText('页内')).not.toBeInTheDocument()
+    expect(screen.queryByText(/MODULE/)).not.toBeInTheDocument()
+    expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.MITMHacker })
+  })
+
+  it('二级导航保留直属父入口且不展示其三级节点', () => {
+    render(<RenyanNavigation defaultExpand={true} onMenuSelect={vi.fn()} setRouteToLabel={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '漏洞检测' }))
+
+    expect(screen.getByRole('button', { name: '通用检测' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '专项检测' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '检测配置' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '插件选择' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '执行日志' })).not.toBeInTheDocument()
+  })
+
+  it('系统设置写入目标分区并通过统一日志诊断事件调用真实能力', () => {
+    const onMenuSelect = vi.fn()
+    render(<RenyanNavigation defaultExpand={true} onMenuSelect={onMenuSelect} setRouteToLabel={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '系统设置' }))
+    fireEvent.click(screen.getByRole('button', { name: '网络与 DNS' }))
+
+    expect(window.sessionStorage.getItem('ruiyan:settings-section')).toBe('network-dns')
+    expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.Beta_ConfigNetwork })
+
+    fireEvent.click(screen.getByRole('button', { name: '日志诊断' }))
+    expect(emit).toHaveBeenCalledWith('onUIOpSettingMenuSelect', 'renyan-diagnostics')
   })
 })

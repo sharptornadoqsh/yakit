@@ -1,12 +1,5 @@
 import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle, ReactElement } from 'react'
-import {
-  useMemoizedFn,
-  useCreation,
-  useUpdateEffect,
-  useInViewport,
-  useControllableValue,
-  useDebounceEffect,
-} from 'ahooks'
+import { useMemoizedFn, useCreation, useUpdateEffect, useInViewport, useControllableValue } from 'ahooks'
 import cloneDeep from 'lodash/cloneDeep'
 import { PluginFilterParams, PluginSearchParams } from '../baseTemplateType'
 import {
@@ -59,21 +52,11 @@ import {
 import { defaultFilter, defaultSearch } from '../builtInData'
 import { getRouteByTaskSource } from './HybridScanTaskListDrawer'
 import { defaultPocPageInfo } from '@/defaultConstants/YakPoC'
-import { RemoteGV } from '@/yakitGV'
-import { getRemoteValue, setRemoteValue } from '@/utils/kv'
-import { YakitTabsProps } from '@/components/yakitSideTab/YakitSideTabType'
-import { YakitSideTab } from '@/components/yakitSideTab/YakitSideTab'
 import { JSONParseLog } from '@/utils/tool'
 
 const PluginBatchExecuteExtraParamsDrawer = React.lazy(() => import('./PluginBatchExecuteExtraParams'))
 const HybridScanTaskListDrawer = React.lazy(() => import('./HybridScanTaskListDrawer'))
-
-const PluginBatchExecutorTab: YakitTabsProps[] = [
-  {
-    label: '插件',
-    value: 'plugin',
-  },
-]
+const detectionWorkflowSteps = ['目标或流量', '检测插件', '参数配置', '执行进度', '风险结果'] as const
 
 interface PluginBatchExecutorProps {
   id: string
@@ -222,6 +205,12 @@ export const PluginBatchExecutor: React.FC<PluginBatchExecutorProps> = React.mem
   const isShowPluginLog = useCreation(() => {
     return pluginExecuteLog.length > 0 || isExecuting
   }, [pluginExecuteLog, isExecuting])
+  const activeWorkflowStep = useCreation(() => {
+    if (executeStatus === 'finished') return 4
+    if (isExecuting || executeStatus === 'error') return 3
+    if (selectNum > 0) return 2
+    return 0
+  }, [executeStatus, isExecuting, selectNum])
   const dataScanParams = useCreation(() => {
     return {
       https: pageInfo.https,
@@ -230,46 +219,26 @@ export const PluginBatchExecutor: React.FC<PluginBatchExecutorProps> = React.mem
     }
   }, [pageInfo])
 
-  // #region 左侧tab
-  const [activeKey, setActiveKey] = useState<string>('plugin')
-  const [show, setShow] = useState<boolean>(true)
-  useEffect(() => {
-    getRemoteValue(RemoteGV.PluginBatchExecTabs).then((setting: string) => {
-      if (setting) {
-        try {
-          const tabs = JSONParseLog(setting, { page: 'PluginBatchExecutor', fun: 'PluginBatchExecTabs' })
-          setShow(tabs.contShow)
-          onActiveKey(tabs.curTabKey)
-        } catch (error) {}
-      }
-    })
-  }, [])
-  const onActiveKey = useMemoizedFn((key) => {
-    setActiveKey(key)
-  })
-  useDebounceEffect(
-    () => {
-      setRemoteValue(RemoteGV.PluginBatchExecTabs, JSON.stringify({ contShow: show, curTabKey: activeKey }))
-    },
-    [show, activeKey],
-    { wait: 300 },
-  )
-  // #endregion
-
   return (
     <div className={styles['plugin-batch-wrapper']}>
-      <div className={styles['plugin-tab-wrap']}>
-        <YakitSideTab
-          type="horizontal"
-          yakitTabs={PluginBatchExecutorTab}
-          activeKey={activeKey}
-          onActiveKey={onActiveKey}
-          show={show}
-          setShow={setShow}
-        />
+      <div className={styles['detection-workflow']} role="list" aria-label="通用漏洞检测流程">
+        {detectionWorkflowSteps.map((step, index) => (
+          <div
+            key={step}
+            role="listitem"
+            aria-current={index === activeWorkflowStep ? 'step' : undefined}
+            className={classNames(styles['workflow-step'], {
+              [styles['workflow-step-active']]: index === activeWorkflowStep,
+              [styles['workflow-step-complete']]: index < activeWorkflowStep,
+            })}
+          >
+            <span className={styles['workflow-step-index']}>{String(index + 1).padStart(2, '0')}</span>
+            <span className={styles['workflow-step-label']}>{step}</span>
+          </div>
+        ))}
       </div>
       <PluginLocalListDetails
-        hidden={!show}
+        hidden={false}
         selectList={selectList}
         setSelectList={setSelectList}
         search={search}
@@ -282,7 +251,7 @@ export const PluginBatchExecutor: React.FC<PluginBatchExecutorProps> = React.mem
           plugin_type: cloneDeep(pluginTypeFilterList),
         }}
         pluginDetailsProps={{
-          title: '选择插件',
+          title: '02 · 检测插件',
           bodyClassName: styles['plugin-batch-executor-body'],
         }}
         fetchListInPageFirstAfter={fetchListInPageFirstAfter}
@@ -290,21 +259,15 @@ export const PluginBatchExecutor: React.FC<PluginBatchExecutorProps> = React.mem
         setSelectNum={setSelectNum}
         pluginGroupExcludeType={['yak', 'codec', 'lua']}
       >
-        <div className={styles['right-wrapper']}>
-          {isShowPluginLog && (
-            <div className={styles['log-wrapper']}>
-              <div className={styles['log-heard']}>插件日志</div>
-              <PluginExecuteLog
-                hidden={false}
-                pluginExecuteLog={pluginExecuteLog}
-                isExecuting={executeStatus === 'process'}
-              />
-            </div>
-          )}
+        <div
+          className={classNames(styles['right-wrapper'], {
+            [styles['right-wrapper-with-log']]: isShowPluginLog,
+          })}
+        >
           <div className={styles['plugin-batch-executor-wrapper']}>
             <ExpandAndRetract isExpand={isExpand} onExpand={onExpand} status={executeStatus}>
               <div className={styles['plugin-batch-executor-title']} ref={batchExecuteDomRef}>
-                <span className={styles['plugin-batch-executor-title-text']}>已选插件</span>
+                <span className={styles['plugin-batch-executor-title-text']}>检测配置</span>
                 {selectNum > 0 && (
                   <YakitTag closable onClose={onRemove} color="info">
                     {selectNum}
@@ -381,6 +344,19 @@ export const PluginBatchExecutor: React.FC<PluginBatchExecutorProps> = React.mem
               </div>
             </div>
           </div>
+          {isShowPluginLog && (
+            <section className={styles['log-wrapper']} aria-labelledby="plugin-batch-progress-title">
+              <div className={styles['log-heard']} id="plugin-batch-progress-title">
+                <span className={styles['stage-number']}>04</span>
+                <span>执行进度</span>
+              </div>
+              <PluginExecuteLog
+                hidden={false}
+                pluginExecuteLog={pluginExecuteLog}
+                isExecuting={executeStatus === 'process'}
+              />
+            </section>
+          )}
         </div>
         <React.Suspense fallback={<>loading...</>}>
           {visibleRaskList && (
@@ -873,6 +849,17 @@ export const HybridScanExecuteContent: React.FC<HybridScanExecuteContentProps> =
             }}
             labelWrap={true}
           >
+            <div className={styles['execute-stage-heading']}>
+              <div className={styles['execute-stage-title']}>
+                <span className={styles['stage-number']}>01</span>
+                <span>目标或流量</span>
+              </div>
+              <span className={styles['execute-stage-divider']} aria-hidden="true" />
+              <div className={styles['execute-stage-title']}>
+                <span className={styles['stage-number']}>03</span>
+                <span>参数配置</span>
+              </div>
+            </div>
             <PluginFixFormParams
               form={form}
               disabled={isExecuting}
@@ -914,13 +901,19 @@ export const HybridScanExecuteContent: React.FC<HybridScanExecuteContentProps> =
           </Form>
         </div>
         {isShowResult && (
-          <PluginExecuteResult
-            streamInfo={streamInfo}
-            runtimeId={runtimeId}
-            loading={isExecuting}
-            defaultActiveKey={defaultActiveKey}
-            pluginExecuteResultWrapper={pluginExecuteResultWrapper}
-          />
+          <section className={styles['result-stage']} aria-label="风险结果">
+            <div className={styles['result-stage-heading']}>
+              <span className={styles['stage-number']}>05</span>
+              <span>风险结果</span>
+            </div>
+            <PluginExecuteResult
+              streamInfo={streamInfo}
+              runtimeId={runtimeId}
+              loading={isExecuting}
+              defaultActiveKey={defaultActiveKey}
+              pluginExecuteResultWrapper={pluginExecuteResultWrapper}
+            />
+          </section>
         )}
         <React.Suspense fallback={<div>loading...</div>}>
           <PluginBatchExecuteExtraParamsDrawer

@@ -49,16 +49,15 @@ import { grpcDownloadOnlinePlugin, grpcFetchLocalPluginDetail } from '@/pages/pl
 import { apiFetchOnlinePluginInfo } from '@/pages/plugins/utils'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { AddYakitScriptPageInfoProps } from '@/store/pageInfo'
-import { YakitHint } from '@/components/yakitUI/YakitHint/YakitHint'
 import { useSubscribeClose } from '@/store/tabSubscribe'
 import useGetSetState from '@/pages/pluginHub/hooks/useGetSetState'
 import { APIFunc } from '@/apiUtils/type'
 import { PluginUploadModal } from '@/pages/pluginHub/pluginUploadModal/PluginUploadModal'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { setClipboardText } from '@/utils/clipboard'
 import yaml from 'js-yaml'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
+import { RuiYanButton, RuiYanConfirmDialog, RuiYanModal } from '@/components/renyanUI'
 
 import classNames from 'classnames'
 import '../../plugins/plugins.scss'
@@ -373,7 +372,6 @@ export const PluginEditor: React.FC<PluginEditorProps> = memo(
       { wait: 300 },
     ).run
 
-    const wrapperRef = useRef<HTMLDivElement>(null)
     /** ---------- 全局基础逻辑 End ---------- */
 
     // 插件基础信息组件 ref
@@ -933,7 +931,7 @@ export const PluginEditor: React.FC<PluginEditorProps> = memo(
     })
 
     return (
-      <div ref={wrapperRef} tabIndex={0} className={styles['plugin-editor']}>
+      <div tabIndex={0} className={styles['plugin-editor']}>
         <YakitSpin spinning={loading} tip={t('PluginEditor.loadingPluginDetail')}>
           <div className={styles['plugin-editor-wrapper']}>
             <div
@@ -1039,16 +1037,15 @@ export const PluginEditor: React.FC<PluginEditorProps> = memo(
 
             <PluginCopyModal visible={copyHint} setVisible={onCopyHintCallback} />
 
-            <YakitHint
-              getContainer={wrapperRef.current || undefined}
-              wrapClassName={styles['old-data-hint-wrapper']}
-              visible={oldShow}
+            <RuiYanConfirmDialog
+              open={oldShow}
               title={t('PluginEditor.oldDataMigrationTitle')}
-              content={t('PluginEditor.oldDataMigrationContent')}
-              okButtonText={t('PluginEditor.copyCode')}
-              cancelButtonText={t('YakitButton.ignore')}
-              okButtonProps={{ loading: copyLoading }}
-              onOk={onOldDataOk}
+              message={t('PluginEditor.oldDataMigrationContent')}
+              confirmText={t('PluginEditor.copyCode')}
+              cancelText={t('YakitButton.ignore')}
+              confirmLoading={copyLoading}
+              closeOnBackdrop={false}
+              onConfirm={onOldDataOk}
               onCancel={onOldDataCancel}
             />
 
@@ -1093,20 +1090,26 @@ const PluginCopyModal: React.FC<PluginCopyModalProps> = memo((props) => {
   })
 
   return (
-    <YakitModal
+    <RuiYanModal
+      open={visible}
       title={t('PluginEditor.copyToCloud')}
-      type="white"
-      width={506}
-      centered={true}
-      maskClosable={false}
-      closable={true}
-      visible={visible}
-      onCancel={onCancel}
-      onOk={onSubmit}
-      bodyStyle={{ padding: 0 }}
+      description={t('PluginEditor.copyToCloudDesc')}
+      width={480}
+      closeOnBackdrop={false}
+      bodyClassName={styles['plugin-copy-modal-body']}
+      onClose={onCancel}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" onClick={onCancel}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton variant="primary" onClick={onSubmit}>
+            {t('YakitButton.ok')}
+          </RuiYanButton>
+        </>
+      }
     >
       <div className={styles['plugin-copy-body']}>
-        <div className={styles['copy-header']}>{t('PluginEditor.copyToCloudDesc')}</div>
         <div className={styles['copy-wrapper']}>
           <div className={styles['title-style']}>{t('PluginEditor.pluginName')}</div>
           <YakitInput
@@ -1116,6 +1119,6 @@ const PluginCopyModal: React.FC<PluginCopyModalProps> = memo((props) => {
           />
         </div>
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 })

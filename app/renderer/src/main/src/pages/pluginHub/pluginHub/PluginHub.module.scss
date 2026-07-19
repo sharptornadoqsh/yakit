@@ -1,39 +1,25 @@
 .yakit-plugin-hub {
   width: 100%;
   height: 100%;
-  display: flex;
-  gap: 8px;
-  padding: 8px;
+  padding: 12px;
   position: relative;
-  background: #eef4f4;
+  background: var(--ruiyan-color-background, #f6f8fc);
 
   .list {
-    flex: 0 1 58%;
-    min-width: 0;
-    max-width: 100%;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
-    border: 1px solid #cbdadc;
-    border-radius: 3px;
+    border: 1px solid var(--ruiyan-color-border, #dce3ed);
+    border-radius: var(--ruiyan-radius-lg, 8px);
     background: var(--Colors-Use-Basic-Background);
-    &.out-list {
-      flex-basis: 100%;
-      width: 100%;
-    }
   }
+}
 
-  .detail {
-    flex: 1 1 42%;
-    min-width: 360px;
-    overflow: hidden;
-    border: 1px solid #b9d2d3;
-    border-radius: 3px;
-    background: var(--Colors-Use-Basic-Background);
-    box-shadow: -8px 0 18px rgba(35, 66, 73, 0.08);
-  }
-
-  .hidden {
-    display: none;
-  }
+.detail-drawer-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
 }
 
 .update-local-hint {

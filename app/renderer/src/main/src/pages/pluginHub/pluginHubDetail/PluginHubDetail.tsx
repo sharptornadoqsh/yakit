@@ -62,6 +62,7 @@ interface PluginHubDetailProps {
   rootElementId?: string
   active?: PluginSourceType
   onBack: () => void
+  embedded?: boolean
 
   // 主动打开插件详情页时，是否需要主动跳到指定 tab 页面
   autoOpenDetailTab?: string
@@ -70,7 +71,7 @@ interface PluginHubDetailProps {
 
 export const PluginHubDetail: React.FC<PluginHubDetailProps> = memo(
   forwardRef((props, ref) => {
-    const { rootElementId, active, onBack, autoOpenDetailTab, setAutoOpenDetailTab } = props
+    const { rootElementId, active, onBack, embedded = false, autoOpenDetailTab, setAutoOpenDetailTab } = props
     const { t } = useI18nNamespaces(['pluginHub', 'yakitUi'])
 
     const userinfo = useStore((s) => s.userInfo)
@@ -86,6 +87,7 @@ export const PluginHubDetail: React.FC<PluginHubDetailProps> = memo(
           params: { ...defaultAddYakitScriptPageInfo, source: YakitRoute.Plugin_Hub },
         }),
       )
+      if (embedded) onBack()
     })
 
     useUpdateEffect(() => {
@@ -711,15 +713,17 @@ export const PluginHubDetail: React.FC<PluginHubDetailProps> = memo(
         id={wrapperId}
         className={classNames(styles['plugin-hub-detail'], { [styles['plugin-hub-detail-error']]: isError })}
       >
-        <div className={styles['detail-header']}>
-          <div className={styles['header-title']}>{t('PluginHubDetail.pluginDetail')}</div>
+        <div className={classNames(styles['detail-header'], { [styles['detail-header-embedded']]: embedded })}>
+          {!embedded && <div className={styles['header-title']}>{t('PluginHubDetail.pluginDetail')}</div>}
           <div className={styles['header-btn']}>
             <YakitButton size="large" icon={<SolidPluscircleIcon />} onClick={onNewPlugin}>
               {t('PluginHubDetail.newPlugin')}
             </YakitButton>
-            <YakitButton size="large" type="outline2" icon={<OutlineReplyIcon />} onClick={onBack}>
-              {t('YakitButton.back')}
-            </YakitButton>
+            {!embedded && (
+              <YakitButton size="large" type="outline2" icon={<OutlineReplyIcon />} onClick={onBack}>
+                {t('YakitButton.back')}
+              </YakitButton>
+            )}
           </div>
         </div>
 
@@ -905,7 +909,7 @@ export const PluginHubDetail: React.FC<PluginHubDetailProps> = memo(
 
         {localPlugin && editHint && (
           <ModifyYakitPlugin
-            getContainer={document.getElementById(rootElementId || '') || document.body}
+            getContainer={document.getElementById(embedded ? wrapperId : rootElementId || '') || document.body}
             plugin={localPlugin}
             visible={editHint}
             onCallback={handleEditHintCallback}

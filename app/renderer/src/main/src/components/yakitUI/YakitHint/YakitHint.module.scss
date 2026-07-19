@@ -139,3 +139,30 @@
 .yakit-hint-modal-container-resize {
   height: 100%;
 }
+.ruiyan-hint-content {
+  display: flex;
+  gap: 16px;
+  color: var(--ruiyan-color-text, #1f2937);
+}
+
+.ruiyan-hint-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--ruiyan-color-warning, #f59e0b);
+}
+
+.ruiyan-hint-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 16px;
+}
+
+.ruiyan-hint-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

@@ -8,7 +8,7 @@ import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { Tooltip } from 'antd'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { MITMAdvancedFilter, MITMFilters, MITMFilterSchema, onFilterEmptyMITMAdvancedFilters } from './MITMFilters'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal, RuiYanSegmented, RuiYanToolbar, showRuiYanModal } from '@/components/renyanUI'
 import {
   OutlineClockIcon,
   OutlineExportIcon,
@@ -17,10 +17,8 @@ import {
   OutlineStorageIcon,
   OutlineTrashIcon,
 } from '@/assets/icon/outline'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
 import emiter from '@/utils/eventBus/eventBus'
-import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
 import { defaultMITMAdvancedFilter, defaultMITMFilterData } from '@/defaultConstants/mitm'
 import cloneDeep from 'lodash/cloneDeep'
 import isEqual from 'lodash/isEqual'
@@ -255,12 +253,11 @@ const MITMFiltersModal: React.FC<MITMFiltersModalProps> = React.memo((props) => 
 
   // 保存过滤器
   const onSaveFilter = useMemoizedFn(() => {
-    const m = showYakitModal({
-      title: (modalT) =>
-        filterType === 'filter'
-          ? modalT('MITMFiltersModal.save_filter_config')
-          : modalT('MITMFiltersModal.save_hijack_config'),
-      content: (modalT) => (
+    const m = showRuiYanModal({
+      title:
+        filterType === 'filter' ? t('MITMFiltersModal.save_filter_config') : t('MITMFiltersModal.save_hijack_config'),
+      description: '保存当前条件组合，后续可从筛选历史中直接复用',
+      content: (
         <div className={styles['mitm-save-filter']}>
           <YakitInput.TextArea
             placeholder={t('MITMFiltersModal.name_placeholder', {
@@ -273,17 +270,16 @@ const MITMFiltersModal: React.FC<MITMFiltersModalProps> = React.memo((props) => 
             }}
           />
           <div className={styles['btn-box']}>
-            <YakitButton
-              type="outline2"
+            <RuiYanButton
+              variant="secondary"
               onClick={() => {
                 setFilterName('')
                 m.destroy()
               }}
             >
               {t('YakitButton.cancel')}
-            </YakitButton>
-            <YakitButton
-              type="primary"
+            </RuiYanButton>
+            <RuiYanButton
               onClick={() => {
                 if (getFilterName().length === 0) {
                   warn(t('MITMFiltersModal.please_enter_name'))
@@ -318,28 +314,22 @@ const MITMFiltersModal: React.FC<MITMFiltersModalProps> = React.memo((props) => 
                 })
               }}
             >
-              {modalT('YakitButton.save')}
-            </YakitButton>
+              {t('YakitButton.save')}
+            </RuiYanButton>
           </div>
         </div>
       ),
-      onCancel: () => {
+      onClose: () => {
         setFilterName('')
-        m.destroy()
       },
-      footer: null,
-      width: 400,
+      width: 480,
+      closeOnBackdrop: false,
     })
   })
 
   const onMenuSelect = useMemoizedFn((v: MITMFilterUIProps) => {
     filtersRef.current.setFormValue(v.baseFilter)
     setFilterData(v.advancedFilters || [])
-  })
-
-  const onSetType = useMemoizedFn((e) => {
-    const { value } = e.target
-    setType(value)
   })
 
   /**获取基础配置、高级配置去除空数据 */
@@ -366,25 +356,37 @@ const MITMFiltersModal: React.FC<MITMFiltersModalProps> = React.memo((props) => 
   })
 
   return (
-    <YakitModal
-      visible={visible}
-      destroyOnClose
-      onCancel={() => {
+    <RuiYanModal
+      open={visible}
+      onClose={() => {
         setVisible(false)
       }}
-      closable={true}
       title={
-        <div className={styles['mitm-filters-title']}>
-          <span>
-            {filterType === 'hijackFilter'
-              ? (editFilterName ? `${t('YakitButton.edit')}` : '') + t('MITMFiltersModal.hijack_condition')
-              : (editFilterName ? `${t('YakitButton.edit')}` : '') + t('MITMFiltersModal.filter_configuration')}
-          </span>
-          <YakitRadioButtons
+        filterType === 'hijackFilter'
+          ? (editFilterName ? `${t('YakitButton.edit')}` : '') + t('MITMFiltersModal.hijack_condition')
+          : (editFilterName ? `${t('YakitButton.edit')}` : '') + t('MITMFiltersModal.filter_configuration')
+      }
+      description="组合基础条件与高级规则，配置结果直接应用于当前代理会话"
+      width={720}
+      closeOnBackdrop={false}
+      bodyClassName={styles['mitm-filters-modal']}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" onClick={() => setVisible(false)}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton onClick={() => onSetFilter()}>
+            {editFilterName ? t('MITMFiltersModal.save_and_apply') : t('YakitButton.confirm')}
+          </RuiYanButton>
+        </>
+      }
+    >
+      <RuiYanToolbar
+        leading={
+          <RuiYanSegmented
             value={type}
-            onChange={onSetType}
-            buttonStyle="solid"
-            options={[
+            onChange={(value) => setType(value as FilterSettingType)}
+            items={[
               {
                 value: 'base-setting',
                 label: t('MITMFiltersModal.base_configuration'),
@@ -395,98 +397,89 @@ const MITMFiltersModal: React.FC<MITMFiltersModalProps> = React.memo((props) => 
               },
             ]}
           />
-        </div>
-      }
-      width={730}
-      maskClosable={false}
-      subTitle={
-        <div className={styles['mitm-filters-subTitle']}>
-          {filterType === 'filter' && (
-            <>
-              <Tooltip title={t('MITMFiltersModal.export_configuration')} align={{ offset: [0, 10] }}>
-                <YakitButton
-                  style={{ padding: '3px 8px' }}
-                  type="text"
-                  icon={<OutlineExportIcon />}
-                  onClick={onFilterExport}
-                />
-              </Tooltip>
-              <Tooltip title={t('MITMFiltersModal.import_configuration')} align={{ offset: [0, 10] }}>
-                <YakitButton
-                  style={{ padding: '3px 8px' }}
-                  type="text"
-                  icon={<OutlineSaveIcon />}
-                  onClick={onFilterImport}
-                />
-              </Tooltip>
-              <ImportFileModal
-                visible={importVisibel}
-                title={t('MITMFiltersModal.import_from_json')}
-                fileType="application/json"
-                onCancel={() => {
-                  setImportVisibel(false)
-                }}
-                onOk={(value) => {
-                  try {
-                    const importValue = JSONParseLog(value, { page: 'MITMFiltersModal', fun: 'onOk' })
-                    onMenuSelect(importValue)
+        }
+        actions={
+          <div className={styles['mitm-filters-subTitle']}>
+            {filterType === 'filter' && (
+              <>
+                <Tooltip title={t('MITMFiltersModal.export_configuration')} align={{ offset: [0, 10] }}>
+                  <YakitButton
+                    style={{ padding: '3px 8px' }}
+                    type="text"
+                    icon={<OutlineExportIcon />}
+                    onClick={onFilterExport}
+                  />
+                </Tooltip>
+                <Tooltip title={t('MITMFiltersModal.import_configuration')} align={{ offset: [0, 10] }}>
+                  <YakitButton
+                    style={{ padding: '3px 8px' }}
+                    type="text"
+                    icon={<OutlineSaveIcon />}
+                    onClick={onFilterImport}
+                  />
+                </Tooltip>
+                <ImportFileModal
+                  visible={importVisibel}
+                  title={t('MITMFiltersModal.import_from_json')}
+                  fileType="application/json"
+                  onCancel={() => {
                     setImportVisibel(false)
-                  } catch (error) {
-                    yakitNotify('error', t('YakitNotification.importFailedNoError'))
-                  }
-                }}
-              ></ImportFileModal>
-            </>
-          )}
+                  }}
+                  onOk={(value) => {
+                    try {
+                      const importValue = JSONParseLog(value, { page: 'MITMFiltersModal', fun: 'onOk' })
+                      onMenuSelect(importValue)
+                      setImportVisibel(false)
+                    } catch (error) {
+                      yakitNotify('error', t('YakitNotification.importFailedNoError'))
+                    }
+                  }}
+                ></ImportFileModal>
+              </>
+            )}
 
-          <YakitButton
-            style={{ padding: '3px 8px' }}
-            icon={<OutlineStorageIcon />}
-            type="text"
-            onClick={onSaveFilter}
-          />
-          <YakitPopover
-            overlayClassName={styles['http-history-table-drop-down-popover']}
-            content={
-              <MitmFilterHistoryStore
-                editFilterName={editFilterName}
-                onSetEditFilterName={setEditFilterName}
-                onSelect={(v) => onMenuSelect(v)}
-                popoverVisible={popoverVisible}
-                setPopoverVisible={setPopoverVisible}
-                removeFilterKey={removeFilterKey}
-              />
-            }
-            trigger="click"
-            placement="bottom"
-            onVisibleChange={setPopoverVisible}
-            visible={popoverVisible}
-          >
-            <YakitButton style={{ padding: '3px 8px' }} icon={<OutlineClockIcon />} type="text" />
-          </YakitPopover>
-
-          <YakitButton type="text" onClick={() => onClearFilters()}>
-            {t('YakitButton.clear')}
-          </YakitButton>
-          {filterType === 'filter' && (
             <YakitButton
+              style={{ padding: '3px 8px' }}
+              icon={<OutlineStorageIcon />}
               type="text"
-              onClick={() => {
-                onResetFilters()
-              }}
+              onClick={onSaveFilter}
+            />
+            <YakitPopover
+              overlayClassName={styles['http-history-table-drop-down-popover']}
+              content={
+                <MitmFilterHistoryStore
+                  editFilterName={editFilterName}
+                  onSetEditFilterName={setEditFilterName}
+                  onSelect={(v) => onMenuSelect(v)}
+                  popoverVisible={popoverVisible}
+                  setPopoverVisible={setPopoverVisible}
+                  removeFilterKey={removeFilterKey}
+                />
+              }
+              trigger="click"
+              placement="bottom"
+              onVisibleChange={setPopoverVisible}
+              visible={popoverVisible}
             >
-              {t('MITMFiltersModal.reset_filter')}
+              <YakitButton style={{ padding: '3px 8px' }} icon={<OutlineClockIcon />} type="text" />
+            </YakitPopover>
+
+            <YakitButton type="text" onClick={() => onClearFilters()}>
+              {t('YakitButton.clear')}
             </YakitButton>
-          )}
-        </div>
-      }
-      className={styles['mitm-filters-modal']}
-      onOk={() => {
-        onSetFilter()
-      }}
-      okText={editFilterName ? t('MITMFiltersModal.save_and_apply') : t('YakitButton.confirm')}
-      bodyStyle={{ padding: 0 }}
-    >
+            {filterType === 'filter' && (
+              <YakitButton
+                type="text"
+                onClick={() => {
+                  onResetFilters()
+                }}
+              >
+                {t('MITMFiltersModal.reset_filter')}
+              </YakitButton>
+            )}
+          </div>
+        }
+      />
       <div className={styles.infoBox}>
         <div>{t('MITMFiltersModal.tip')}</div>
         {filterType === 'hijackFilter' ? (
@@ -512,7 +505,7 @@ const MITMFiltersModal: React.FC<MITMFiltersModalProps> = React.memo((props) => 
           visible={type === 'advanced-setting'}
         />
       </React.Suspense>
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 
@@ -694,10 +687,9 @@ const ImportFileModal: React.FC<ImportFileModalProps> = (props) => {
   }
 
   return (
-    <YakitModal
+    <RuiYanModal
       title={title}
-      width={850}
-      subTitle={
+      description={
         <div className={styles['import-text']}>
           {t('YakitDraggerContent.drag_file_tip')}
           <input type="file" className={styles['fileInput']} ref={fileInputRef} onChange={handleFileChange} />
@@ -707,15 +699,22 @@ const ImportFileModal: React.FC<ImportFileModalProps> = (props) => {
           {t('MITMFiltersModal.drag_hint_suffix')}
         </div>
       }
-      destroyOnClose={true}
-      visible={visible}
-      okText={okText}
-      onCancel={onCancel}
-      onOk={() => onOk(value)}
+      width={960}
+      open={visible}
+      onClose={onCancel}
+      closeOnBackdrop={false}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" onClick={onCancel}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton onClick={() => onOk(value)}>{okText}</RuiYanButton>
+        </>
+      }
     >
       <div className={styles['import-editor']} onDragOver={handleDragOver} onDrop={handleDrop}>
         <YakitEditor value={value} setValue={setValue} type="json"></YakitEditor>
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 }

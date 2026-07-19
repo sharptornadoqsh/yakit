@@ -1,11 +1,89 @@
 import ReactDOM from 'react-dom'
 import React, { memo, useMemo, useState } from 'react'
 import { HintModal, YakitHintModal } from './YakitHintModal'
-import { YakitHintProps, YakitHintWhiteProps } from './YakitHintType'
+import { YakitHintModalProps, YakitHintProps, YakitHintWhiteProps } from './YakitHintType'
 import { usePrevious } from 'ahooks'
+import { RuiYanButton, RuiYanModal, RuiYanModalWidth } from '@/components/renyanUI'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
+import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 
 import classNames from 'classnames'
 import styles from './YakitHint.module.scss'
+
+const getRuiYanHintWidth = (width?: number): RuiYanModalWidth => {
+  if (!width || width <= 480) return 480
+  if (width <= 720) return 720
+  return 960
+}
+
+const RuiYanHintModal: React.FC<YakitHintModalProps> = (props) => {
+  const {
+    visible,
+    width,
+    title,
+    content,
+    footer,
+    footerExtra,
+    heardIcon,
+    extraIcon,
+    okButtonText,
+    okButtonProps,
+    onOk,
+    cancelButtonText,
+    cancelButtonProps,
+    onCancel,
+    children,
+  } = props
+  const { t } = useI18nNamespaces(['yakitUi'])
+  const defaultFooter = (
+    <div className={styles['ruiyan-hint-footer']}>
+      <div>{footerExtra}</div>
+      <div className={styles['ruiyan-hint-footer-actions']}>
+        <RuiYanButton
+          variant="secondary"
+          loading={Boolean(cancelButtonProps?.loading)}
+          disabled={cancelButtonProps?.disabled}
+          style={cancelButtonProps?.style}
+          className={cancelButtonProps?.className}
+          onClick={onCancel}
+        >
+          {cancelButtonText || t('YakitButton.cancel')}
+        </RuiYanButton>
+        <RuiYanButton
+          variant={okButtonProps?.danger || okButtonProps?.colors === 'danger' ? 'danger' : 'primary'}
+          loading={Boolean(okButtonProps?.loading)}
+          disabled={okButtonProps?.disabled}
+          style={okButtonProps?.style}
+          className={okButtonProps?.className}
+          onClick={onOk}
+        >
+          {okButtonText || t('YakitButton.ok')}
+        </RuiYanButton>
+      </div>
+    </div>
+  )
+
+  return (
+    <RuiYanModal
+      open={visible}
+      title={title || t('YakitModal.friendlyReminder')}
+      width={getRuiYanHintWidth(width)}
+      onClose={() => onCancel?.()}
+      closeOnBackdrop={false}
+      footer={footer === null ? undefined : footer || defaultFooter}
+    >
+      <div className={styles['ruiyan-hint-content']}>
+        {heardIcon || extraIcon ? (
+          <div className={styles['ruiyan-hint-icon']}>
+            {heardIcon}
+            {extraIcon}
+          </div>
+        ) : null}
+        <div>{children || content}</div>
+      </div>
+    </RuiYanModal>
+  )
+}
 
 export const YakitHint: React.FC<YakitHintProps> = memo((props) => {
   const { mask = true, maskColor, childModal = [], getContainer, visible, ...rest } = props
@@ -42,6 +120,17 @@ export const YakitHint: React.FC<YakitHintProps> = memo((props) => {
 
     return childModal
   }, [childModal])
+
+  if (RENYAN_SHELL_ENABLED) {
+    return (
+      <>
+        <RuiYanHintModal {...rest} visible={visible} />
+        {modals.map(({ key, content }) => (
+          <RuiYanHintModal {...content} key={key} />
+        ))}
+      </>
+    )
+  }
 
   return ReactDOM.createPortal(
     <div

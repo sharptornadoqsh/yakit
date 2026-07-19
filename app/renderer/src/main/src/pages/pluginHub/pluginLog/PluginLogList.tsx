@@ -8,15 +8,14 @@ import emiter from '@/utils/eventBus/eventBus'
 import { useStore } from '@/store'
 import { PluginLogCodeDiff, PluginLogMergeDetail } from './PluginLogMergeDetail'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
-import { YakitHint } from '@/components/yakitUI/YakitHint/YakitHint'
 import cloneDeep from 'lodash/cloneDeep'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { AuthorImg } from '@/pages/plugins/funcTemplate'
 import { YakitRoundCornerTag } from '@/components/yakitUI/YakitRoundCornerTag/YakitRoundCornerTag'
 import { TextareaForImage } from '@/pages/pluginEditor/pluginImageTextarea/PluginImageTextareaType'
 import { pluginSupplementJSONConvertToData } from '@/pages/pluginEditor/utils/convert'
 import { ImagePreviewList } from '../utilsUI/UtilsTemplate'
 import { formatTimestamp } from '@/utils/timeUtil'
+import { RuiYanConfirmDialog, RuiYanModal } from '@/components/renyanUI'
 
 // import classNames from "classnames"
 import styles from './PluginLog.module.scss'
@@ -397,28 +396,22 @@ export const PluginLogList: React.FC<PluginLogListProps> = memo((props) => {
       <PluginLogCodeDiff uuid={plugin.uuid} id={activeLogId.current} visible={showCode} setVisible={handleCancelCode} />
 
       {/* 删除评论|回复二次确认框 */}
-      <YakitHint
-        getContainer={document.getElementById(getContainer || '') || undefined}
-        wrapClassName={styles['plugin-log-del-comment-hit']}
-        visible={delCommentShow}
+      <RuiYanConfirmDialog
+        open={delCommentShow}
         title="删除评论"
-        content="是否确认要删除该条评论"
-        okButtonProps={{ loading: delCommentLoading }}
-        onOk={handleDelCommentOK}
+        message="是否确认要删除该条评论？删除后无法恢复。"
+        confirmText="删除"
+        cancelText="取消"
+        danger={true}
+        confirmLoading={delCommentLoading}
+        closeOnBackdrop={false}
+        onConfirm={handleDelCommentOK}
         onCancel={handleDelCommentClose}
       />
 
       {/* 回复的引用预览 */}
       {replyInfo.current && (
-        <YakitModal
-          getContainer={document.getElementById(getContainer || '') || undefined}
-          title="评论详情"
-          type="white"
-          visible={showQuotation}
-          centered={true}
-          footer={null}
-          onCancel={handleCancelShowQuotaion}
-        >
+        <RuiYanModal open={showQuotation} width={720} title="评论详情" onClose={handleCancelShowQuotaion}>
           <div className={styles['preview-reply']}>
             <div className={styles['header-wrapper']}>
               <AuthorImg src={replyInfo.current.parentComment?.headImg || UnLogin} />
@@ -437,7 +430,7 @@ export const PluginLogList: React.FC<PluginLogListProps> = memo((props) => {
               )}
             </div>
           </div>
-        </YakitModal>
+        </RuiYanModal>
       )}
     </div>
   )

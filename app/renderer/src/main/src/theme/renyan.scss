@@ -2,8 +2,8 @@
   --ruiyan-color-primary: #1677ff;
   --ruiyan-color-primary-hover: #0958d9;
   --ruiyan-color-primary-soft: #eaf3ff;
-  --ruiyan-color-accent: #00c2a8;
-  --ruiyan-color-teal: #14b8a6;
+  --ruiyan-color-accent: #00bfa6;
+  --ruiyan-color-teal: #00bfa6;
   --ruiyan-color-success: #22c55e;
   --ruiyan-color-warning: #f59e0b;
   --ruiyan-color-danger: #ef4444;
@@ -12,7 +12,7 @@
   --ruiyan-color-text: #1f2937;
   --ruiyan-color-text-secondary: #64748b;
   --ruiyan-color-text-tertiary: #94a3b8;
-  --ruiyan-color-border: #e2e8f0;
+  --ruiyan-color-border: #e5eaf2;
   --ruiyan-color-border-strong: #cbd5e1;
   --ruiyan-color-background: #f6f8fc;
   --ruiyan-color-surface: #ffffff;
@@ -24,16 +24,19 @@
   --ruiyan-space-5: 20px;
   --ruiyan-space-6: 24px;
   --ruiyan-space-8: 32px;
-  --ruiyan-space-12: 48px;
-  --ruiyan-space-16: 64px;
   --ruiyan-radius-sm: 6px;
-  --ruiyan-radius-md: 8px;
+  --ruiyan-radius-md: 10px;
   --ruiyan-radius-lg: 12px;
   --ruiyan-radius-pill: 999px;
-  --ruiyan-shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
-  --ruiyan-shadow-md: 0 10px 30px rgb(15 23 42 / 10%);
+  --ruiyan-shadow-sm: none;
+  --ruiyan-shadow-card: none;
+  --ruiyan-shadow-md: 0 16px 40px rgb(15 23 42 / 14%);
   --ruiyan-shadow-focus: 0 0 0 3px rgb(22 119 255 / 18%);
-  --ruiyan-font-sans: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --ruiyan-duration-hover: 120ms;
+  --ruiyan-duration-panel: 160ms;
+  --ruiyan-duration-drawer: 180ms;
+  --ruiyan-duration-fast: var(--ruiyan-duration-hover);
+  --ruiyan-font-sans: 'MiSans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   --ruiyan-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
@@ -44,9 +47,9 @@
   --ruiyan-color-text-tertiary: #71829a;
   --ruiyan-color-border: #28364b;
   --ruiyan-color-border-strong: #3a4b64;
-  --ruiyan-color-background: #0d1524;
-  --ruiyan-color-surface: #121d2f;
-  --ruiyan-color-surface-muted: #17243a;
+  --ruiyan-color-background: #08111f;
+  --ruiyan-color-surface: #101b2d;
+  --ruiyan-color-surface-muted: #152238;
   --ruiyan-color-primary-soft: #102d55;
 }
 

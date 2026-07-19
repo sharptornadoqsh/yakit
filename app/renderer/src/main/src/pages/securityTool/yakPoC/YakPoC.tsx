@@ -77,13 +77,13 @@ import { batchPluginType } from '@/defaultConstants/PluginBatchExecutor'
 import { defaultPocPageInfo } from '@/defaultConstants/YakPoC'
 import { HybridScanControlAfterRequest } from '@/models/HybridScan'
 import { getReleaseEditionName, getRemoteHttpSettingGV } from '@/utils/envfile'
-import { YakitTabsProps } from '@/components/yakitSideTab/YakitSideTabType'
-import { YakitSideTab } from '@/components/yakitSideTab/YakitSideTab'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { RuiYanSegmented } from '@/components/renyanUI'
 
 const HybridScanTaskListDrawer = React.lazy(
   () => import('@/pages/plugins/pluginBatchExecutor/HybridScanTaskListDrawer'),
 )
+const detectionWorkflowSteps = ['目标或流量', '检测插件', '参数配置', '执行进度', '风险结果'] as const
 
 export const onToManageGroup = () => {
   emiter.emit(
@@ -95,20 +95,9 @@ export const onToManageGroup = () => {
   )
 }
 
-const YakPoCTab: YakitTabsProps[] = [
-  {
-    label: 'YakPoC.byKeyword',
-    value: 'keyword',
-  },
-  {
-    label: 'YakPoC.byGroup',
-    value: 'group',
-  },
-]
-
 /**专项漏洞检测 */
 export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
-  const { t, i18n } = useI18nNamespaces(['yakPoC'])
+  const { t } = useI18nNamespaces(['yakPoC'])
   const { pageId } = props
 
   const { queryPagesDataById } = usePageInfo(
@@ -234,19 +223,30 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
     }
   }, [])
 
+  const activeWorkflowStep = useCreation(() => {
+    if (executeStatus === 'finished') return 4
+    if (executeStatus === 'process' || executeStatus === 'paused' || executeStatus === 'error') return 3
+    if (selectGroupListAll.length > 0) return 2
+    return 0
+  }, [executeStatus, selectGroupListAll.length])
+
   return (
     <div className={styles['yak-poc-wrapper']} ref={pluginGroupRef}>
-      <div className={styles['yakpoc-tab-wrap']}>
-        <YakitSideTab
-          type="horizontal"
-          key={i18n.language}
-          yakitTabs={YakPoCTab}
-          activeKey={type}
-          onActiveKey={onActiveKey}
-          show={!hidden}
-          setShow={(v) => setHidden(!v)}
-          t={t}
-        />
+      <div className={styles['detection-workflow']} role="list" aria-label="专项漏洞检测流程">
+        {detectionWorkflowSteps.map((step, index) => (
+          <div
+            key={step}
+            role="listitem"
+            aria-current={index === activeWorkflowStep ? 'step' : undefined}
+            className={classNames(styles['workflow-step'], {
+              [styles['workflow-step-active']]: index === activeWorkflowStep,
+              [styles['workflow-step-complete']]: index < activeWorkflowStep,
+            })}
+          >
+            <span className={styles['workflow-step-index']}>{String(index + 1).padStart(2, '0')}</span>
+            <span className={styles['workflow-step-label']}>{step}</span>
+          </div>
+        ))}
       </div>
       <div className={styles['yak-poc-body']}>
         <div
@@ -256,8 +256,18 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
         >
           <div className={styles['left-header-search']}>
             <div className={styles['header-type-wrapper']}>
-              <span className={styles['header-text']}>{t('YakPoC.selectPlugin')}</span>
+              <span className={styles['stage-number']}>02</span>
+              <span className={styles['header-text']}>检测插件</span>
             </div>
+            <RuiYanSegmented
+              label="专项检测分类方式"
+              value={type}
+              onChange={onActiveKey}
+              items={[
+                { label: t('YakPoC.byKeyword'), value: 'keyword' },
+                { label: t('YakPoC.byGroup'), value: 'group' },
+              ]}
+            />
           </div>
           <PluginGroupByKeyWord
             pageId={pageId}
@@ -1037,6 +1047,10 @@ const YakPoCExecuteContent: React.FC<YakPoCExecuteContentProps> = React.memo((pr
     <>
       {isShowPluginAndLog && (
         <div className={styles['midden-wrapper']} style={{ width: i18n.language.startsWith('zh') ? 300 : 350 }}>
+          <div className={styles['midden-stage-heading']}>
+            <span className={styles['stage-number']}>{showType === 'log' ? '04' : '02'}</span>
+            <span>{showType === 'log' ? '执行进度' : '已选插件'}</span>
+          </div>
           <div className={styles['midden-heard']}>
             <YakitRadioButtons
               size="small"

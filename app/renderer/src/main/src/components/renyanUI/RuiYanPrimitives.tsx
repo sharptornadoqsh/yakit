@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import classNames from 'classnames'
 import { RuiYanIcon, type RuiYanIconName } from './RuiYanIcons'
 import styles from './RuiYanUI.module.scss'
@@ -118,6 +119,89 @@ export interface RuiYanTableColumn<T> {
   render: (record: T, index: number) => React.ReactNode
 }
 
+export interface RuiYanPermissionColumn {
+  key: string
+  label: React.ReactNode
+}
+
+export interface RuiYanPermissionRow {
+  key: string
+  label: React.ReactNode
+  description?: React.ReactNode
+  values: Readonly<Record<string, boolean | null | undefined>>
+}
+
+export interface RuiYanPermissionMatrixProps {
+  columns: readonly RuiYanPermissionColumn[]
+  rows: readonly RuiYanPermissionRow[]
+  onChange?: (rowKey: string, columnKey: string, checked: boolean) => void
+  emptyTitle?: string
+  className?: string
+}
+
+export const RuiYanPermissionMatrix: React.FC<RuiYanPermissionMatrixProps> = ({
+  columns,
+  rows,
+  onChange,
+  emptyTitle = '暂无权限数据',
+  className,
+}) => {
+  if (rows.length === 0) return <RuiYanEmptyState compact title={emptyTitle} />
+
+  return (
+    <div className={classNames(styles['permission-matrix-wrap'], className)}>
+      <table className={styles['permission-matrix']}>
+        <thead>
+          <tr>
+            <th scope="col">权限模块</th>
+            {columns.map((column) => (
+              <th key={column.key} scope="col">
+                {column.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key}>
+              <th scope="row">
+                <strong>{row.label}</strong>
+                {row.description ? <span>{row.description}</span> : null}
+              </th>
+              {columns.map((column) => {
+                const value = row.values[column.key]
+                if (value === null || value === undefined) {
+                  return (
+                    <td key={column.key}>
+                      <span className={styles['permission-unavailable']} aria-label="不适用">
+                        —
+                      </span>
+                    </td>
+                  )
+                }
+                return (
+                  <td key={column.key}>
+                    <label className={styles['permission-cell']}>
+                      <input
+                        type="checkbox"
+                        checked={value}
+                        disabled={!onChange}
+                        aria-label={`${String(row.label)} ${String(column.label)}`}
+                        onChange={(event) => onChange?.(row.key, column.key, event.target.checked)}
+                      />
+                      <span aria-hidden="true" />
+                    </label>
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export interface RuiYanDataTableProps<T> {
   columns: readonly RuiYanTableColumn<T>[]
   data: readonly T[]
@@ -215,6 +299,94 @@ export interface RuiYanTabItem {
   label: React.ReactNode
   content: React.ReactNode
   disabled?: boolean
+}
+
+export interface RuiYanBreadcrumbItem {
+  key: string
+  label: React.ReactNode
+  onClick?: () => void
+}
+
+export interface RuiYanBreadcrumbProps {
+  items: readonly RuiYanBreadcrumbItem[]
+  className?: string
+  label?: string
+}
+
+export const RuiYanBreadcrumb: React.FC<RuiYanBreadcrumbProps> = ({ items, className, label = '当前位置' }) => (
+  <nav className={classNames(styles.breadcrumb, className)} aria-label={label}>
+    <ol>
+      {items.map((item, index) => {
+        const current = index === items.length - 1
+        return (
+          <li key={item.key}>
+            {item.onClick && !current ? (
+              <button type="button" onClick={item.onClick}>
+                {item.label}
+              </button>
+            ) : (
+              <span aria-current={current ? 'page' : undefined}>{item.label}</span>
+            )}
+          </li>
+        )
+      })}
+    </ol>
+  </nav>
+)
+
+export interface RuiYanSegmentedItem {
+  value: string
+  label: React.ReactNode
+  disabled?: boolean
+}
+
+export interface RuiYanSegmentedProps {
+  items: readonly RuiYanSegmentedItem[]
+  value?: string
+  defaultValue?: string
+  onChange?: (value: string) => void
+  className?: string
+  label?: string
+}
+
+export const RuiYanSegmented: React.FC<RuiYanSegmentedProps> = ({
+  items,
+  value,
+  defaultValue,
+  onChange,
+  className,
+  label = '视图切换',
+}) => {
+  const firstAvailable = items.find((item) => !item.disabled)?.value || ''
+  const [innerValue, setInnerValue] = useState(defaultValue || firstAvailable)
+  const selectedValue = items.some((item) => item.value === value && !item.disabled)
+    ? value
+    : items.some((item) => item.value === innerValue && !item.disabled)
+      ? innerValue
+      : firstAvailable
+
+  const selectItem = (nextValue: string) => {
+    if (value === undefined) setInnerValue(nextValue)
+    onChange?.(nextValue)
+  }
+
+  return (
+    <div className={classNames(styles.segmented, className)} role="radiogroup" aria-label={label}>
+      {items.map((item) => (
+        <button
+          key={item.value}
+          type="button"
+          role="radio"
+          className={classNames(styles['segmented-item'], item.value === selectedValue && styles['segmented-active'])}
+          aria-checked={item.value === selectedValue}
+          disabled={item.disabled}
+          onClick={() => selectItem(item.value)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export interface RuiYanTabsProps {
@@ -378,21 +550,29 @@ export const RuiYanErrorState: React.FC<RuiYanStateComponentProps> = (props) => 
 
 interface RuiYanOverlayProps {
   open: boolean
-  title: string
+  title: React.ReactNode
+  description?: React.ReactNode
   onClose: () => void
+  closable?: boolean
   children: React.ReactNode
   footer?: React.ReactNode
+  navigation?: React.ReactNode
+  bodyClassName?: string
   closeOnBackdrop?: boolean
   kind: 'dialog' | 'drawer'
-  width?: number | string
+  width: number
 }
 
 const RuiYanOverlay: React.FC<RuiYanOverlayProps> = ({
   open,
   title,
+  description,
   onClose,
+  closable = true,
   children,
   footer,
+  navigation,
+  bodyClassName,
   closeOnBackdrop = true,
   kind,
   width,
@@ -405,7 +585,7 @@ const RuiYanOverlay: React.FC<RuiYanOverlayProps> = ({
     const previous = document.activeElement as HTMLElement | null
     containerRef.current?.focus()
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape' && closable) onClose()
       if (event.key !== 'Tab' || !containerRef.current) return
       const focusable = Array.from(
         containerRef.current.querySelectorAll<HTMLElement>(
@@ -432,7 +612,7 @@ const RuiYanOverlay: React.FC<RuiYanOverlayProps> = ({
       document.removeEventListener('keydown', handleKeyDown)
       previous?.focus()
     }
-  }, [open, onClose])
+  }, [open, onClose, closable])
 
   if (!open || typeof document === 'undefined') return null
 
@@ -453,10 +633,16 @@ const RuiYanOverlay: React.FC<RuiYanOverlayProps> = ({
         tabIndex={-1}
       >
         <header className={styles[`${kind}-header`]}>
-          <h2 id={titleId}>{title}</h2>
-          <RuiYanIconButton icon={<RuiYanIcon name="close" />} label="关闭" onClick={onClose} />
+          <div className={styles['overlay-heading']}>
+            <h2 id={titleId}>{title}</h2>
+            {description ? <p>{description}</p> : null}
+          </div>
+          {closable ? <RuiYanIconButton icon={<RuiYanIcon name="close" />} label="关闭" onClick={onClose} /> : null}
         </header>
-        <div className={styles[`${kind}-body`]}>{children}</div>
+        <div className={classNames(styles['overlay-content'], navigation && styles['overlay-content-split'])}>
+          {navigation ? <aside className={styles['overlay-navigation']}>{navigation}</aside> : null}
+          <div className={classNames(styles[`${kind}-body`], bodyClassName)}>{children}</div>
+        </div>
         {footer ? <footer className={styles[`${kind}-footer`]}>{footer}</footer> : null}
       </div>
     </div>,
@@ -464,13 +650,141 @@ const RuiYanOverlay: React.FC<RuiYanOverlayProps> = ({
   )
 }
 
-export interface RuiYanModalProps extends Omit<RuiYanOverlayProps, 'kind'> {}
+export type RuiYanModalWidth = 480 | 720 | 960
 
-export const RuiYanModal: React.FC<RuiYanModalProps> = (props) => <RuiYanOverlay kind="dialog" {...props} />
+export interface RuiYanModalProps extends Omit<RuiYanOverlayProps, 'kind' | 'width'> {
+  width?: RuiYanModalWidth
+}
 
-export interface RuiYanDrawerProps extends Omit<RuiYanOverlayProps, 'kind'> {}
+export const RuiYanModal: React.FC<RuiYanModalProps> = ({ width = 720, ...props }) => (
+  <RuiYanOverlay kind="dialog" width={width} {...props} />
+)
 
-export const RuiYanDrawer: React.FC<RuiYanDrawerProps> = (props) => <RuiYanOverlay kind="drawer" {...props} />
+export interface ShowRuiYanModalOptions {
+  title: React.ReactNode
+  description?: React.ReactNode
+  content: React.ReactNode
+  footer?: React.ReactNode
+  width?: RuiYanModalWidth
+  closable?: boolean
+  closeOnBackdrop?: boolean
+  onClose?: () => void
+  onConfirm?: () => void
+  confirmText?: React.ReactNode
+  cancelText?: React.ReactNode
+}
+
+export interface RuiYanModalHandle {
+  destroy: () => void
+}
+
+export const showRuiYanModal = (options: ShowRuiYanModalOptions): RuiYanModalHandle => {
+  if (typeof document === 'undefined') return { destroy: () => {} }
+
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  let destroyed = false
+  const destroy = () => {
+    if (destroyed) return
+    destroyed = true
+    root.unmount()
+    host.remove()
+  }
+  const onClose = () => {
+    options.onClose?.()
+    destroy()
+  }
+  const footer = Object.prototype.hasOwnProperty.call(options, 'footer') ? (
+    options.footer
+  ) : options.onConfirm ? (
+    <>
+      <RuiYanButton variant="secondary" onClick={onClose}>
+        {options.cancelText || '取消'}
+      </RuiYanButton>
+      <RuiYanButton onClick={options.onConfirm}>{options.confirmText || '确认'}</RuiYanButton>
+    </>
+  ) : undefined
+
+  root.render(
+    <RuiYanModal
+      open={true}
+      title={options.title}
+      description={options.description}
+      onClose={onClose}
+      footer={footer}
+      width={options.width}
+      closable={options.closable}
+      closeOnBackdrop={options.closeOnBackdrop}
+    >
+      {options.content}
+    </RuiYanModal>,
+  )
+
+  return { destroy }
+}
+
+export type RuiYanDrawerWidth = 480 | 640
+
+export interface RuiYanDrawerProps extends Omit<RuiYanOverlayProps, 'kind' | 'width'> {
+  width?: RuiYanDrawerWidth
+}
+
+export const RuiYanDrawer: React.FC<RuiYanDrawerProps> = ({ width = 640, ...props }) => (
+  <RuiYanOverlay kind="drawer" width={width} {...props} />
+)
+
+export interface RuiYanConfirmDialogProps extends Omit<RuiYanModalProps, 'children' | 'footer' | 'onClose' | 'width'> {
+  message: React.ReactNode
+  confirmText?: React.ReactNode
+  cancelText?: React.ReactNode
+  danger?: boolean
+  confirmLoading?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+export const RuiYanConfirmDialog: React.FC<RuiYanConfirmDialogProps> = ({
+  message,
+  confirmText = '确认',
+  cancelText = '取消',
+  danger = false,
+  confirmLoading,
+  onConfirm,
+  onCancel,
+  ...props
+}) => (
+  <RuiYanModal
+    {...props}
+    width={480}
+    onClose={onCancel}
+    footer={
+      <div className={styles['confirm-actions']}>
+        {danger ? (
+          <RuiYanButton
+            variant="ghost"
+            className={styles['confirm-danger']}
+            loading={confirmLoading}
+            onClick={onConfirm}
+          >
+            {confirmText}
+          </RuiYanButton>
+        ) : null}
+        <span className={styles['confirm-spacer']} />
+        <RuiYanButton variant="secondary" onClick={onCancel}>
+          {cancelText}
+        </RuiYanButton>
+        {!danger ? (
+          <RuiYanButton variant="primary" loading={confirmLoading} onClick={onConfirm}>
+            {confirmText}
+          </RuiYanButton>
+        ) : null}
+      </div>
+    }
+  >
+    <div className={styles['confirm-message']}>{message}</div>
+  </RuiYanModal>
+)
 
 export interface RuiYanFormSectionProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   title: React.ReactNode
@@ -502,6 +816,35 @@ export interface RuiYanDetailPanelProps extends Omit<React.HTMLAttributes<HTMLDi
   title: React.ReactNode
   extra?: React.ReactNode
 }
+
+export interface RuiYanCodeEditorFrameProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
+  title: React.ReactNode
+  description?: React.ReactNode
+  toolbar?: React.ReactNode
+  status?: React.ReactNode
+}
+
+export const RuiYanCodeEditorFrame: React.FC<RuiYanCodeEditorFrameProps> = ({
+  title,
+  description,
+  toolbar,
+  status,
+  className,
+  children,
+  ...props
+}) => (
+  <section className={classNames(styles['code-editor-frame'], className)} {...props}>
+    <header className={styles['code-editor-header']}>
+      <div>
+        <h2>{title}</h2>
+        {description ? <span>{description}</span> : null}
+      </div>
+      {toolbar ? <div className={styles['code-editor-toolbar']}>{toolbar}</div> : null}
+    </header>
+    <div className={styles['code-editor-body']}>{children}</div>
+    {status ? <footer className={styles['code-editor-status']}>{status}</footer> : null}
+  </section>
+)
 
 export const RuiYanDetailPanel: React.FC<RuiYanDetailPanelProps> = ({
   title,

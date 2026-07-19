@@ -10,6 +10,9 @@ import { OutlineXIcon } from '@/assets/icon/outline'
 import { createRoot } from 'react-dom/client'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import i18n from '@/i18n/i18n'
+import { RuiYanButton, showRuiYanModal, type RuiYanModalHandle, type RuiYanModalWidth } from '@/components/renyanUI'
+import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
+
 const tOriginal = i18n.getFixedT(null, 'yakitUi')
 
 export type ModalI18nNode = React.ReactNode | ((modalT: TFunction) => React.ReactNode) | string
@@ -102,6 +105,148 @@ export interface YakitModalConfirmProps extends Omit<YakitBaseModalProp, 'title'
   icon?: ReactNode
 }
 
+interface RuiYanModalFooterProps {
+  cancelText?: ModalI18nNode
+  confirmText?: ModalI18nNode
+  cancelButtonProps?: {
+    loading?: unknown
+    disabled?: boolean
+    style?: React.CSSProperties
+    className?: string
+  }
+  okButtonProps?: {
+    loading?: unknown
+    disabled?: boolean
+    style?: React.CSSProperties
+    className?: string
+    danger?: boolean
+    colors?: string
+  }
+  showConfirmLoading?: boolean
+  onCancel: (event: React.MouseEvent<HTMLButtonElement>) => void
+  onConfirm: (event: React.MouseEvent<HTMLButtonElement>) => void
+}
+
+const RuiYanModalFooter: React.FC<RuiYanModalFooterProps> = ({
+  cancelText,
+  confirmText,
+  cancelButtonProps,
+  okButtonProps,
+  showConfirmLoading,
+  onCancel,
+  onConfirm,
+}) => {
+  const [loading, setLoading] = useState(false)
+
+  return (
+    <>
+      <RuiYanButton
+        variant="secondary"
+        loading={Boolean(cancelButtonProps?.loading)}
+        disabled={cancelButtonProps?.disabled}
+        style={cancelButtonProps?.style}
+        className={cancelButtonProps?.className}
+        onClick={onCancel}
+      >
+        <ModalI18nRender node={cancelText || tOriginal('YakitButton.cancel')} />
+      </RuiYanButton>
+      <RuiYanButton
+        variant={okButtonProps?.danger || okButtonProps?.colors === 'danger' ? 'danger' : 'primary'}
+        loading={loading || Boolean(okButtonProps?.loading)}
+        disabled={okButtonProps?.disabled}
+        style={okButtonProps?.style}
+        className={okButtonProps?.className}
+        onClick={(event) => {
+          if (showConfirmLoading) setLoading(true)
+          onConfirm(event)
+        }}
+      >
+        <ModalI18nRender node={confirmText || tOriginal('YakitButton.ok')} />
+      </RuiYanButton>
+    </>
+  )
+}
+
+const getRuiYanModalWidth = (width?: string | number): RuiYanModalWidth => {
+  if (typeof width === 'number') {
+    if (width <= 480) return 480
+    if (width <= 720) return 720
+    return 960
+  }
+  if (typeof width === 'string') {
+    const value = Number.parseFloat(width)
+    if (Number.isFinite(value)) {
+      if (width.includes('%')) return value <= 50 ? 720 : 960
+      if (value <= 480) return 480
+      if (value <= 720) return 720
+      return 960
+    }
+  }
+  return 720
+}
+
+const showRuiYanConfirmModal = (props: YakitModalConfirmProps): RuiYanModalHandle => {
+  let rawModal: RuiYanModalHandle | undefined
+  let afterCloseCalled = false
+  const runAfterClose = () => {
+    if (afterCloseCalled) return
+    afterCloseCalled = true
+    props.modalAfterClose?.()
+  }
+  const modal: RuiYanModalHandle = {
+    destroy: () => {
+      rawModal?.destroy()
+      runAfterClose()
+    },
+  }
+  const footer =
+    props.footer === null ? undefined : props.footer ? (
+      (props.footer as React.ReactNode)
+    ) : (
+      <RuiYanModalFooter
+        cancelText={props.onCancelText}
+        confirmText={props.onOkText}
+        cancelButtonProps={props.cancelButtonProps}
+        okButtonProps={props.okButtonProps}
+        showConfirmLoading={props.showConfirmLoading}
+        onCancel={(event) => {
+          props.onCancel?.(event)
+          modal.destroy()
+        }}
+        onConfirm={(event) => props.onOk?.(event)}
+      />
+    )
+
+  rawModal = showRuiYanModal({
+    title: <ModalI18nRender node={props.title || tOriginal('YakitModal.friendlyReminder')} />,
+    description: props.subTitle,
+    content: (
+      <ErrorBoundary
+        FallbackComponent={({ error }) => (
+          <div>
+            <p>{tOriginal('YakitNotification.modalCrashRetry')}</p>
+            <pre>{error?.message}</pre>
+          </div>
+        )}
+      >
+        <ModalI18nRender node={props.content} />
+      </ErrorBoundary>
+    ),
+    footer,
+    width: 480,
+    closable: props.closable !== false,
+    closeOnBackdrop: props.maskClosable !== false,
+    onClose: () => {
+      const event = { stopPropagation: () => {} } as React.MouseEvent<HTMLElement>
+      if (props.onCloseX) props.onCloseX(event)
+      else props.onCancel?.(event)
+      runAfterClose()
+    },
+  })
+
+  return modal
+}
+
 interface YakitBaseModalProps extends YakitModalProp, React.ComponentProps<any> {
   onVisibleSetter?: (setter: (i: boolean) => void) => void
   showConfirmLoading?: boolean
@@ -110,6 +255,8 @@ interface YakitBaseModalProps extends YakitModalProp, React.ComponentProps<any> 
 }
 
 export const YakitModalConfirm = (props: YakitModalConfirmProps) => {
+  if (RENYAN_SHELL_ENABLED) return showRuiYanConfirmModal(props)
+
   const div = document.createElement('div')
   document.body.appendChild(div)
   let setter: (r: boolean) => any = () => {}
@@ -286,12 +433,80 @@ export const debugYakitModalAny = (y: any) => {
   })
 }
 
-interface ShowModalV2Props extends Omit<ShowModalProps, 'title' | 'content'> {
+interface ShowModalV2Props extends Omit<ShowModalProps, 'title' | 'content' | 'onOkText'> {
   title?: ModalI18nNode
   content?: ModalI18nNode
+  onOkText?: ModalI18nNode
+  onCancelText?: ModalI18nNode
+  showConfirmLoading?: boolean
+  onCloseX?: (event: React.MouseEvent<HTMLElement>) => void
+}
+
+const showRuiYanLegacyModal = (props: ShowModalV2Props): RuiYanModalHandle => {
+  let rawModal: RuiYanModalHandle | undefined
+  let afterCloseCalled = false
+  const runAfterClose = () => {
+    if (afterCloseCalled) return
+    afterCloseCalled = true
+    props.modalAfterClose?.()
+  }
+  const modal: RuiYanModalHandle = {
+    destroy: () => {
+      rawModal?.destroy()
+      runAfterClose()
+    },
+  }
+  const footer =
+    props.footer === null ? undefined : props.footer ? (
+      (props.footer as React.ReactNode)
+    ) : (
+      <RuiYanModalFooter
+        cancelText={props.onCancelText}
+        confirmText={props.onOkText}
+        cancelButtonProps={props.cancelButtonProps}
+        okButtonProps={props.okButtonProps}
+        showConfirmLoading={props.showConfirmLoading}
+        onCancel={(event) => {
+          props.onCancel?.(event)
+          modal.destroy()
+        }}
+        onConfirm={(event) => props.onOk?.(event)}
+      />
+    )
+
+  rawModal = showRuiYanModal({
+    title: <ModalI18nRender node={props.title || tOriginal('YakitModal.friendlyReminder')} />,
+    description: props.subTitle,
+    content: (
+      <ErrorBoundary
+        FallbackComponent={({ error }) => (
+          <div>
+            <p>{tOriginal('YakitNotification.modalCrashRetry')}</p>
+            <pre>{error?.message}</pre>
+          </div>
+        )}
+      >
+        <ModalI18nRender node={props.content} />
+      </ErrorBoundary>
+    ),
+    footer,
+    width: getRuiYanModalWidth(props.width),
+    closable: props.closable !== false,
+    closeOnBackdrop: props.maskClosable !== false,
+    onClose: () => {
+      const event = { stopPropagation: () => {} } as React.MouseEvent<HTMLElement>
+      if (props.onCloseX) props.onCloseX(event)
+      else props.onCancel?.(event)
+      runAfterClose()
+    },
+  })
+
+  return modal
 }
 
 export const showYakitModal = (props: ShowModalV2Props) => {
+  if (RENYAN_SHELL_ENABLED) return showRuiYanLegacyModal(props)
+
   const div = document.createElement('div')
   if (!!props.getContainer && props.getContainer instanceof HTMLElement) {
     props.getContainer.appendChild(div)

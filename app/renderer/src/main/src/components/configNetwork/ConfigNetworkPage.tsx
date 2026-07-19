@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { AutoCard } from '@/components/AutoCard'
 import { ManyMultiSelectForString, SwitchItem } from '@/utils/inputUtil'
-import { Divider, Form, Modal, Slider, Space, Upload } from 'antd'
+import { Divider, Form, Slider, Upload } from 'antd'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
-import { YakitPopconfirm } from '@/components/yakitUI/YakitPopconfirm/YakitPopconfirm'
 import { yakitInfo, warn, failed, success, yakitNotify } from '@/utils/notification'
 import { AutoSpin } from '@/components/AutoSpin'
 import update from 'immutability-helper'
@@ -16,19 +14,23 @@ import { StringToUint8Array, Uint8ArrayToString } from '@/utils/str'
 import cloneDeep from 'lodash/cloneDeep'
 import { RectangleFailIcon, RectangleSucceeIcon, UnionIcon } from './icon'
 import { SolidCheckCircleIcon, SolidLockClosedIcon } from '@/assets/icon/colors'
-import { showYakitModal } from '../yakitUI/YakitModal/YakitModalConfirm'
 import classNames from 'classnames'
 import { YakitSwitch } from '../yakitUI/YakitSwitch/YakitSwitch'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
-import { BanIcon, CogIcon, DragSortIcon, PencilAltIcon, RemoveIcon, TrashIcon } from '@/assets/newIcon'
-import { YakitDrawer } from '../yakitUI/YakitDrawer/YakitDrawer'
+import { BanIcon, CogIcon, DragSortIcon, PencilAltIcon, TrashIcon } from '@/assets/newIcon'
+import {
+  RuiYanButton,
+  RuiYanConfirmDialog,
+  RuiYanDrawer,
+  RuiYanFormSection,
+  RuiYanModal,
+  showRuiYanModal,
+} from '@/components/renyanUI'
 import { TableVirtualResize } from '../TableVirtualResize/TableVirtualResize'
 import { ColumnsTypeProps } from '../TableVirtualResize/TableVirtualResizeType'
-import { YakitModal } from '../yakitUI/YakitModal/YakitModal'
 import { YakitSelect } from '../yakitUI/YakitSelect/YakitSelect'
 import ProxyRulesConfig from './ProxyRulesConfig'
 import { v4 as uuidv4 } from 'uuid'
-import { ExclamationCircleOutlined } from '@ant-design/icons'
 import { PcapMetadata } from '@/models/Traffic'
 import { SelectOptionProps } from '@/pages/fuzzer/HTTPFuzzerPage'
 import { KVPair } from '@/models/kv'
@@ -216,6 +218,22 @@ export const defaultParams: GlobalNetworkConfig = {
   MaxContentLength: 10,
 }
 
+const SETTINGS_SECTION_EVENT = 'ruiyan:select-settings-section'
+const SETTINGS_SECTION_STORAGE_KEY = 'ruiyan:settings-section'
+const SETTINGS_SECTION_KEYS = [
+  'network-dns',
+  'tls-client',
+  'security-settings',
+  'password-policy',
+  'third-party-settings',
+] as const
+type SettingsSectionKey = (typeof SETTINGS_SECTION_KEYS)[number]
+
+const isSettingsSectionKey = (value: unknown): value is SettingsSectionKey =>
+  typeof value === 'string' && SETTINGS_SECTION_KEYS.includes(value as SettingsSectionKey)
+
+const PASSWORD_SPECIAL_CHARACTERS = '.<>?;:[]{}~!@#$%^&*()_+-="'
+
 export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
   const [params, setParams] = useState<GlobalNetworkConfig>(defaultParams)
   const [certificateParams, setCertificateParams] = useState<ClientCertificatePfx[]>()
@@ -225,7 +243,8 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
   const [loading, setLoading] = useState(false)
   const isShowLoading = useRef<boolean>(true)
   const [visible, setVisible] = useState<boolean>(false)
-  const configRef = useRef<any>()
+  const [resetConfirmVisible, setResetConfirmVisible] = useState(false)
+  const configRef = useRef<HTMLDivElement>(null)
   const [inViewport] = useInViewport(configRef)
   const [netInterfaceList, setNetInterfaceList] = useState<SelectOptionProps[]>([]) // 代理代表
   const [proxyDrawerVisible, setProxyDrawerVisible] = useState(false)
@@ -234,6 +253,44 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
     proxyConfig: { Routes = [], Endpoints = [] },
   } = useProxy()
   const originGlobalConfigRef = useRef<GlobalNetworkConfig>(cloneDeep(defaultParams))
+
+  const scrollToSettingsSection = useMemoizedFn((key: SettingsSectionKey, behavior?: ScrollBehavior) => {
+    const section = configRef.current?.querySelector<HTMLElement>(`[data-settings-section="${key}"]`)
+    if (!section) return
+
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    section.scrollIntoView({
+      behavior: behavior || (reduceMotion ? 'auto' : 'smooth'),
+      block: 'start',
+    })
+  })
+
+  useEffect(() => {
+    let pendingScroll: number | undefined
+    const scheduleScroll = (key: SettingsSectionKey, behavior?: ScrollBehavior) => {
+      if (pendingScroll !== undefined) window.clearTimeout(pendingScroll)
+      pendingScroll = window.setTimeout(() => scrollToSettingsSection(key, behavior), 0)
+    }
+    const onSelectSettingsSection = (event: Event) => {
+      const key = (event as CustomEvent<unknown>).detail
+      if (!isSettingsSectionKey(key)) return
+      try {
+        window.sessionStorage.setItem(SETTINGS_SECTION_STORAGE_KEY, key)
+      } catch {}
+      scheduleScroll(key)
+    }
+
+    window.addEventListener(SETTINGS_SECTION_EVENT, onSelectSettingsSection)
+    try {
+      const storedSection = window.sessionStorage.getItem(SETTINGS_SECTION_STORAGE_KEY)
+      if (isSettingsSectionKey(storedSection)) scheduleScroll(storedSection, 'auto')
+    } catch {}
+
+    return () => {
+      window.removeEventListener(SETTINGS_SECTION_EVENT, onSelectSettingsSection)
+      if (pendingScroll !== undefined) window.clearTimeout(pendingScroll)
+    }
+  }, [scrollToSettingsSection])
   /** ---------- 是否删除私密插件逻辑 Start ---------- */
   const [isDelPrivatePlugin, setIsDelPrivatePlugin] = useState<boolean>(false)
   useEffect(() => {
@@ -482,15 +539,16 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
   const hostRef = useRef<string>('')
   const handleConfigureHost = (key: number, Host?: string) => {
     hostRef.current = Host || ''
-    const m = showYakitModal({
-      title: (modalT) => modalT('ConfigNetworkPage.inputHostTitle'),
-      content: (modalT) => (
+    const m = showRuiYanModal({
+      title: t('ConfigNetworkPage.inputHostTitle'),
+      description: t('ConfigNetworkPage.domainHelp'),
+      content: (
         <div style={{ paddingTop: 20 }}>
-          <Form labelCol={{ span: 5 }} wrapperCol={{ span: 18 }} size={'small'}>
-            <Form.Item label={modalT('ConfigNetworkPage.domain')} help={modalT('ConfigNetworkPage.domainHelp')}>
+          <Form layout="vertical" size={'small'}>
+            <Form.Item label={t('ConfigNetworkPage.domain')} help={t('ConfigNetworkPage.domainHelp')}>
               <YakitInput
                 defaultValue={hostRef.current}
-                placeholder={modalT('ConfigNetworkPage.domainPlaceholder')}
+                placeholder={t('ConfigNetworkPage.domainPlaceholder')}
                 allowClear
                 onChange={(e) => {
                   const { value } = e.target
@@ -501,11 +559,8 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
           </Form>
         </div>
       ),
-      onCancel: () => {
-        m.destroy()
-      },
-      onOkText: t('YakitButton.add'),
-      onOk: () => {
+      confirmText: t('YakitButton.add'),
+      onConfirm: () => {
         setCertificateParams((prev) => {
           if (Array.isArray(prev)) {
             prev[key].Host = hostRef.current
@@ -514,7 +569,7 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
         })
         m.destroy()
       },
-      width: 400,
+      width: 480,
     })
   }
 
@@ -540,12 +595,13 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
             <YakitButton
               type="outline2"
               onClick={() => {
-                const m = showYakitModal({
-                  title: (modalT) => modalT('ConfigNetworkPage.passwordUnlock'),
-                  content: (modalT) => (
+                const m = showRuiYanModal({
+                  title: t('ConfigNetworkPage.passwordUnlock'),
+                  description: '输入证书密码并调用现有校验接口',
+                  content: (
                     <div style={{ padding: 20 }}>
                       <YakitInput.Password
-                        placeholder={modalT('ConfigNetworkPage.enterCertificatePassword')}
+                        placeholder={t('ConfigNetworkPage.enterCertificatePassword')}
                         allowClear
                         onChange={(e) => {
                           const { value } = e.target
@@ -559,10 +615,7 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                       />
                     </div>
                   ),
-                  onCancel: () => {
-                    m.destroy()
-                  },
-                  onOk: () => {
+                  onConfirm: () => {
                     ipcRenderer
                       .invoke('ValidP12PassWord', {
                         Pkcs12Bytes: item.Pkcs12Bytes,
@@ -582,7 +635,7 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                         }
                       })
                   },
-                  width: 400,
+                  width: 480,
                 })
               }}
             >
@@ -774,22 +827,42 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
     setOpenPerformanceTips(true)
   }
 
+  const onResetGlobalConfig = useMemoizedFn(() => {
+    setResetConfirmVisible(false)
+    onResetDelPrivatePlugin()
+    onResetChromePath()
+    onResetPprofFileAutoAnalyze()
+    onResetSecondaryTabsNum()
+    onResetLimitLogNum()
+    onResetPerformanceTips()
+    setCloseConfirmEnabled(true)
+    onConfirmCloseConfirmEnabled(true)
+    ipcRenderer.invoke('ResetGlobalNetworkConfig', {}).then(() => {
+      cerFormRef.current?.resetFields()
+      update()
+      yakitInfo(t('ConfigNetworkPage.resetConfigSuccess'))
+    })
+  })
+
   return (
     <>
       <div ref={configRef} className={styles['config-network-page']}>
-        <AutoCard style={{ height: 'auto' }}>
-          <AutoSpin spinning={loading} tip={t('ConfigNetworkPage.loading')}>
-            {params && (
-              <Form
-                size={'small'}
-                labelCol={{ span: 5 }}
-                wrapperCol={{ span: 14 }}
-                onSubmitCapture={() => submit()}
-                labelWrap
+        <AutoSpin spinning={loading} tip={t('ConfigNetworkPage.loading')}>
+          {params && (
+            <Form
+              className={styles['settings-form']}
+              layout="vertical"
+              size={'small'}
+              onSubmitCapture={() => submit()}
+              labelWrap
+            >
+              <RuiYanFormSection
+                id="ruiyan-settings-network-dns"
+                className={classNames(styles['settings-section'], styles['settings-section-network'])}
+                data-settings-section="network-dns"
+                title="网络与 DNS"
+                description="配置系统 DNS、备用 DNS 以及 TCP / DoH 回退。"
               >
-                <Divider orientation={'left'} style={{ marginTop: '0px' }}>
-                  {t('ConfigNetworkPage.dnsConfig')}
-                </Divider>
                 <SwitchItem
                   label={t('ConfigNetworkPage.disableSystemDNS')}
                   setValue={(DisableSystemDNS) => setParams({ ...params, DisableSystemDNS })}
@@ -826,9 +899,15 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                     mode={'tags'}
                   />
                 )}
-                <Divider orientation={'left'} style={{ marginTop: '0px' }}>
-                  {t('ConfigNetworkPage.tlsClientConfig')}
-                </Divider>
+              </RuiYanFormSection>
+
+              <RuiYanFormSection
+                id="ruiyan-settings-tls-client"
+                className={classNames(styles['settings-section'], styles['settings-section-tls'])}
+                data-settings-section="tls-client"
+                title="TLS 客户端"
+                description="管理客户端证书格式、证书内容与支持的 TLS 版本范围。"
+              >
                 <Form.Item label={t('ConfigNetworkPage.selectFormat')}>
                   <YakitRadioButtons
                     size="small"
@@ -873,8 +952,7 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                     ref={cerFormRef}
                     isShowCerName={false}
                     formProps={{
-                      labelCol: { span: 5 },
-                      wrapperCol: { span: 14 },
+                      layout: 'vertical',
                     }}
                   />
                 )}
@@ -912,10 +990,15 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                     }}
                   />
                 </Form.Item>
+              </RuiYanFormSection>
 
-                <Divider orientation={'left'} style={{ marginTop: '0px' }}>
-                  {t('ConfigNetworkPage.thirdPartyAppConfig')}
-                </Divider>
+              <RuiYanFormSection
+                id="ruiyan-settings-third-party-settings"
+                className={classNames(styles['settings-section'], styles['settings-section-third-party'])}
+                data-settings-section="third-party-settings"
+                title="第三方应用"
+                description="管理第三方服务凭据、AI 模型与现有自定义代码片段。"
+              >
                 <Form.Item label={t('ConfigNetworkPage.thirdPartyApp')}>
                   {(params.AppConfigs || []).map((i, index) => {
                     const extraParamsArr = i.ExtraParams || []
@@ -927,12 +1010,11 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                       <YakitTag
                         key={index}
                         onClick={() => {
-                          let m = showYakitModal({
-                            title: (modalT) => modalT('ConfigNetworkPage.editThirdPartyApp'),
-                            width: 600,
-                            closable: true,
-                            maskClosable: false,
-                            footer: null,
+                          let m = showRuiYanModal({
+                            title: t('ConfigNetworkPage.editThirdPartyApp'),
+                            description: '修改当前第三方应用配置并保存到全局设置',
+                            width: 720,
+                            closeOnBackdrop: false,
                             content: (
                               <NewThirdPartyApplicationConfig
                                 formValues={{
@@ -978,12 +1060,11 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                   <YakitButton
                     type={'outline1'}
                     onClick={() => {
-                      let m = showYakitModal({
-                        title: (modalT) => modalT('ConfigNetworkPage.addThirdPartyApp'),
-                        width: 600,
-                        footer: null,
-                        closable: true,
-                        maskClosable: false,
+                      let m = showRuiYanModal({
+                        title: t('ConfigNetworkPage.addThirdPartyApp'),
+                        description: '添加第三方应用并更新现有优先级配置',
+                        width: 720,
+                        closeOnBackdrop: false,
                         content: (
                           <NewThirdPartyApplicationConfig
                             onAdd={(data) => {
@@ -1055,10 +1136,15 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                 >
                   <CodeCustomize />
                 </Form.Item>
+              </RuiYanFormSection>
 
-                <Divider orientation={'left'} style={{ marginTop: '0px' }}>
-                  {t('ConfigNetworkPage.otherConfig')}
-                </Divider>
+              <RuiYanFormSection
+                id="ruiyan-settings-security-settings"
+                className={classNames(styles['settings-section'], styles['settings-section-security'])}
+                data-settings-section="security-settings"
+                title="安全设置"
+                description="配置访问限制、代理、存储、性能、扫描网卡与隐私选项。"
+              >
                 <Form.Item label={t('ConfigNetworkPage.httpAuthGlobalConfig')}>
                   <div className={styles['form-rule-body']}>
                     <div className={styles['form-rule']} onClick={() => setVisible(true)}>
@@ -1209,8 +1295,6 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                 <Form.Item
                   label={t('ConfigNetworkPage.dumpPacketSize')}
                   tooltip={t('ConfigNetworkPage.dumpPacketSizeTip')}
-                  labelCol={{ span: 5 }}
-                  wrapperCol={{ span: 2 }}
                 >
                   <YakitInput
                     suffix="M"
@@ -1252,11 +1336,7 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                     onChange={(pprofFileAutoAnalyze) => setPprofFileAutoAnalyze(pprofFileAutoAnalyze)}
                   />
                 </Form.Item>
-                <Form.Item
-                  label={t('ConfigNetworkPage.secondaryTabsNum')}
-                  labelCol={{ span: 5 }}
-                  wrapperCol={{ span: 2 }}
-                >
+                <Form.Item label={t('ConfigNetworkPage.secondaryTabsNum')}>
                   <YakitInput
                     size="small"
                     value={secondaryTabsNum}
@@ -1283,11 +1363,7 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                     }}
                   />
                 </Form.Item>
-                <Form.Item
-                  label={t('ConfigNetworkPage.pluginLogCount')}
-                  labelCol={{ span: 5 }}
-                  wrapperCol={{ span: 2 }}
-                >
+                <Form.Item label={t('ConfigNetworkPage.pluginLogCount')}>
                   <YakitInput
                     size="small"
                     value={limitLogNum}
@@ -1333,39 +1409,65 @@ export const ConfigNetworkPage: React.FC<ConfigNetworkPageProp> = (props) => {
                 >
                   <YakitSwitch checked={isDelPrivatePlugin} onChange={setIsDelPrivatePlugin} />
                 </Form.Item>
-                <Form.Item colon={false} label={' '}>
-                  <Space>
-                    <YakitButton type="primary" htmlType="submit">
-                      {t('ConfigNetworkPage.updateGlobalConfig')}
-                    </YakitButton>
-                    <YakitPopconfirm
-                      title={t('ConfigNetworkPage.confirmResetConfig')}
-                      onConfirm={() => {
-                        onResetDelPrivatePlugin()
-                        onResetChromePath()
-                        onResetPprofFileAutoAnalyze()
-                        onResetSecondaryTabsNum()
-                        onResetLimitLogNum()
-                        onResetPerformanceTips()
-                        setCloseConfirmEnabled(true)
-                        onConfirmCloseConfirmEnabled(true)
-                        ipcRenderer.invoke('ResetGlobalNetworkConfig', {}).then(() => {
-                          cerFormRef.current?.resetFields()
-                          update()
-                          yakitInfo(t('ConfigNetworkPage.resetConfigSuccess'))
-                        })
-                      }}
-                      placement="top"
-                    >
-                      <YakitButton type="outline1"> {t('ConfigNetworkPage.resetConfig')} </YakitButton>
-                    </YakitPopconfirm>
-                  </Space>
-                </Form.Item>
-              </Form>
-            )}
-          </AutoSpin>
-        </AutoCard>
+              </RuiYanFormSection>
+
+              <RuiYanFormSection
+                id="ruiyan-settings-password-policy"
+                className={classNames(styles['settings-section'], styles['settings-section-password'])}
+                data-settings-section="password-policy"
+                title="密码策略"
+                description="依据当前 utils/passwordPolicy.ts 中的前端校验规则只读展示。"
+              >
+                <ul className={styles['password-policy-list']}>
+                  <li>
+                    <span>长度</span>
+                    <strong>8–20 位</strong>
+                  </li>
+                  <li>
+                    <span>英文字母</span>
+                    <strong>至少 1 个大写字母和 1 个小写字母</strong>
+                  </li>
+                  <li>
+                    <span>数字</span>
+                    <strong>至少 1 个数字</strong>
+                  </li>
+                  <li className={styles['password-policy-special']}>
+                    <span>特殊字符（至少 1 个，且仅限以下集合）</span>
+                    <code>{PASSWORD_SPECIAL_CHARACTERS}</code>
+                  </li>
+                </ul>
+                <div className={styles['password-policy-evidence']} role="note">
+                  <strong>服务端存储证据边界</strong>
+                  <p>当前前端策略文件不包含服务端密码存储实现；本区不声明密码的具体存储、加密或哈希方案。</p>
+                </div>
+              </RuiYanFormSection>
+
+              <div className={styles['settings-footer']}>
+                <RuiYanButton
+                  className={styles['settings-reset-button']}
+                  variant="secondary"
+                  onClick={() => setResetConfirmVisible(true)}
+                >
+                  {t('ConfigNetworkPage.resetConfig')}
+                </RuiYanButton>
+                <RuiYanButton variant="primary" type="submit">
+                  {t('ConfigNetworkPage.updateGlobalConfig')}
+                </RuiYanButton>
+              </div>
+            </Form>
+          )}
+        </AutoSpin>
       </div>
+      <RuiYanConfirmDialog
+        open={resetConfirmVisible}
+        title={t('ConfigNetworkPage.resetConfig')}
+        message={t('ConfigNetworkPage.confirmResetConfig')}
+        confirmText={t('ConfigNetworkPage.resetConfig')}
+        cancelText={t('YakitButton.cancel')}
+        danger
+        onConfirm={onResetGlobalConfig}
+        onCancel={() => setResetConfirmVisible(false)}
+      />
       {visible && (
         <NTMLConfig
           visible={visible && !!inViewport}
@@ -1579,7 +1681,7 @@ interface DataProps extends AuthInfo {
 }
 
 export const NTMLConfig: React.FC<NTMLConfigProps> = (props) => {
-  const { visible, setVisible, getContainer, params, setParams, onNtmlSave } = props
+  const { visible, setVisible, params, setParams, onNtmlSave } = props
   const { t, i18n } = useI18nNamespaces(['configNetwork', 'yakitUi'])
   const [data, setData] = useState<DataProps[]>([])
   const [isRefresh, setIsRefresh] = useState<boolean>(false)
@@ -1613,32 +1715,33 @@ export const NTMLConfig: React.FC<NTMLConfigProps> = (props) => {
 
   const onClose = useMemoizedFn(() => {
     if (JSON.stringify(initData.current) !== JSON.stringify(data)) {
-      Modal.confirm({
+      let modal: ReturnType<typeof showRuiYanModal>
+      modal = showRuiYanModal({
         title: t('YakitModal.friendlyReminder'),
-        icon: <ExclamationCircleOutlined />,
         content: t('ConfigNetworkPage.saveHttpAuthAndClose'),
-        okText: t('YakitButton.save'),
-        cancelText: t('YakitButton.doNotSave'),
-        closable: true,
-        closeIcon: (
-          <div
-            onClick={(e) => {
-              e.stopPropagation()
-              Modal.destroyAll()
-            }}
-            className="modal-remove-icon"
-          >
-            <RemoveIcon />
-          </div>
+        width: 480,
+        closeOnBackdrop: false,
+        footer: (
+          <>
+            <RuiYanButton
+              variant="secondary"
+              onClick={() => {
+                setVisible(false)
+                modal.destroy()
+              }}
+            >
+              {t('YakitButton.doNotSave')}
+            </RuiYanButton>
+            <RuiYanButton
+              onClick={() => {
+                onOk()
+                modal.destroy()
+              }}
+            >
+              {t('YakitButton.save')}
+            </RuiYanButton>
+          </>
         ),
-        onOk: () => {
-          onOk()
-        },
-        onCancel: () => {
-          setVisible(false)
-        },
-        cancelButtonProps: { size: 'small', className: 'modal-cancel-button' },
-        okButtonProps: { size: 'small', className: 'modal-ok-button' },
       })
     } else {
       setVisible(false)
@@ -1791,38 +1894,24 @@ export const NTMLConfig: React.FC<NTMLConfigProps> = (props) => {
   })
   return (
     <>
-      <YakitDrawer
-        // placement='right'
-        width="max(700px, 50%)"
-        closable={false}
+      <RuiYanDrawer
+        width={640}
         onClose={() => onClose()}
-        visible={visible}
-        getContainer={getContainer}
-        // mask={false}
-        maskClosable={false}
-        // style={{height: visible ? heightDrawer : 0}}
-        className={classNames(styles['ntlm-config-drawer'])}
-        contentWrapperStyle={{ boxShadow: '0px -2px 4px rgba(133, 137, 158, 0.2)' }}
-        title={
-          <div className={styles['heard-title']}>
-            <div className={styles['title']}>{t('ConfigNetworkPage.httpAuthGlobalConfig')}</div>
-            <div className={styles['table-total']}>
-              {t('ConfigNetworkPage.authConfigTotal', { count: params.AuthInfos.length })}
-            </div>
-          </div>
-        }
-        extra={
-          <div className={styles['heard-right-operation']}>
-            <YakitButton type="primary" className={styles['button-create']} onClick={() => onCreateAuthInfo()}>
+        open={visible}
+        closeOnBackdrop={false}
+        bodyClassName={styles['ntlm-config-drawer']}
+        title={t('ConfigNetworkPage.httpAuthGlobalConfig')}
+        description={t('ConfigNetworkPage.authConfigTotal', { count: params.AuthInfos.length })}
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={() => onClose()}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton variant="secondary" onClick={() => onCreateAuthInfo()}>
               {t('YakitButton.add_new')}
-            </YakitButton>
-            <YakitButton type="primary" className={styles['button-save']} onClick={() => onOk()}>
-              {t('YakitButton.save')}
-            </YakitButton>
-            <div onClick={() => onClose()} className={styles['icon-remove']}>
-              <RemoveIcon />
-            </div>
-          </div>
+            </RuiYanButton>
+            <RuiYanButton onClick={() => onOk()}>{t('YakitButton.save')}</RuiYanButton>
+          </>
         }
       >
         <div className={styles['ntlm-config-table']}>
@@ -1855,7 +1944,7 @@ export const NTMLConfig: React.FC<NTMLConfigProps> = (props) => {
             onMoveRowEnd={onMoveRowEnd}
           />
         </div>
-      </YakitDrawer>
+      </RuiYanDrawer>
       {modalStatus && (
         <NTMLConfigModal
           modalStatus={modalStatus}
@@ -1934,18 +2023,25 @@ export const NTMLConfigModal: React.FC<NTMLConfigModalProps> = (props) => {
     },
   ]
   return (
-    <YakitModal
-      maskClosable={false}
+    <RuiYanModal
+      closeOnBackdrop={false}
       title={isEdit ? t('YakitButton.edit') : t('YakitButton.add_new')}
-      visible={modalStatus}
-      onCancel={() => onClose()}
-      closable
-      okType="primary"
+      description="配置认证主机、账号、密码与认证类型"
+      open={modalStatus}
+      onClose={() => onClose()}
       width={480}
-      onOk={() => onOk()}
-      bodyStyle={{ padding: '24px 16px' }}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" onClick={() => onClose()}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton onClick={() => onOk()}>
+            {isEdit ? t('YakitButton.save') : t('YakitButton.add_new')}
+          </RuiYanButton>
+        </>
+      }
     >
-      <Form form={form} labelCol={{ span: 5 }} wrapperCol={{ span: 16 }} className={styles['modal-from']}>
+      <Form form={form} layout="vertical" className={styles['modal-from']}>
         <Form.Item
           label="Host"
           name="Host"
@@ -1980,7 +2076,7 @@ export const NTMLConfigModal: React.FC<NTMLConfigModalProps> = (props) => {
           </YakitSelect>
         </Form.Item>
       </Form>
-    </YakitModal>
+    </RuiYanModal>
   )
 }
 

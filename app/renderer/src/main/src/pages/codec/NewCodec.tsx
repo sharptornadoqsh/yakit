@@ -64,7 +64,7 @@ import { YakitDropdownMenu } from '@/components/yakitUI/YakitDropdownMenu/YakitD
 import { YakitMenuItemProps } from '@/components/yakitUI/YakitMenu/YakitMenu'
 import { pluginTypeToName } from '../plugins/builtInData'
 import { YakitCheckableTag } from '@/components/yakitUI/YakitTag/YakitCheckableTag'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 import HexEditor from 'react-hex-editor'
 import oneDarkPro from 'react-hex-editor/themes/oneDarkPro'
 import { HexEditorHandle } from 'react-hex-editor/dist/types'
@@ -73,7 +73,6 @@ import { YakitRoute } from '@/enums/yakitRoute'
 import { useSubscribeClose } from '@/store/tabSubscribe'
 import emiter from '@/utils/eventBus/eventBus'
 import { MultipleNodeInfo } from '../layout/mainOperatorContent/MainOperatorContentType'
-import { YakitModalConfirm } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
 import { useTheme } from '@/hook/useTheme'
 import { handleOpenFileSystemDialog } from '@/utils/fileSystemDialog'
 import { YakitPopconfirm } from '@/components/yakitUI/YakitPopconfirm/YakitPopconfirm'
@@ -1544,16 +1543,29 @@ export const NewCodecMiddleRunList: React.FC<NewCodecMiddleRunListProps> = forwa
           {t('YakitButton.runNow')}
         </YakitButton>
       </div>
-      <YakitModal
-        visible={cacheModal}
-        bodyStyle={{ padding: 0 }}
+      <RuiYanModal
+        open={cacheModal}
         title={t('NewCodecMiddleRunList.saveCodecOrder')}
-        width={400}
-        footer={null}
-        onCancel={() => {
+        description="为当前处理流程设置名称，保存后可在历史流程中复用"
+        width={480}
+        onClose={() => {
           setFilterName('')
           setCacheModal(false)
         }}
+        footer={
+          <>
+            <RuiYanButton
+              variant="secondary"
+              onClick={() => {
+                setFilterName('')
+                setCacheModal(false)
+              }}
+            >
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton onClick={onSaveFun}>{t('YakitButton.save')}</RuiYanButton>
+          </>
+        }
       >
         <div className={styles['codec-save-modal']}>
           <YakitInput.TextArea
@@ -1565,22 +1577,8 @@ export const NewCodecMiddleRunList: React.FC<NewCodecMiddleRunListProps> = forwa
               setFilterName(e.target.value)
             }}
           />
-          <div className={styles['btn-box']}>
-            <YakitButton
-              type="outline2"
-              onClick={() => {
-                setFilterName('')
-                setCacheModal(false)
-              }}
-            >
-              {t('YakitButton.cancel')}
-            </YakitButton>
-            <YakitButton type="primary" onClick={onSaveFun}>
-              {t('YakitButton.save')}
-            </YakitButton>
-          </div>
         </div>
-      </YakitModal>
+      </RuiYanModal>
     </div>
   )
 })
@@ -2133,36 +2131,24 @@ export const NewCodec: React.FC<NewCodecProps> = (props) => {
       if (id === data.id) {
         // 编辑模式需提示
         if (codecFlow && rightItems.length > 0) {
-          const m = YakitModalConfirm({
-            width: 420,
-            type: 'white',
-            title: (modalT) => modalT('YakitModal.closePrompt'),
-            content: (modalT) => modalT('NewCodec.saveUpdateConfirm'),
-            onCancel() {
-              m.destroy()
-            },
+          const m = showRuiYanModal({
+            width: 480,
+            title: t('YakitModal.closePrompt'),
+            content: t('NewCodec.saveUpdateConfirm'),
             footer: (
-              <div
-                style={{
-                  width: '100%',
-                  padding: '0px 24px 24px 0px',
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: 8,
-                }}
-              >
-                <YakitButton
-                  type="outline2"
+              <>
+                <RuiYanButton
+                  variant="secondary"
                   onClick={() => {
                     emiter.emit('onCloseSubPageByInfo', res)
                     m.destroy()
                   }}
                 >
                   {t('YakitButton.doNotSave')}
-                </YakitButton>
+                </RuiYanButton>
 
-                <YakitButton
-                  type="primary"
+                <RuiYanButton
+                  variant="primary"
                   onClick={() => {
                     newCodecMiddleRunListRef.current?.onUpdateFun()
                     setTimeout(() => {
@@ -2172,8 +2158,8 @@ export const NewCodec: React.FC<NewCodecProps> = (props) => {
                   }}
                 >
                   {t('YakitButton.save')}
-                </YakitButton>
-              </div>
+                </RuiYanButton>
+              </>
             ),
           })
         }
@@ -2206,9 +2192,23 @@ export const NewCodec: React.FC<NewCodecProps> = (props) => {
     // 分类的类名
     let tagList: string[] = []
     let data: LeftDataProps[] = []
+    const cryptographicAlgorithmOrder = ['SM2', 'SM3', 'SM4', 'AES', 'RSA']
+    const getCryptographicAlgorithm = (method: CodecMethod) => {
+      const searchText = `${method.CodecName} ${method.CodecMethod} ${method.Tag}`.toLocaleUpperCase()
+      return cryptographicAlgorithmOrder.find((algorithm) => searchText.includes(algorithm))
+    }
     // 固定顺序
-    const NewMethods = Methods.sort((a, b) => differentiate(a.CodecName) - differentiate(b.CodecName))
-    NewMethods.forEach((item) => {
+    const NewMethods = [...Methods].sort((a, b) => differentiate(a.CodecName) - differentiate(b.CodecName))
+    const cryptographicMethods = NewMethods.filter((method) => getCryptographicAlgorithm(method)).sort((a, b) => {
+      const algorithmA = getCryptographicAlgorithm(a) || ''
+      const algorithmB = getCryptographicAlgorithm(b) || ''
+      const orderDifference =
+        cryptographicAlgorithmOrder.indexOf(algorithmA) - cryptographicAlgorithmOrder.indexOf(algorithmB)
+      return orderDifference || differentiate(a.CodecName) - differentiate(b.CodecName)
+    })
+    const cryptographicMethodNames = new Set(cryptographicMethods.map((method) => method.CodecName))
+
+    NewMethods.filter((method) => !cryptographicMethodNames.has(method.CodecName)).forEach((item) => {
       if (tagList.includes(item.Tag)) {
         const newData = data.map((itemIn) => {
           const { title, node } = itemIn
@@ -2229,6 +2229,13 @@ export const NewCodec: React.FC<NewCodecProps> = (props) => {
         tagList.push(item.Tag)
       }
     })
+
+    if (cryptographicMethods.length > 0) {
+      data.unshift({
+        title: '密码算法',
+        node: cryptographicMethods,
+      })
+    }
 
     // 找到 title 为 "其他" 的项的索引
     const index = data.findIndex((item) => item.title === '其他')

@@ -35,7 +35,7 @@ import {
 } from 'ahooks'
 import { API } from '@/services/swagger/resposeType'
 import cloneDeep from 'lodash/cloneDeep'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanConfirmDialog, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 import { Form, Progress, Tooltip } from 'antd'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
@@ -68,7 +68,6 @@ import { DefaultStatusList, defaultSearch } from '../builtInData'
 import { useStore } from '@/store'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { PluginGroupList } from '../local/PluginsLocalType'
-import { showYakitModal } from '@/components/yakitUI/YakitModal/YakitModalConfirm'
 import { PluginGroupDrawer } from '@/pages/pluginHub/group/PluginGroupDrawer'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
 import { UpdateGroupList, UpdateGroupListItem } from '@/pages/pluginHub/group/UpdateGroupList'
@@ -1028,7 +1027,9 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
 
   /** ---------- 同步插件到企业版 start ---------- */
   const [syncToEELoading, setSyncToEELoading] = useState<boolean>(false)
-  const sureSyncPluginToEE = (m) => {
+  const [syncConfirmVisible, setSyncConfirmVisible] = useState<boolean>(false)
+  const sureSyncPluginToEE = () => {
+    if (syncToEELoading) return
     setSyncToEELoading(true)
     httpUploadPluginToEE()
       .then((res) => {
@@ -1037,7 +1038,7 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
           setTimeout(() => {
             onRefListAndTotalAndGroup()
           }, 3000)
-          m.destroy()
+          setSyncConfirmVisible(false)
         }
       })
       .catch(() => {})
@@ -1046,25 +1047,7 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
       })
   }
   const onSyncPluginToEE = useMemoizedFn(() => {
-    const m = showYakitModal({
-      title: (modalT) => modalT('PluginManage.syncTitle'),
-      type: 'white',
-      maskClosable: false,
-      content: (modalT) => (
-        <div className={styles['syncToEE']}>
-          <div className={styles['syncToEE-title']}>{modalT('PluginManage.syncConfirm')}</div>
-          <div className={styles['syncToEE-footer']}>
-            <YakitButton type="outline2" onClick={() => m.destroy()}>
-              {t('YakitButton.cancel')}
-            </YakitButton>
-            <YakitButton type="primary" loading={syncToEELoading} onClick={() => sureSyncPluginToEE(m)}>
-              {t('YakitButton.confirm')}
-            </YakitButton>
-          </div>
-        </div>
-      ),
-      footer: null,
-    })
+    setSyncConfirmVisible(true)
   })
   /** ---------- 同步插件到企业版 end ---------- */
 
@@ -1107,6 +1090,8 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
                   type="outline2"
                   size="large"
                   name={t('PluginManage.syncToEE')}
+                  loading={syncToEELoading}
+                  disabled={syncToEELoading}
                   onClick={onSyncPluginToEE}
                 />
               )}
@@ -1148,43 +1133,16 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
                     onClick: ({ key }) => {
                       switch (key) {
                         case 'resetAll':
-                          let m = showYakitModal({
-                            title: (modalT) => modalT('YakitButton.resetAll'),
-                            centered: true,
-                            width: 400,
-                            closable: true,
-                            maskClosable: false,
-                            footer: (
-                              <div
-                                style={{
-                                  textAlign: 'right',
-                                  width: '100%',
-                                  margin: '0 15px 15px',
-                                }}
-                              >
-                                <YakitButton
-                                  type="outline1"
-                                  style={{ marginRight: 15 }}
-                                  onClick={() => {
-                                    m.destroy()
-                                  }}
-                                >
-                                  {t('YakitButton.cancel')}
-                                </YakitButton>
-                                <YakitButton
-                                  onClick={() => {
-                                    onResetAll()
-                                    m.destroy()
-                                  }}
-                                >
-                                  {t('YakitButton.confirm')}
-                                </YakitButton>
-                              </div>
-                            ),
-                            content: (modalT) => (
-                              <div style={{ padding: 15 }}>{modalT('PluginManage.resetConfirm')}</div>
-                            ),
-                            onCancel: () => {
+                          let m = showRuiYanModal({
+                            title: t('YakitButton.resetAll'),
+                            description: '重置操作将调用当前插件库的既有恢复流程',
+                            width: 480,
+                            closeOnBackdrop: false,
+                            content: <div style={{ padding: 15 }}>{t('PluginManage.resetConfirm')}</div>,
+                            confirmText: t('YakitButton.confirm'),
+                            cancelText: t('YakitButton.cancel'),
+                            onConfirm: () => {
+                              onResetAll()
                               m.destroy()
                             },
                           })
@@ -1447,6 +1405,20 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
         plugins={selectUUIDs}
         onOK={onModifyAuthor}
       />
+      <RuiYanConfirmDialog
+        open={syncConfirmVisible}
+        title={t('PluginManage.syncTitle')}
+        description="将当前插件数据同步至既有企业服务端"
+        message={t('PluginManage.syncConfirm')}
+        confirmText={t('YakitButton.confirm')}
+        cancelText={t('YakitButton.cancel')}
+        confirmLoading={syncToEELoading}
+        closeOnBackdrop={false}
+        onConfirm={sureSyncPluginToEE}
+        onCancel={() => {
+          if (!syncToEELoading) setSyncConfirmVisible(false)
+        }}
+      />
       <ReasonModal
         visible={showReason.visible}
         setVisible={onCancelReason}
@@ -1467,17 +1439,15 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
         onOk={onRemoveOk}
       ></ListDelGroupConfirmPop>
       {importGroupVisible && (
-        <YakitModal
+        <RuiYanModal
           title={t('PluginManage.importGroupTitle')}
-          closable={true}
-          visible={importGroupVisible}
-          maskClosable={false}
-          centered
-          onCancel={() => setImportGroupVisible(false)}
-          footer={null}
+          description="导入插件分组文件并应用到当前真实插件目录"
+          open={importGroupVisible}
+          closeOnBackdrop={false}
+          onClose={() => setImportGroupVisible(false)}
         >
           <UploadGroupModal importSuccess={fetchPluginFilters} onClose={() => setImportGroupVisible(false)} />
-        </YakitModal>
+        </RuiYanModal>
       )}
 
       {/* 一键下载 */}
@@ -1507,19 +1477,18 @@ export const PluginManage: React.FC<PluginManageProps> = (props) => {
       />
       {/* 上传插件库 */}
       {uploadPluginLibraryVisible && (
-        <YakitModal
+        <RuiYanModal
           title={t('PluginManage.uploadPluginLibrary')}
-          closable={true}
-          visible={uploadPluginLibraryVisible}
-          maskClosable={false}
-          onCancel={() => setUploadPluginLibraryVisible(false)}
-          footer={null}
+          description="选择本地插件数据库并调用既有上传流程"
+          open={uploadPluginLibraryVisible}
+          closeOnBackdrop={false}
+          onClose={() => setUploadPluginLibraryVisible(false)}
         >
           <UploadPluginLibrary
             onUploadPluginLibrary={onUploadPluginLibrary}
             onClose={() => setUploadPluginLibraryVisible(false)}
           />
-        </YakitModal>
+        </RuiYanModal>
       )}
       <YakitHint
         visible={percentShow}
@@ -1552,7 +1521,7 @@ interface ModifyAuthorModalProps {
 /** @name 批量修改插件作者 */
 const ModifyAuthorModal: React.FC<ModifyAuthorModalProps> = memo((props) => {
   const { visible, setVisible, plugins, onOK } = props
-  const { t } = useI18nNamespaces(['pluginHub'])
+  const { t } = useI18nNamespaces(['pluginHub', 'yakitUi'])
 
   const [loading, setLoading] = useState<boolean>(false)
   const [list, setList] = useState<API.UserList[]>([])
@@ -1625,19 +1594,23 @@ const ModifyAuthorModal: React.FC<ModifyAuthorModalProps> = memo((props) => {
   }, [visible])
 
   return (
-    <YakitModal
+    <RuiYanModal
       title={t('PluginManage.batchModifyAuthorTitle')}
-      width={448}
-      type="white"
-      centered={true}
-      closable={true}
-      keyboard={false}
-      visible={visible}
-      cancelButtonProps={{ loading: submitLoading }}
-      confirmLoading={submitLoading}
-      onCancel={cancel}
-      onOk={submit}
-      bodyStyle={{ padding: 0 }}
+      description={t('PluginManage.selectedPluginCount', { count: plugins.length || 0 })}
+      width={480}
+      open={visible}
+      onClose={cancel}
+      closeOnBackdrop={false}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" loading={submitLoading} onClick={cancel}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton loading={submitLoading} onClick={submit}>
+            {t('YakitButton.confirm')}
+          </RuiYanButton>
+        </>
+      }
     >
       <div className={styles['modify-author-modal-body']}>
         <Form.Item
@@ -1671,7 +1644,7 @@ const ModifyAuthorModal: React.FC<ModifyAuthorModalProps> = memo((props) => {
           </YakitSelect>
         </Form.Item>
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 
@@ -1685,7 +1658,7 @@ interface ReasonModalProps {
 /** @name 原因说明 */
 export const ReasonModal: React.FC<ReasonModalProps> = memo((props) => {
   const { visible, setVisible, type = 'nopass', total, onOK } = props
-  const { t, i18n } = useI18nNamespaces(['pluginHub'])
+  const { t, i18n } = useI18nNamespaces(['pluginHub', 'yakitUi'])
 
   const title = useMemo(() => {
     if (type === 'nopass') return t('PluginManage.reasonNopass')
@@ -1712,18 +1685,21 @@ export const ReasonModal: React.FC<ReasonModalProps> = memo((props) => {
   })
 
   return (
-    <YakitModal
+    <RuiYanModal
       title={title}
-      width={448}
-      type="white"
-      centered={true}
-      closable={true}
-      maskClosable={false}
-      keyboard={false}
-      visible={visible}
-      onCancel={setVisible}
-      onOk={onSubmit}
-      bodyStyle={{ padding: 0 }}
+      description={total ? t('PluginManage.selectedPluginCount', { count: total || 0 }) : undefined}
+      width={480}
+      closeOnBackdrop={false}
+      open={visible}
+      onClose={setVisible}
+      footer={
+        <>
+          <RuiYanButton variant="secondary" onClick={setVisible}>
+            {t('YakitButton.cancel')}
+          </RuiYanButton>
+          <RuiYanButton onClick={onSubmit}>{t('YakitButton.confirm')}</RuiYanButton>
+        </>
+      }
     >
       <div className={styles['reason-modal-body']}>
         {
@@ -1763,7 +1739,7 @@ export const ReasonModal: React.FC<ReasonModalProps> = memo((props) => {
           <div className={styles['hint-wrapper']}>{t('PluginManage.selectedPluginCount', { count: total || 0 })}</div>
         )}
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 })
 

@@ -1,6 +1,6 @@
 import { ForwardedRef, forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
 import {
   ImportAndExportStatusInfo,
   LogListInfo,
@@ -30,7 +30,7 @@ interface PluginLocalExportProps {
 }
 
 export const PluginLocalExport: React.FC<PluginLocalExportProps> = (props) => {
-  const { visible, exportLocalParams, onClose, getContainer } = props
+  const { visible, exportLocalParams, onClose } = props
   const [localStreamData, setLocalStreamData] = useState<SaveProgressStream>()
   const localStreamDataRef = useRef<SaveProgressStream>()
   const [locallogListInfo, setLocallogListInfo] = useState<LogListInfo[]>([])
@@ -120,22 +120,17 @@ export const PluginLocalExport: React.FC<PluginLocalExportProps> = (props) => {
   }
 
   return (
-    <YakitModal
-      visible={visible}
-      getContainer={getContainer}
-      type="white"
+    <RuiYanModal
+      open={visible}
       title="导出本地插件"
-      onCancel={handleExportLocalPluginFinish}
-      width={680}
-      closable={true}
-      maskClosable={false}
-      destroyOnClose={true}
-      bodyStyle={{ padding: 0 }}
-      footerStyle={{ justifyContent: 'flex-end' }}
+      description="显示真实导出任务的进度与日志"
+      onClose={handleExportLocalPluginFinish}
+      width={720}
+      closeOnBackdrop={false}
       footer={
-        <YakitButton type={'outline2'} onClick={handleExportLocalPluginFinish}>
+        <RuiYanButton variant="secondary" onClick={handleExportLocalPluginFinish}>
           {localStreamData?.Progress === 1 ? '完成' : '取消'}
-        </YakitButton>
+        </RuiYanButton>
       }
     >
       <div style={{ padding: '0 16px' }}>
@@ -146,7 +141,7 @@ export const PluginLocalExport: React.FC<PluginLocalExportProps> = (props) => {
           logListInfo={locallogListInfo}
         ></ImportAndExportStatusInfo>
       </div>
-    </YakitModal>
+    </RuiYanModal>
   )
 }
 

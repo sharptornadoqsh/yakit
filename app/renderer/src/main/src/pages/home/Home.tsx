@@ -17,14 +17,8 @@ import {
   RuiYanIcon,
   RuiYanLoadingState,
   RuiYanStatusBadge,
-  type RuiYanIconName,
 } from '@/components/renyanUI'
-import {
-  buildRenyanProtocolDistribution,
-  buildRenyanTrafficTrend,
-  mapRenyanHomeMetrics,
-  type RenyanHomeMetricSnapshot,
-} from './homeMetrics'
+import { buildRenyanTrafficTrend, mapRenyanHomeMetrics, type RenyanHomeMetricSnapshot } from './homeMetrics'
 import styles from './home.module.scss'
 
 const { ipcRenderer } = window.require('electron')
@@ -39,14 +33,6 @@ interface DashboardState {
   trafficStatus: QueryStatus
   riskStatus: QueryStatus
   taskStatus: QueryStatus
-}
-
-interface QuickEntry {
-  key: string
-  title: string
-  description: string
-  route: YakitRoute
-  icon: RuiYanIconName
 }
 
 const EMPTY_METRICS = mapRenyanHomeMetrics({})
@@ -151,102 +137,7 @@ const Home: React.FC = () => {
   }, [loadDashboard])
 
   const trafficTrend = useMemo(() => buildRenyanTrafficTrend(dashboard.trafficSamples), [dashboard.trafficSamples])
-  const protocolDistribution = useMemo(
-    () => buildRenyanProtocolDistribution(dashboard.trafficSamples),
-    [dashboard.trafficSamples],
-  )
   const trafficTrendMaximum = Math.max(1, ...trafficTrend.map((item) => item.total))
-
-  const trafficEntries = useMemo<QuickEntry[]>(
-    () => [
-      {
-        key: 'traffic-proxy',
-        title: t('Home.Renyan.interactiveProxy'),
-        description: t('Home.Renyan.interactiveProxyDescription'),
-        route: YakitRoute.MITMHacker,
-        icon: 'proxy',
-      },
-      {
-        key: 'traffic-history',
-        title: t('Home.Renyan.trafficHistory'),
-        description: t('Home.Renyan.trafficHistoryDescription'),
-        route: YakitRoute.DB_HTTPHistory,
-        icon: 'traffic',
-      },
-      {
-        key: 'packet-replay',
-        title: t('Home.Renyan.packetReplay'),
-        description: t('Home.Renyan.packetReplayDescription'),
-        route: YakitRoute.HTTPFuzzer,
-        icon: 'replay',
-      },
-      {
-        key: 'packet-diff',
-        title: t('Home.Renyan.packetDiff'),
-        description: t('Home.Renyan.packetDiffDescription'),
-        route: YakitRoute.DataCompare,
-        icon: 'packet',
-      },
-    ],
-    [t],
-  )
-
-  const securityEntries = useMemo<QuickEntry[]>(
-    () => [
-      {
-        key: 'general-scan',
-        title: t('Home.Renyan.generalScan'),
-        description: t('Home.Renyan.generalScanDescription'),
-        route: YakitRoute.BatchExecutorPage,
-        icon: 'vulnerability',
-      },
-      {
-        key: 'targeted-scan',
-        title: t('Home.Renyan.targetedScan'),
-        description: t('Home.Renyan.targetedScanDescription'),
-        route: YakitRoute.PoC,
-        icon: 'vulnerability',
-      },
-      {
-        key: 'brute-test',
-        title: t('Home.Renyan.bruteTest'),
-        description: t('Home.Renyan.bruteTestDescription'),
-        route: YakitRoute.Mod_Brute,
-        icon: 'brute',
-      },
-      {
-        key: 'scan-results',
-        title: t('Home.Renyan.scanResults'),
-        description: t('Home.Renyan.scanResultsDescription'),
-        route: YakitRoute.YakRunner_ScanHistory,
-        icon: 'project',
-      },
-    ],
-    [t],
-  )
-
-  const renderQuickEntries = (entries: QuickEntry[]) => (
-    <div className={styles['quick-grid']}>
-      {entries.map((entry) => (
-        <button
-          type="button"
-          key={entry.key}
-          className={styles['quick-entry']}
-          data-home-entry={entry.key}
-          onClick={() => openRoute(entry.route)}
-        >
-          <span className={styles['quick-icon']}>
-            <RuiYanIcon name={entry.icon} />
-          </span>
-          <span className={styles['quick-copy']}>
-            <strong>{entry.title}</strong>
-            <small>{entry.description}</small>
-          </span>
-          <RuiYanIcon name="chevron" className={styles['quick-arrow']} />
-        </button>
-      ))}
-    </div>
-  )
 
   const renderProjectOverview = () => {
     if (dashboard.projectStatus === 'loading') return <RuiYanLoadingState compact title="项目读取中" />
@@ -347,63 +238,73 @@ const Home: React.FC = () => {
     )
   }
 
+  const renderTaskOverview = () => {
+    if (dashboard.taskStatus === 'loading') return <RuiYanLoadingState compact title="任务读取中" />
+    if (dashboard.taskStatus === 'error') {
+      return (
+        <RuiYanErrorState
+          compact
+          title="最近任务读取失败"
+          action={
+            <RuiYanButton size="small" onClick={loadDashboard}>
+              {t('Home.Renyan.retry')}
+            </RuiYanButton>
+          }
+        />
+      )
+    }
+    if (dashboard.recentTasks.length === 0) {
+      return <RuiYanEmptyState compact title="暂无检测任务" />
+    }
+
+    const latestTask = dashboard.recentTasks[0]
+    const latestStatus = taskStatusPresentation[latestTask.Status] || taskStatusPresentation.error
+
+    return (
+      <div className={styles['metric-content']}>
+        <div className={styles['metric-number']}>{dashboard.recentTasks.length}</div>
+        <div className={styles['metric-detail']}>
+          <span>最近记录，最多五条</span>
+          <strong>{latestStatus.label}</strong>
+        </div>
+        <div className={styles['metric-detail']}>
+          <span>最近更新时间</span>
+          <strong>{formatTaskTime(latestTask.UpdatedAt || latestTask.CreatedAt)}</strong>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles['workbench']} data-testid="renyan-workbench">
-      <section className={styles['workbench-hero']}>
+      <header className={styles['workbench-header']}>
         <div>
-          <span className={styles['eyebrow']}>{t('Home.Renyan.commandCenter')}</span>
           <h2>{t('Home.Renyan.workbenchTitle')}</h2>
           <p>{t('Home.Renyan.workbenchDescription')}</p>
         </div>
-        <div className={styles['hero-actions']}>
+        <div className={styles['header-actions']}>
           <RuiYanButton
             variant="secondary"
             icon={<RuiYanIcon name="environment" />}
-            onClick={() => emiter.emit('onUIOpSettingMenuSelect', 'store')}
+            onClick={() => emiter.emit('onUIOpSettingMenuSelect', RENYAN_SHELL_EVENTS.openEngineUpdate)}
           >
-            环境管理
-          </RuiYanButton>
-          <RuiYanButton icon={<RuiYanIcon name="plus" />} onClick={() => openRoute(YakitRoute.BatchExecutorPage)}>
-            新建任务
+            引擎与更新
           </RuiYanButton>
           <RuiYanButton variant="ghost" onClick={loadDashboard}>
             {t('Home.Renyan.refreshData')}
           </RuiYanButton>
         </div>
-      </section>
+      </header>
 
-      <section className={styles['entry-section']} data-testid="renyan-traffic-entries">
+      <section className={styles['kpi-section']}>
         <div className={styles['section-heading']}>
           <div>
-            <span>01</span>
-            <h3>{t('Home.Renyan.trafficAnalysis')}</h3>
-          </div>
-          <p>{t('Home.Renyan.trafficAnalysisDescription')}</p>
-        </div>
-        {renderQuickEntries(trafficEntries)}
-      </section>
-
-      <section className={styles['entry-section']} data-testid="renyan-security-entries">
-        <div className={styles['section-heading']}>
-          <div>
-            <span>02</span>
-            <h3>{t('Home.Renyan.securityTesting')}</h3>
-          </div>
-          <p>{t('Home.Renyan.securityTestingDescription')}</p>
-        </div>
-        {renderQuickEntries(securityEntries)}
-      </section>
-
-      <section className={styles['overview-section']}>
-        <div className={styles['section-heading']}>
-          <div>
-            <span>03</span>
             <h3>{t('Home.Renyan.workspaceOverview')}</h3>
+            <p>{t('Home.Renyan.workspaceOverviewDescription')}</p>
           </div>
-          <p>{t('Home.Renyan.workspaceOverviewDescription')}</p>
         </div>
-        <div className={styles['overview-grid']}>
-          <RuiYanCard className={styles['overview-card']} data-testid="renyan-project-overview">
+        <div className={styles['kpi-grid']}>
+          <RuiYanCard className={styles['kpi-card']} data-testid="renyan-project-overview">
             <div className={styles['card-heading']}>
               <span className={styles['card-icon']}>
                 <RuiYanIcon name="project" />
@@ -419,7 +320,7 @@ const Home: React.FC = () => {
             {renderProjectOverview()}
           </RuiYanCard>
 
-          <RuiYanCard className={styles['overview-card']} data-testid="renyan-traffic-overview">
+          <RuiYanCard className={styles['kpi-card']} data-testid="renyan-traffic-overview">
             <div className={styles['card-heading']}>
               <span className={styles['card-icon']}>
                 <RuiYanIcon name="traffic" />
@@ -435,7 +336,7 @@ const Home: React.FC = () => {
             {renderTrafficOverview()}
           </RuiYanCard>
 
-          <RuiYanCard className={styles['overview-card']} data-testid="renyan-risk-overview">
+          <RuiYanCard className={styles['kpi-card']} data-testid="renyan-risk-overview">
             <div className={styles['card-heading']}>
               <span className={styles['card-icon']}>
                 <RuiYanIcon name="vulnerability" />
@@ -451,132 +352,97 @@ const Home: React.FC = () => {
             {renderRiskOverview()}
           </RuiYanCard>
 
-          <RuiYanCard className={styles['overview-card']} data-testid="renyan-engine-overview">
+          <RuiYanCard className={styles['kpi-card']} data-testid="renyan-task-overview">
             <div className={styles['card-heading']}>
               <span className={styles['card-icon']}>
-                <RuiYanIcon name="environment" />
+                <RuiYanIcon name="project" />
               </span>
               <div>
-                <h4>{t('Home.Renyan.engineStatus')}</h4>
-                <small>{t('Home.Renyan.currentSession')}</small>
+                <h4>近期任务</h4>
+                <small>本地检测记录</small>
               </div>
-              <button
-                type="button"
-                onClick={() => emiter.emit('onUIOpSettingMenuSelect', RENYAN_SHELL_EVENTS.openEngineUpdate)}
-              >
-                {t('Home.Renyan.engineUpdate')}
+              <button type="button" onClick={() => openRoute(YakitRoute.BatchExecutorPage)}>
+                查看检测
               </button>
             </div>
-            <div className={styles['service-status']}>
-              <RuiYanIcon name="environment" />
-              <div>
-                <strong>引擎与运行环境</strong>
-                <span>打开引擎与更新查看当前连接状态</span>
-              </div>
-            </div>
-          </RuiYanCard>
-
-          <RuiYanCard className={styles['overview-card']} data-testid="renyan-team-overview">
-            <div className={styles['card-heading']}>
-              <span className={styles['card-icon']}>
-                <RuiYanIcon name="team" />
-              </span>
-              <div>
-                <h4>{t('Home.Renyan.teamService')}</h4>
-                <small>{t('Home.Renyan.deliveryStatus')}</small>
-              </div>
-            </div>
-            <RuiYanEmptyState
-              compact
-              title={t('Home.Renyan.teamPlanned')}
-              description={t('Home.Renyan.teamPlannedDescription')}
-            />
+            {renderTaskOverview()}
           </RuiYanCard>
         </div>
       </section>
 
-      <section className={styles['insight-section']}>
-        <div className={styles['section-heading']}>
-          <div>
-            <span>04</span>
-            <h3>流量趋势与协议分布</h3>
+      <section className={styles['insight-grid']}>
+        <RuiYanCard className={styles['insight-card']}>
+          <div className={styles['insight-heading']}>
+            <div>
+              <h3>最近七日流量趋势</h3>
+              <small>按流量创建日期统计，最多读取二百四十条真实样本</small>
+            </div>
+            <RuiYanStatusBadge tone="info">样本 {dashboard.trafficSamples.length}</RuiYanStatusBadge>
           </div>
-          <p>统计最近读取的真实流量样本，最多二百四十条</p>
-        </div>
-        <div className={styles['insight-grid']}>
-          <RuiYanCard className={styles['insight-card']}>
-            <div className={styles['insight-heading']}>
-              <div>
-                <h4>最近七日流量趋势</h4>
-                <small>按流量创建日期聚合</small>
-              </div>
-              <RuiYanStatusBadge tone="info">样本 {dashboard.trafficSamples.length}</RuiYanStatusBadge>
-            </div>
-            {dashboard.trafficStatus === 'loading' ? (
-              <RuiYanLoadingState compact title="流量样本读取中" />
-            ) : dashboard.trafficStatus === 'error' ? (
-              <RuiYanErrorState compact title="流量趋势读取失败" />
-            ) : dashboard.trafficSamples.length === 0 ? (
-              <RuiYanEmptyState compact title="暂无流量趋势" description="当前项目没有可统计的流量样本。" />
-            ) : (
-              <div className={styles['trend-chart']} role="img" aria-label="最近七日流量趋势">
-                {trafficTrend.map((item) => (
-                  <div className={styles['trend-column']} key={item.key}>
-                    <span>{item.total}</span>
-                    <div className={styles['trend-track']}>
-                      <i style={{ height: `${(item.total / trafficTrendMaximum) * 100}%` }} />
-                    </div>
-                    <small>{item.label}</small>
+          {dashboard.trafficStatus === 'loading' ? (
+            <RuiYanLoadingState compact title="流量样本读取中" />
+          ) : dashboard.trafficStatus === 'error' ? (
+            <RuiYanErrorState compact title="流量趋势读取失败" />
+          ) : dashboard.trafficSamples.length === 0 ? (
+            <RuiYanEmptyState compact title="暂无流量趋势" description="当前项目没有可统计的流量样本。" />
+          ) : (
+            <div className={styles['trend-chart']} role="img" aria-label="最近七日流量趋势">
+              {trafficTrend.map((item) => (
+                <div className={styles['trend-column']} key={item.key}>
+                  <span>{item.total}</span>
+                  <div className={styles['trend-track']}>
+                    <i style={{ height: `${(item.total / trafficTrendMaximum) * 100}%` }} />
                   </div>
-                ))}
-              </div>
-            )}
-          </RuiYanCard>
-
-          <RuiYanCard className={styles['insight-card']}>
-            <div className={styles['insight-heading']}>
-              <div>
-                <h4>协议分布</h4>
-                <small>按传输安全与长连接字段分类</small>
-              </div>
+                  <small>{item.label}</small>
+                </div>
+              ))}
             </div>
-            {dashboard.trafficStatus === 'loading' ? (
-              <RuiYanLoadingState compact title="协议统计读取中" />
-            ) : dashboard.trafficStatus === 'error' ? (
-              <RuiYanErrorState compact title="协议分布读取失败" />
-            ) : protocolDistribution.length === 0 ? (
-              <RuiYanEmptyState compact title="暂无协议分布" description="当前项目没有可分类的流量样本。" />
-            ) : (
-              <div className={styles['protocol-list']}>
-                {protocolDistribution.map((item) => (
-                  <div className={styles['protocol-item']} key={item.key}>
+          )}
+        </RuiYanCard>
+
+        <RuiYanCard className={styles['insight-card']}>
+          <div className={styles['insight-heading']}>
+            <div>
+              <h3>风险分布</h3>
+              <small>来自当前项目已报告的真实风险等级</small>
+            </div>
+            {dashboard.metrics.riskTotal !== null && (
+              <RuiYanStatusBadge tone="warning">合计 {dashboard.metrics.riskTotal}</RuiYanStatusBadge>
+            )}
+          </div>
+          {dashboard.riskStatus === 'loading' ? (
+            <RuiYanLoadingState compact title="风险统计读取中" />
+          ) : dashboard.riskStatus === 'error' ? (
+            <RuiYanErrorState compact title="风险分布读取失败" />
+          ) : dashboard.metrics.riskLevels.length === 0 ? (
+            <RuiYanEmptyState compact title="暂无风险分布" description="当前项目没有已报告的风险等级。" />
+          ) : (
+            <div className={styles['risk-distribution']}>
+              {dashboard.metrics.riskLevels.map((item) => {
+                const ratio = dashboard.metrics.riskTotal ? item.total / dashboard.metrics.riskTotal : 0
+                return (
+                  <div className={styles['risk-distribution-item']} key={item.key}>
                     <div>
                       <strong>{item.label}</strong>
                       <span>{item.total}</span>
                     </div>
-                    <div className={styles['protocol-track']}>
-                      <i style={{ width: `${item.ratio * 100}%` }} />
+                    <div className={styles['risk-distribution-track']}>
+                      <i style={{ width: `${ratio * 100}%` }} />
                     </div>
-                    <small>
-                      {new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 1 }).format(
-                        item.ratio,
-                      )}
-                    </small>
                   </div>
-                ))}
-              </div>
-            )}
-          </RuiYanCard>
-        </div>
+                )
+              })}
+            </div>
+          )}
+        </RuiYanCard>
       </section>
 
       <section className={styles['activity-section']}>
         <div className={styles['section-heading']}>
           <div>
-            <span>05</span>
             <h3>任务与团队动态</h3>
+            <p>任务来自本地检测记录，团队区域不生成模拟活动</p>
           </div>
-          <p>任务来自本地检测记录，团队区域不生成模拟活动</p>
         </div>
         <div className={styles['activity-grid']}>
           <RuiYanCard className={styles['activity-card']}>

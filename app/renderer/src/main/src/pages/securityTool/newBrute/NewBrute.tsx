@@ -35,6 +35,7 @@ import { YakitRoute } from '@/enums/yakitRoute'
 import { defaultBruteExecuteExtraFormValue, defaultBrutePageInfo } from '@/defaultConstants/NewBrute'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
+import { RuiYanEmptyState } from '@/components/renyanUI'
 
 const BruteExecuteParamsDrawer = React.lazy(() => import('./BruteExecuteParamsDrawer'))
 
@@ -390,101 +391,111 @@ const BruteExecuteContent: React.FC<BruteExecuteContentProps> = React.memo(
     }, [streamInfo.progressState])
     return (
       <>
-        <div
-          className={classNames(styles['brute-form-wrapper'], {
-            [styles['brute-form-wrapper-hidden']]: !isExpand,
-          })}
-        >
-          <Form
-            form={form}
-            onFinish={onStartExecute}
-            labelCol={{ span: 6 }}
-            wrapperCol={{ span: 12 }} //这样设置是为了让输入框居中
-            validateMessages={{
-              /* eslint-disable no-template-curly-in-string */
-              required: t('YakitForm.field_required_with_label', { label: '${label}' }),
-            }}
-            labelWrap={true}
-          >
-            <YakitFormDraggerContentPath
-              style={{ width: '100%' }}
-              formItemProps={{
-                name: 'Targets',
-                label: t('BruteExecuteContent.inputTarget'),
-                rules: [{ required: true }],
-                initialValue: pageInfo.targets,
-              }}
-              accept=".txt,.xlsx,.xls,.csv"
-              textareaProps={{
-                placeholder: t('BruteExecuteContent.targetPlaceholder'),
-                rows: 3,
-              }}
-              help={t('YakitDraggerContent.drag_files_tip')}
-              disabled={isExecuting}
-              onTextAreaType={setInputType}
-              textAreaType={inputType}
-            />
-            <Form.Item label={' '} colon={false}>
-              <div className={styles['form-extra']}>
-                <YakitTag>
-                  {t('BruteExecuteContent.targetConcurrentLabel')}
-                  {extraParamsValue.Concurrent}
-                </YakitTag>
-                {extraParamsValue?.OkToStop ? (
-                  <YakitTag>{t('BruteExecuteContent.stopOnSuccess')}</YakitTag>
-                ) : (
-                  <YakitTag>{t('BruteExecuteContent.continueOnSuccess')}</YakitTag>
-                )}
-                {(extraParamsValue?.DelayMax || 0) > 0 && (
-                  <YakitTag>
-                    {t('BruteExecuteContent.randomPause')}
-                    {extraParamsValue.DelayMin}-{extraParamsValue.DelayMax}s
-                  </YakitTag>
-                )}
+        <div className={styles['brute-content-grid']}>
+          <section className={styles['brute-config-pane']} aria-label="目标与执行配置">
+            <div
+              className={classNames(styles['brute-form-wrapper'], {
+                [styles['brute-form-wrapper-hidden']]: !isExpand,
+              })}
+            >
+              <Form
+                form={form}
+                onFinish={onStartExecute}
+                validateMessages={{
+                  /* eslint-disable no-template-curly-in-string */
+                  required: t('YakitForm.field_required_with_label', { label: '${label}' }),
+                }}
+                labelWrap={true}
+              >
+                <YakitFormDraggerContentPath
+                  style={{ width: '100%' }}
+                  formItemProps={{
+                    name: 'Targets',
+                    label: t('BruteExecuteContent.inputTarget'),
+                    rules: [{ required: true }],
+                    initialValue: pageInfo.targets,
+                  }}
+                  accept=".txt,.xlsx,.xls,.csv"
+                  textareaProps={{
+                    placeholder: t('BruteExecuteContent.targetPlaceholder'),
+                    rows: 3,
+                  }}
+                  help={t('YakitDraggerContent.drag_files_tip')}
+                  disabled={isExecuting}
+                  onTextAreaType={setInputType}
+                  textAreaType={inputType}
+                />
+                <Form.Item label={t('BruteExecuteContent.extraParams')} colon={false}>
+                  <div className={styles['form-extra']}>
+                    <YakitTag>
+                      {t('BruteExecuteContent.targetConcurrentLabel')}
+                      {extraParamsValue.Concurrent}
+                    </YakitTag>
+                    {extraParamsValue?.OkToStop ? (
+                      <YakitTag>{t('BruteExecuteContent.stopOnSuccess')}</YakitTag>
+                    ) : (
+                      <YakitTag>{t('BruteExecuteContent.continueOnSuccess')}</YakitTag>
+                    )}
+                    {(extraParamsValue?.DelayMax || 0) > 0 && (
+                      <YakitTag>
+                        {t('BruteExecuteContent.randomPause')}
+                        {extraParamsValue.DelayMin}-{extraParamsValue.DelayMax}s
+                      </YakitTag>
+                    )}
+                  </div>
+                </Form.Item>
+                <Form.Item colon={false} style={{ marginBottom: 0 }}>
+                  <div className={styles['plugin-execute-form-operate']}>
+                    {isExecuting ? (
+                      <YakitButton danger onClick={onStopExecute} size="large">
+                        {t('YakitButton.stop')}
+                      </YakitButton>
+                    ) : (
+                      <YakitButton
+                        className={styles['plugin-execute-form-operate-start']}
+                        htmlType="submit"
+                        size="large"
+                        disabled={selectNum === 0}
+                      >
+                        {t('YakitButton.start_execution')}
+                      </YakitButton>
+                    )}
+                    <YakitButton type="text" onClick={openExtraPropsDrawer} disabled={isExecuting} size="large">
+                      {t('BruteExecuteContent.extraParams')}
+                    </YakitButton>
+                  </div>
+                </Form.Item>
+              </Form>
+            </div>
+          </section>
+          <section className={styles['brute-result-pane']} aria-label="执行进度、命中与日志">
+            {progressList.length > 1 && (
+              <div className={styles['executing-progress']}>
+                {progressList.map((ele, index) => (
+                  <React.Fragment key={ele.id}>
+                    {index !== 0 && <Divider type="vertical" style={{ margin: 0, top: 2 }} />}
+                    <PluginExecuteProgress percent={ele.progress} name={ele.id} />
+                  </React.Fragment>
+                ))}
               </div>
-            </Form.Item>
-            <Form.Item colon={false} label={' '} style={{ marginBottom: 0 }}>
-              <div className={styles['plugin-execute-form-operate']}>
-                {isExecuting ? (
-                  <YakitButton danger onClick={onStopExecute} size="large">
-                    {t('YakitButton.stop')}
-                  </YakitButton>
-                ) : (
-                  <YakitButton
-                    className={styles['plugin-execute-form-operate-start']}
-                    htmlType="submit"
-                    size="large"
-                    disabled={selectNum === 0}
-                  >
-                    {t('YakitButton.start_execution')}
-                  </YakitButton>
-                )}
-                <YakitButton type="text" onClick={openExtraPropsDrawer} disabled={isExecuting} size="large">
-                  {t('BruteExecuteContent.extraParams')}
-                </YakitButton>
-              </div>
-            </Form.Item>
-          </Form>
+            )}
+            {isShowResult ? (
+              <PluginExecuteResult
+                streamInfo={streamInfo}
+                runtimeId={runtimeId}
+                loading={isExecuting}
+                defaultActiveKey={''}
+                pluginExecuteResultWrapper={styles['brute-execute-result-wrapper']}
+              />
+            ) : (
+              <RuiYanEmptyState
+                compact
+                title="暂无执行结果"
+                description="选择协议并配置目标后，命中结果和执行日志将在此显示。"
+              />
+            )}
+          </section>
         </div>
-        {progressList.length > 1 && (
-          <div className={styles['executing-progress']}>
-            {progressList.map((ele, index) => (
-              <React.Fragment key={ele.id}>
-                {index !== 0 && <Divider type="vertical" style={{ margin: 0, top: 2 }} />}
-                <PluginExecuteProgress percent={ele.progress} name={ele.id} />
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        {isShowResult && (
-          <PluginExecuteResult
-            streamInfo={streamInfo}
-            runtimeId={runtimeId}
-            loading={isExecuting}
-            defaultActiveKey={''}
-            pluginExecuteResultWrapper={styles['brute-execute-result-wrapper']}
-          />
-        )}
         <React.Suspense fallback={<div>loading...</div>}>
           <BruteExecuteParamsDrawer
             extraParamsValue={extraParamsValue}

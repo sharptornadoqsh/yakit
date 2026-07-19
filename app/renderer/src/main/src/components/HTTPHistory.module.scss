@@ -2,55 +2,79 @@
 
 .hTTPHistory {
   height: 100%;
-  padding: 8px;
-  background: #eef4f4;
+  min-height: 0;
+  background: #f6f8fc;
+}
 
-  &-left {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: hidden;
-    border: 1px solid #cbdadc;
-    border-radius: 3px;
-    background: var(--Colors-Use-Basic-Background);
+.history-filter-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 520px;
+  height: 100%;
+}
 
-    .tab-content {
-      flex: 1;
-      min-height: 0;
-      overflow: auto;
-      width: 100%;
-      height: 100%;
-    }
+.history-filter-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+}
 
-    .webTree-wrapper {
-      height: 100%;
-      padding: 15px 0 15px 15px;
-    }
+.webTree-wrapper,
+.process-wrapper {
+  height: 100%;
+  min-height: 0;
+  padding: 12px;
 
-    .process-wrapper {
-      height: 100%;
-    }
-    .ai-wrapper {
-      height: 100%;
-      .history-ai-header {
-        margin-left: 8px;
-      }
-      .defualt-focus-mode {
-        border-radius: 20px;
-        padding: 0 12px 0 8px;
-        height: 24px;
-        line-height: 16px;
-      }
-    }
+  &[hidden] {
+    display: none !important;
   }
+}
 
-  &-right {
-    height: 100%;
-    overflow: hidden;
-    border: 1px solid #cbdadc;
-    border-radius: 3px;
-    background: var(--Colors-Use-Basic-Background);
-  }
+.history-table-stage,
+.history-detail-split {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.history-table-stage {
+  overflow: hidden;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.history-detail-drawer {
+  height: 100%;
+  min-height: 480px;
+  overflow: hidden;
+}
+
+.history-aside-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.history-aside-table,
+.history-aside-detail {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.history-aside-detail {
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .history-process-popover {
@@ -230,5 +254,6 @@
 
 .hTTPFlowRealTimeTableAndEditor {
   height: 100%;
-  padding: 8px;
+  min-height: 0;
+  padding: 0;
 }

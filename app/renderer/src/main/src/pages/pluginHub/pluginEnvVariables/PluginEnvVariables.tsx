@@ -5,7 +5,7 @@ import { OutlinePencilaltIcon, OutlinePluscircleIcon, OutlineTrashIcon } from '@
 import { PluginEnvInfo, PluginEnvVariablesProps } from './PluginEnvVariablesType'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
-import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import {
   grpcCreatePluginEnvVariables,
@@ -401,16 +401,23 @@ export const PluginEnvVariables: React.FC<PluginEnvVariablesProps> = memo((props
         </div>
       </div>
 
-      <YakitModal
-        type="white"
+      <RuiYanModal
         title={`${isNew.current ? t('YakitButton.add_new') : t('YakitButton.edit')} ${t('PluginEnvVariables.value')}`}
-        centered={true}
-        maskClosable={false}
-        closable={true}
-        visible={showEdit}
-        okButtonProps={{ loading: modalLoading }}
-        onCancel={handleCancelEdit}
-        onOk={handleOKEdit}
+        description="设置插件执行期间使用的真实环境变量"
+        width={480}
+        open={showEdit}
+        closeOnBackdrop={false}
+        onClose={handleCancelEdit}
+        footer={
+          <>
+            <RuiYanButton variant="secondary" onClick={handleCancelEdit}>
+              {t('YakitButton.cancel')}
+            </RuiYanButton>
+            <RuiYanButton loading={modalLoading} onClick={handleOKEdit}>
+              {t('YakitButton.ok')}
+            </RuiYanButton>
+          </>
+        }
       >
         <div className={styles['edit-info-modal-body']}>
           <div className={styles['edit-info-item']}>
@@ -435,7 +442,7 @@ export const PluginEnvVariables: React.FC<PluginEnvVariablesProps> = memo((props
             />
           </div>
         </div>
-      </YakitModal>
+      </RuiYanModal>
     </div>
   )
 })

@@ -178,6 +178,8 @@ export interface SubTabsProps {
   softMode: SoftMode
   currentTabKey: YakitRoute | string
   ref: ?any
+  /** Keep the existing sub-page state and commands without rendering the legacy tab strip. */
+  headless?: boolean
   pageItem: PageCache
   // index: number
   onFocusPage: () => void

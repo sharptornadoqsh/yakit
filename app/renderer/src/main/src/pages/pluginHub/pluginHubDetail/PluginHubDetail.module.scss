@@ -23,6 +23,13 @@
     }
   }
 
+  .detail-header-embedded {
+    min-height: 48px;
+    justify-content: flex-end;
+    padding: 8px 12px;
+    background: var(--Colors-Use-Neutral-Bg);
+  }
+
   .detail-body {
     flex: 1;
     overflow: hidden;

@@ -5,72 +5,32 @@
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  .web-fuzzer-tab {
+  .web-fuzzer-toolbar {
     display: flex;
     flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
     width: 100%;
-    min-height: 39px;
-    border-bottom: 1px solid #cbdadc;
-    background: #f1f6f6;
-    svg {
-      width: 16px;
-      height: 16px;
-      color: var(--Colors-Use-Neutral-Text-3-Secondary);
-    }
-    &-item {
+    min-height: 52px;
+    padding: 8px 12px;
+    border: 1px solid #e6eaf0;
+    border-radius: 10px;
+    background: #ffffff;
+
+    > div {
       display: flex;
-      align-items: center;
-      padding: 7px 12px;
-      gap: 6px;
-      color: var(--Colors-Use-Neutral-Text-1-Title);
-      cursor: pointer;
-      border-right: 1px solid #d6e2e3;
-      border-bottom: 2px solid transparent;
-      &:hover {
-        background-color: var(--Colors-Use-Neutral-Border);
+      flex-direction: column;
+      gap: 2px;
+
+      strong {
+        color: #1f2937;
+        font-size: 13px;
       }
-    }
-    &-item-active {
-      color: #087f83;
-      background-color: #e7f7f5;
-      border-bottom-color: #0caf9f;
-      &:hover {
-        background-color: #dff3f1;
-        color: #087f83;
-        svg {
-          color: #087f83;
-        }
+
+      span {
+        color: #64748b;
+        font-size: 11px;
       }
-      svg {
-        color: #087f83;
-      }
-    }
-    &-item-active-sequence {
-      color: var(--Colors-Use-Main-On-Primary);
-      background-color: var(--Colors-Use-Main-Primary);
-      &:hover {
-        background-color: var(--Colors-Use-Main-Primary);
-        color: var(--Colors-Use-Main-On-Primary);
-        svg {
-          color: var(--Colors-Use-Main-On-Primary);
-        }
-      }
-      svg {
-        color: var(--Colors-Use-Main-On-Primary);
-      }
-    }
-    &-item-advanced-config-unShow {
-      color: var(--Colors-Use-Neutral-Text-1-Title);
-      background-color: var(--Colors-Use-Neutral-Text-4-Help-text);
-      svg {
-        color: var(--Colors-Use-Neutral-Text-1-Title);
-      }
-    }
-    &-label {
-      font-weight: 600;
-      line-height: 16px;
-      font-size: 12px;
-      white-space: nowrap;
     }
   }
   .web-fuzzer-tab-content {
@@ -78,6 +38,22 @@
     flex: 1;
     overflow: hidden;
     height: 100%;
+    margin-top: 12px;
+  }
+}
+
+.web-fuzzer-advanced-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+
+  button {
+    justify-content: flex-start;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
   }
 }
 
