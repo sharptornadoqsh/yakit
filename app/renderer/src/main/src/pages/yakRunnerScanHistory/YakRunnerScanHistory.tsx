@@ -53,6 +53,7 @@ import { apiQuerySSAPrograms } from './utils'
 import { getGroupNamesTotal } from '../yakRunnerCodeScan/utils'
 import { JSONParseLog } from '@/utils/tool'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { RuiYanPanel, RuiYanToolbar } from '@/components/renyanUI'
 const { ipcRenderer } = window.require('electron')
 export interface GenerateSSAReportResponse {
   Success: boolean
@@ -393,18 +394,36 @@ const YakRunnerScanHistory: React.FC<YakRunnerScanHistoryProp> = (props) => {
 
   const ResizeBoxProps = useCreation(() => {
     let p = {
-      firstRatio: '32%',
+      firstRatio: '30%',
     }
     return p
   }, [])
   return (
     <div className={styles['YakRunnerScanHistory']} ref={yakRunnerScanHistoryRef} id="yakrunner-scan-history">
-      <div className={classNames('yakit-content-single-ellipsis', styles['YakRunnerScanHistory-title'])}>
-        {pageInfo.Programs.length > 0 ? pageInfo.Programs[0] : '未识别项目名'}
-      </div>
-      <div className={styles['YakRunnerScanHistory-main']}>
+      <RuiYanToolbar
+        className={styles['YakRunnerScanHistory-title']}
+        leading={
+          <div className={styles['YakRunnerScanHistory-title-content']}>
+            <span className={styles['YakRunnerScanHistory-title-label']}>
+              {t('YakRunnerScanHistory.compileHistory')}
+            </span>
+            <strong
+              className={classNames('yakit-content-single-ellipsis', styles['YakRunnerScanHistory-title-project'])}
+            >
+              {pageInfo.Programs.length > 0 ? pageInfo.Programs[0] : '未识别项目名'}
+            </strong>
+          </div>
+        }
+      />
+      <RuiYanPanel
+        className={styles['YakRunnerScanHistory-main']}
+        bodyClassName={styles['YakRunnerScanHistory-main-body']}
+      >
         <YakitResizeBox
-          firstMinSize={'280px'}
+          firstMinSize={'260px'}
+          secondMinSize={'420px'}
+          firstNodeStyle={{ padding: 0, minWidth: 0, overflow: 'hidden' }}
+          secondNodeStyle={{ padding: 0, minWidth: 0, overflow: 'hidden' }}
           firstNode={<CompileHistoryList pageInfo={pageInfo} clickItem={clickItem} setClickItem={setClickItem} />}
           secondNode={
             <TableVirtualResize<SyntaxFlowScanTask>
@@ -435,7 +454,7 @@ const YakRunnerScanHistory: React.FC<YakRunnerScanHistoryProp> = (props) => {
           }
           {...ResizeBoxProps}
         />
-      </div>
+      </RuiYanPanel>
     </div>
   )
 }

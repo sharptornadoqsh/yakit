@@ -56,6 +56,7 @@ import emiter from '@/utils/eventBus/eventBus'
 import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { CodeScanTaskList } from '../yakRunnerCodeScan/CodeScanTaskListDrawer/CodeScanTaskListDrawer'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { RuiYanPanel } from '@/components/renyanUI'
 const { ipcRenderer } = window.require('electron')
 
 interface ReportViewerPageProp {}
@@ -64,17 +65,20 @@ export const ReportViewerPage: React.FC<ReportViewerPageProp> = (props) => {
 
   return (
     <div className={styles['reportViewerPage']}>
-      <YakitResizeBox
-        isVer={false}
-        lineDirection="left"
-        firstNode={<ReportList selectReportId={selectReportId} onSetSelectReportId={setSelectReportId} />}
-        firstRatio="30%"
-        firstMinSize="400px"
-        firstNodeStyle={{ padding: 0 }}
-        secondNode={<ReportViewer reportId={selectReportId} />}
-        secondRatio="70%"
-        secondMinSize="500px"
-      ></YakitResizeBox>
+      <div className={styles['report-workspace']}>
+        <YakitResizeBox
+          isVer={false}
+          lineDirection="left"
+          firstNode={<ReportList selectReportId={selectReportId} onSetSelectReportId={setSelectReportId} />}
+          firstRatio="31%"
+          firstMinSize="280px"
+          firstNodeStyle={{ padding: 0, minWidth: 0, overflow: 'hidden' }}
+          secondNode={<ReportViewer reportId={selectReportId} />}
+          secondRatio="69%"
+          secondMinSize="420px"
+          secondNodeStyle={{ padding: 0, minWidth: 0, overflow: 'hidden' }}
+        ></YakitResizeBox>
+      </div>
     </div>
   )
 }
@@ -211,19 +215,13 @@ const ReportList: React.FC<ReportListProp> = (props) => {
   })
 
   return (
-    <YakitCard
-      className={styles['card']}
-      headStyle={{
-        height: 32,
-        minHeight: 32,
-        boxSizing: 'content-box',
-        paddingLeft: 0,
-      }}
-      bodyStyle={{ padding: 12, paddingLeft: 0, width: '100%', height: 'calc(100% - 32px)' }}
+    <RuiYanPanel
+      className={styles['report-list-panel']}
+      bodyClassName={styles['report-list-body']}
       title={
-        <div className={styles['card-title']}>
+        <span className={styles['card-title']}>
           <span className={styles['card-title-text']}>{t('ReportViewerPage.reportList')}</span>
-        </div>
+        </span>
       }
       extra={
         <div className={styles['card-extra']}>
@@ -355,7 +353,7 @@ const ReportList: React.FC<ReportListProp> = (props) => {
           <CodeScanTaskList visible={createVisible} setVisible={setCreateVisible} readonly={true} />
         </div>
       </YakitModal>
-    </YakitCard>
+    </RuiYanPanel>
   )
 }
 
@@ -613,27 +611,14 @@ const ReportViewer: React.FC<ReportViewerProp> = (props) => {
         <YakitSpin spinning={loading} wrapperClassName={styles['loading-wrapper']}></YakitSpin>
       ) : (
         <YakitSpin spinning={downloadLoading}>
-          <YakitCard
-            className={styles['card']}
-            headStyle={{
-              height: 32,
-              minHeight: 32,
-              boxSizing: 'content-box',
-              paddingLeft: 0,
-              paddingRight: 0,
-            }}
-            bodyStyle={{
-              padding: 0,
-              paddingBottom: 12,
-              paddingTop: 12,
-              width: '100%',
-              height: 'calc(100% - 32px)',
-            }}
+          <RuiYanPanel
+            className={styles['report-preview-panel']}
+            bodyClassName={styles['report-preview-body']}
             title={
-              <div className={styles['card-title']}>
+              <span className={styles['card-title']}>
                 <span className={styles['card-title-text']}>{report.Title}</span>
                 <YakitTag>{reportId}</YakitTag>
-              </div>
+              </span>
             }
             extra={
               <div className={styles['card-extra']}>
@@ -685,7 +670,7 @@ const ReportViewer: React.FC<ReportViewerProp> = (props) => {
               </div>
             }
           >
-            <div ref={divRef} className={styles['card-body']} style={{ overflow: 'auto' }}>
+            <div ref={divRef} className={classNames(styles['card-body'], styles['report-content-scroll'])}>
               <Space direction={'vertical'} style={{ width: '100%' }}>
                 {reportItems.map((i, index) => (
                   <ReportItemRender item={i} key={index} />
@@ -708,7 +693,7 @@ const ReportViewer: React.FC<ReportViewerProp> = (props) => {
                 />
               </div>
             )}
-          </YakitCard>
+          </RuiYanPanel>
         </YakitSpin>
       )}
     </div>

@@ -1,132 +1,231 @@
 .reportViewerPage {
+  display: flex;
+  width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
-  padding: 12px;
+  padding: var(--ruiyan-space-3);
   box-sizing: border-box;
-  background: var(--Colors-Use-Neutral-Bg);
+  background: var(--ruiyan-color-background);
+
+  .report-workspace {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--ruiyan-color-surface);
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-md);
+  }
+
+  .report-list-panel,
+  .report-preview-panel {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .report-list-panel {
+    border-right: 1px solid var(--ruiyan-color-border);
+  }
+
+  .report-list-body,
+  .report-preview-body {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .report-list-body {
+    padding: var(--ruiyan-space-2);
+    background: var(--ruiyan-color-surface-muted);
+  }
+
+  .report-preview-body {
+    padding: var(--ruiyan-space-3) var(--ruiyan-space-4);
+    background: var(--ruiyan-color-surface);
+  }
 
   .list-item {
     position: relative;
-    margin-bottom: 4px;
+    margin-bottom: var(--ruiyan-space-1);
+    overflow: hidden;
     cursor: pointer;
-    background-color: var(--Colors-Use-Basic-Background);
-    border-radius: 2px;
+    background-color: var(--ruiyan-color-surface);
+    border: 1px solid var(--ruiyan-color-border);
+    border-radius: var(--ruiyan-radius-sm);
     transition:
       background-color 120ms ease,
+      border-color 120ms ease,
       box-shadow 120ms ease;
 
     &-header {
-      border: 1px solid var(--Colors-Use-Neutral-Border);
+      border: 0;
+      border-bottom: 1px solid var(--ruiyan-color-border);
     }
+
     &-body {
-      border: 1px solid var(--Colors-Use-Neutral-Border);
-      border-top: none;
+      border: 0;
     }
   }
-  .list-item-hoverable {
-    &:hover {
-      background-color: var(--Colors-Use-Neutral-Bg-Hover);
-      box-shadow: inset 2px 0 0 var(--Colors-Use-Main-Primary);
-    }
+
+  .list-item-hoverable:hover {
+    background-color: var(--ruiyan-color-primary-soft);
+    border-color: color-mix(in srgb, var(--ruiyan-color-primary) 38%, var(--ruiyan-color-border));
+    box-shadow: inset 2px 0 0 var(--ruiyan-color-primary);
   }
+
   .icon-select {
-    color: var(--Colors-Use-Neutral-Text-3-Secondary);
     position: absolute;
-    right: 0;
-    top: 0;
+    top: 7px;
+    right: 8px;
+    z-index: 1;
+    color: var(--ruiyan-color-text-secondary);
 
     svg {
       width: 16px;
       height: 16px;
     }
   }
+
   .icon-select-active {
-    color: var(--Colors-Use-Main-Primary);
+    color: var(--ruiyan-color-primary);
   }
+
   .card {
-    border: none;
-    border-radius: 2px;
-    background-color: var(--Colors-Use-Basic-Background);
+    min-width: 0;
+    background-color: transparent;
+    border: 0;
+    border-radius: 0;
+
     &-title {
       display: flex;
+      min-width: 0;
       align-items: center;
+      gap: 6px;
 
-      gap: 5px;
       &-text {
-        font-size: 14px;
+        min-width: 0;
+        overflow: hidden;
+        color: var(--ruiyan-color-text);
+        font-size: 13px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
+
     &-extra {
       display: flex;
+      flex: 0 0 auto;
       align-items: center;
-
       gap: 5px;
+
       .UISettingSvgIcon {
         cursor: pointer;
+
         svg {
           width: 18px;
           height: 18px;
-          color: var(--Colors-Use-Neutral-Text-1-Title);
+          color: var(--ruiyan-color-text);
         }
       }
     }
+
     &-body {
+      width: 100%;
       height: 100%;
+      min-width: 0;
+      min-height: 0;
     }
+
     &-selected {
-      background-color: var(--Colors-Use-Main-Bg);
-      box-shadow: inset 2px 0 0 var(--Colors-Use-Main-Primary);
+      background-color: var(--ruiyan-color-primary-soft);
+      box-shadow: inset 2px 0 0 var(--ruiyan-color-primary);
 
       .list-item-header,
       .list-item-body {
-        border: 1px solid var(--Colors-Use-Main-Border);
+        border-color: color-mix(in srgb, var(--ruiyan-color-primary) 38%, var(--ruiyan-color-border));
       }
     }
   }
+
   .report-viewer {
     position: relative;
-    background-color: var(--Colors-Use-Basic-Background);
+    width: 100%;
     height: 100%;
-    border-left: 1px solid var(--Colors-Use-Neutral-Border);
-    .report-empty {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      background-color: var(--Colors-Use-Basic-Background);
-      width: calc(100% + 1px);
-      height: 100%;
-      display: flex;
-      align-items: center;
-      flex-direction: column;
-      justify-content: center;
-      :global {
-        margin: 0;
-        border: none;
-      }
-    }
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--ruiyan-color-surface);
+
+    .report-empty,
     .loading-wrapper {
       position: absolute;
-      background-color: var(--Colors-Use-Basic-Background);
-      left: 50%;
       top: 50%;
-      transform: translate(-50%, -50%);
-      height: 100%;
-      width: calc(100% + 1px);
+      left: 50%;
       display: flex;
+      width: 100%;
+      height: 100%;
       align-items: center;
-      flex-direction: column;
       justify-content: center;
+      flex-direction: column;
+      background-color: var(--ruiyan-color-surface);
+      transform: translate(-50%, -50%);
+    }
+
+    .report-empty {
+      :global {
+        margin: 0;
+        border: 0;
+      }
+    }
+  }
+
+  .report-content-scroll {
+    flex: 1;
+    padding-right: 2px;
+    overflow: auto;
+
+    :global(.ant-space) {
+      min-width: 0;
     }
   }
 }
 
 .pagination {
-  padding-top: 12px;
   display: flex;
+  flex: 0 0 auto;
   justify-content: flex-end;
+  margin-top: var(--ruiyan-space-2);
+  padding-top: var(--ruiyan-space-2);
+  border-top: 1px solid var(--ruiyan-color-border);
 }
 
 .card-code-scan-task-list {
-  height: 600px;
+  height: min(600px, 68vh);
+  min-height: 360px;
+  overflow: hidden;
+}
+
+@media screen and (max-width: 1100px) {
+  .reportViewerPage {
+    padding: var(--ruiyan-space-2);
+
+    .report-list-body {
+      padding: 6px;
+    }
+
+    .report-preview-body {
+      padding: var(--ruiyan-space-2) var(--ruiyan-space-3);
+    }
+
+    .card-extra {
+      gap: 2px;
+    }
+  }
 }
