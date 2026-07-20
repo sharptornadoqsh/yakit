@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef, ReactNode, ReactElement, useCallback, FC } from 'react'
-import { Button, Card, Col, Descriptions, PageHeader, Row, Space, Tooltip } from 'antd'
+import { Button, Col, Descriptions, Row, Space, Tooltip } from 'antd'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import { HTTPFlow } from './HTTPFlowTable/HTTPFlowTable'
 import { IMonacoEditor, NewHTTPCard, NewHTTPPacketEditor, RenderTypeOptionVal } from '../utils/editors'
@@ -43,6 +43,7 @@ import { YakitCopyText } from './yakitUI/YakitCopyText/YakitCopyText'
 import YakitCollapse from './yakitUI/YakitCollapse/YakitCollapse'
 import PluginTabs from './businessUI/PluginTabs/PluginTabs'
 import { YakitSpin } from './yakitUI/YakitSpin/YakitSpin'
+import { RuiYanCodeEditorFrame, RuiYanPageHeader } from './renyanUI'
 import { asynSettingState } from '@/utils/optimizeRender'
 import { HighLightText } from './yakitUI/YakitEditor/YakitEditorType'
 import useGetSetState from '@/pages/pluginHub/hooks/useGetSetState'
@@ -293,15 +294,15 @@ export const HTTPFlowDetail: React.FC<HTTPFlowDetailProp> = (props) => {
       tip={t('HTTPFlowDetail.analyzingDetailedParameters')}
     >
       {flow ? (
-        <>
+        <div className={styles['http-flow-detail']}>
           {props.noHeader ? undefined : (
-            <PageHeader
+            <RuiYanPageHeader
+              className={styles['flow-detail-header']}
               title={t('HTTPFlowDetail.requestDetails')}
-              subTitle={`${props.id}${
+              description={`${props.id}${
                 (props.payloads || []).length > 0 ? `  Payload: ${props.payloads?.join(',')}` : ''
               }`}
-              style={{ padding: 0, paddingBottom: 5 }}
-              extra={
+              actions={
                 props.fetchRequest ? (
                   <Space>
                     <Tooltip title={t('HTTPFlowDetail.previousRequest')}>
@@ -331,7 +332,7 @@ export const HTTPFlowDetail: React.FC<HTTPFlowDetailProp> = (props) => {
               }
             />
           )}
-          <Space direction={'vertical'} style={{ width: '100%' }}>
+          <div className={styles['flow-detail-content']}>
             <Descriptions
               column={4}
               bordered={true}
@@ -425,19 +426,14 @@ export const HTTPFlowDetail: React.FC<HTTPFlowDetailProp> = (props) => {
                 ''
               )}
             </div>
-            <Row gutter={8}>
-              <Col span={12}>
-                <Card
-                  title={
-                    <>
-                      {t('HTTPFlowDetail.rawHTTPRequest')}
-                      {reqByte > 0 && <YakitTag style={{ marginLeft: 8 }}>{reqByte} bytes</YakitTag>}
-                    </>
-                  }
-                  size={'small'}
-                  bodyStyle={{ padding: 0 }}
+            <div className={styles['packet-editor-grid']}>
+              <div className={styles['packet-editor-cell']}>
+                <RuiYanCodeEditorFrame
+                  className={styles['packet-editor-frame']}
+                  title={t('HTTPFlowDetail.rawHTTPRequest')}
+                  status={reqByte > 0 ? `${reqByte} bytes` : undefined}
                 >
-                  <div style={{ height: 350 }}>
+                  <div className={styles['packet-editor-body']}>
                     {flow.IsWebsocket ? (
                       <WebSocketEditor flow={flow} value={flow.RequestString} onSetEditor={setWsReqEditor} />
                     ) : (
@@ -476,20 +472,15 @@ export const HTTPFlowDetail: React.FC<HTTPFlowDetailProp> = (props) => {
                       />
                     )}
                   </div>
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card
-                  title={
-                    <>
-                      {t('HTTPFlowDetail.rawHTTPResponse')}
-                      {resByte > 0 && <YakitTag style={{ marginLeft: 8 }}>{resByte} bytes</YakitTag>}
-                    </>
-                  }
-                  size={'small'}
-                  bodyStyle={{ padding: 0 }}
+                </RuiYanCodeEditorFrame>
+              </div>
+              <div className={styles['packet-editor-cell']}>
+                <RuiYanCodeEditorFrame
+                  className={styles['packet-editor-frame']}
+                  title={t('HTTPFlowDetail.rawHTTPResponse')}
+                  status={resByte > 0 ? `${resByte} bytes` : undefined}
                 >
-                  <div style={{ height: 350 }}>
+                  <div className={styles['packet-editor-body']}>
                     {flow.IsWebsocket ? (
                       <WebSocketEditor flow={flow} value={flow.ResponseString} onSetEditor={setWsResEditor} />
                     ) : (
@@ -528,9 +519,9 @@ export const HTTPFlowDetail: React.FC<HTTPFlowDetailProp> = (props) => {
                       />
                     )}
                   </div>
-                </Card>
-              </Col>
-            </Row>
+                </RuiYanCodeEditorFrame>
+              </div>
+            </div>
             {props.randomChunkedData && props.randomChunkedData?.length > 0 && (
               <RandomChunkedDataTable data={props.randomChunkedData} />
             )}
@@ -640,8 +631,8 @@ export const HTTPFlowDetail: React.FC<HTTPFlowDetailProp> = (props) => {
                 </YakitCollapse>
               </Col>
             </Row>
-          </Space>
-        </>
+          </div>
+        </div>
       ) : (
         ''
       )}

@@ -76,6 +76,20 @@
   --ruiyan-color-primary-soft: #102d55;
 }
 
+.ruiyan-app-shell,
+body.ruiyan-workspace-active {
+  --ruiyan-color-primary-soft: #e8f1fb;
+  --ruiyan-color-text: #202d3c;
+  --ruiyan-color-text-secondary: #5f6f80;
+  --ruiyan-color-text-tertiary: #8997a6;
+  --ruiyan-color-border: #d9dfe7;
+  --ruiyan-color-border-strong: #bdc7d3;
+  --ruiyan-color-background: #f2f4f7;
+  --ruiyan-color-surface: #ffffff;
+  --ruiyan-color-surface-muted: #f6f7f9;
+  color-scheme: light;
+}
+
 .ruiyan-app-shell {
   --Colors-Use-Main-Primary: var(--ruiyan-color-primary);
   --Colors-Use-Main-Hover: var(--ruiyan-color-primary-hover);
