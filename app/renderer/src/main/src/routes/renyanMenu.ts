@@ -67,6 +67,7 @@ export const RENYAN_SHELL_EVENTS = {
   openAbout: 'openRenyanAbout',
   openEngineUpdate: 'openRenyanEngineUpdate',
   openLogin: 'openRenyanLogin',
+  messageUnreadChange: 'ruiyan:message-unread-change',
   selectNavigationGroup: 'selectRenyanNavigationGroup',
   selectSettingsSection: 'ruiyan:select-settings-section',
 } as const

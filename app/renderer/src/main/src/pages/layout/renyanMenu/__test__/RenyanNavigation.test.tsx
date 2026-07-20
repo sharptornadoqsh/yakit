@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { YakitRoute } from '@/enums/yakitRoute'
 import { RenyanNavigation } from '../RenyanNavigation'
@@ -13,8 +13,10 @@ vi.mock('@/components/renyanUI/RuiYanPage.module.scss', () => ({
 
 const testState = vi.hoisted(() => ({
   currentRoute: '' as YakitRoute | string,
+  isLogin: false,
 }))
 const emit = vi.hoisted(() => vi.fn())
+const apiFetchQueryMessage = vi.hoisted(() => vi.fn())
 
 vi.mock('@/store/pageInfo', () => ({
   usePageInfo: (selector: (state: { currentPageTabRouteKey: YakitRoute | string }) => unknown) =>
@@ -24,9 +26,18 @@ vi.mock('@/store/pageInfo', () => ({
 vi.mock('@/store', () => ({
   useStore: (selector: (state: { userInfo: Record<string, unknown> }) => unknown) =>
     selector({
-      userInfo: { isLogin: false, role: '', companyName: null, githubName: null, wechatName: null, qqName: null },
+      userInfo: {
+        isLogin: testState.isLogin,
+        role: '',
+        companyName: null,
+        githubName: null,
+        wechatName: null,
+        qqName: null,
+      },
     }),
 }))
+
+vi.mock('@/components/MessageCenter/utils', () => ({ apiFetchQueryMessage }))
 
 vi.mock('@/i18n/useI18nNamespaces', () => ({
   useI18nNamespaces: () => ({
@@ -42,7 +53,10 @@ vi.mock('@/utils/eventBus/eventBus', () => ({
 describe('睿眼顶部导航', () => {
   beforeEach(() => {
     testState.currentRoute = YakitRoute.NewHome
+    testState.isLogin = false
     emit.mockReset()
+    apiFetchQueryMessage.mockReset()
+    apiFetchQueryMessage.mockResolvedValue({ data: [], pagemeta: { total: 0 } })
     window.sessionStorage.clear()
   })
 
@@ -104,5 +118,18 @@ describe('睿眼顶部导航', () => {
     onMenuSelect.mockClear()
     fireEvent.click(screen.getByRole('button', { name: '日志诊断' }))
     expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.Beta_DiagnoseNetwork })
+  })
+
+  it('顶部消息入口展示真实未读状态并响应消息中心更新', async () => {
+    testState.isLogin = true
+    apiFetchQueryMessage.mockResolvedValue({ data: [], pagemeta: { total: 2 } })
+
+    render(<RenyanNavigation defaultExpand={true} onMenuSelect={vi.fn()} setRouteToLabel={vi.fn()} />)
+
+    const notificationButton = screen.getByRole('button', { name: /消息通知/ })
+    await waitFor(() => expect(notificationButton).toHaveAttribute('aria-label', '消息通知，有未读消息'))
+
+    window.dispatchEvent(new CustomEvent('ruiyan:message-unread-change', { detail: false }))
+    await waitFor(() => expect(notificationButton).toHaveAttribute('aria-label', '消息通知'))
   })
 })

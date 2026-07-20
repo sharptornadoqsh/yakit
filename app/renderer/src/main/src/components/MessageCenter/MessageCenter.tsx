@@ -49,9 +49,14 @@ import {
 } from '@/pages/softwareSettings/ProjectManage'
 import { YakitHint } from '../yakitUI/YakitHint/YakitHint'
 import { RuiYanButton } from '@/components/renyanUI'
-import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
+import { RENYAN_SHELL_ENABLED, RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
 import moment from 'moment'
 const { ipcRenderer } = window.require('electron')
+
+const dispatchUnreadState = (hasUnread: boolean) => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(RENYAN_SHELL_EVENTS.messageUnreadChange, { detail: hasUnread }))
+}
 
 export interface MessageItemProps {
   onClose: () => void
@@ -306,6 +311,7 @@ export const MessageItem: React.FC<MessageItemProps> = (props) => {
     })
       .then((ok) => {
         if (ok) {
+          if (!data.isRead) removeItem?.(data)
           switch (data.upPluginType) {
             // 跳转到插件仓库回收站
             case 'delete':
@@ -378,7 +384,6 @@ export const MessageItem: React.FC<MessageItemProps> = (props) => {
               break
             case 'task':
               // task任务已读不含操作
-              removeItem && removeItem(data)
               break
             // 其余跳转到插件日志
             default:
@@ -674,7 +679,9 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
     )
       .then((res) => {
         if (newQueryData?.isRead === 'false') {
-          setNoRedDataTotal(res.pagemeta.total)
+          const unreadTotal = res.pagemeta.total
+          setNoRedDataTotal(unreadTotal)
+          dispatchUnreadState(unreadTotal > 0)
         }
 
         if (!res.data) {
@@ -716,6 +723,7 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
         fun: 'onRefreshMessageSocketFun',
       })
       if (obj.isRead === false) {
+        dispatchUnreadState(true)
         setNoRedDataTotal((prev) => {
           return (prev || 0) + 1
         })
@@ -748,6 +756,13 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
   })
 
   const removeItem = useMemoizedFn((item: API.MessageLogDetail) => {
+    if (!item.isRead) {
+      setNoRedDataTotal((prev) => {
+        const next = Math.max((prev || 0) - 1, 0)
+        dispatchUnreadState(next > 0)
+        return next
+      })
+    }
     if (activeKey === 'unread' && !item.isRead) {
       const newList = dataSorce.filter((i) => i.hash !== item.hash)
       setDataSorce(newList)
@@ -819,6 +834,7 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
         if (ok) {
           update()
           setNoRedDataTotal(0)
+          dispatchUnreadState(false)
         }
       })
     }
@@ -831,6 +847,8 @@ export const MessageCenterModal: React.FC<MessageCenterModalProps> = (props) => 
     }).then((ok) => {
       if (ok) {
         update()
+        setNoRedDataTotal(0)
+        dispatchUnreadState(false)
       }
     })
   })

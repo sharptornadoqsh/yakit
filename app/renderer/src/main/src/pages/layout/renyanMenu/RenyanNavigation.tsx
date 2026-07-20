@@ -15,6 +15,7 @@ import {
   isRenyanMenuItemNavigable,
 } from '@/routes/renyanMenu'
 import { RuiYanPrimaryNav, RuiYanSecondaryNav, RuiYanTopCommandBar, type RuiYanCommand } from '@/components/renyanUI'
+import { apiFetchQueryMessage } from '@/components/MessageCenter/utils'
 
 interface RenyanRouteSelection {
   route: YakitRoute
@@ -85,6 +86,7 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
   const currentPath = useMemo(() => findRenyanMenuPath(currentRoute || '', menu), [currentRoute, menu])
   const [activeGroupKey, setActiveGroupKey] = useState(currentPath[0]?.key || menu[0]?.key || '')
   const [activeSecondaryKey, setActiveSecondaryKey] = useState(currentPath[currentPath.length - 1]?.key || '')
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
 
   useEffect(() => {
     if (currentRoute === YakitRoute.Beta_ConfigNetwork) {
@@ -121,6 +123,34 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
     const selectGroup = (event: Event) => setActiveGroupKey((event as CustomEvent<string>).detail)
     window.addEventListener(RENYAN_SHELL_EVENTS.selectNavigationGroup, selectGroup)
     return () => window.removeEventListener(RENYAN_SHELL_EVENTS.selectNavigationGroup, selectGroup)
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    if (!userInfo.isLogin) {
+      setHasUnreadNotifications(false)
+      return () => {
+        active = false
+      }
+    }
+
+    apiFetchQueryMessage({ page: 1, limit: 1 }, { isRead: 'false' })
+      .then((response) => {
+        if (active) setHasUnreadNotifications(response.pagemeta.total > 0)
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [userInfo.isLogin])
+
+  useEffect(() => {
+    const onUnreadChange = (event: Event) => {
+      setHasUnreadNotifications(Boolean((event as CustomEvent<boolean>).detail))
+    }
+    window.addEventListener(RENYAN_SHELL_EVENTS.messageUnreadChange, onUnreadChange)
+    return () => window.removeEventListener(RENYAN_SHELL_EVENTS.messageUnreadChange, onUnreadChange)
   }, [])
 
   const activeGroup = menu.find((item) => item.key === activeGroupKey) || menu[0]
@@ -178,6 +208,7 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
         commands={commands}
         userName={userName}
         teamName={teamName}
+        hasUnreadNotifications={hasUnreadNotifications}
         onNotifications={() => emiter.emit('openAllMessageNotification')}
         onProfile={() => onMenuSelect({ route: YakitRoute.AccountAdminPage })}
       />

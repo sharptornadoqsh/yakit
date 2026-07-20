@@ -156,7 +156,12 @@ export const RuiYanTopCommandBar: React.FC<RuiYanTopCommandBarProps> = ({
             <span>{command.label}</span>
           </button>
         ))}
-        <button type="button" className={styles['top-icon-button']} aria-label="消息通知" onClick={onNotifications}>
+        <button
+          type="button"
+          className={styles['top-icon-button']}
+          aria-label={hasUnreadNotifications ? '消息通知，有未读消息' : '消息通知'}
+          onClick={onNotifications}
+        >
           <RuiYanIcon name="bell" />
           {hasUnreadNotifications ? <span className={styles['notification-dot']} aria-hidden="true" /> : null}
         </button>
