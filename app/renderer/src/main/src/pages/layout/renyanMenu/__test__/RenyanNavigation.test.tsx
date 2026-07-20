@@ -87,7 +87,8 @@ describe('睿眼顶部导航', () => {
     fireEvent.click(screen.getByRole('button', { name: '交互代理' }))
 
     expect(screen.getByRole('button', { name: '代理控制台' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '劫持会话' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '劫持会话' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '拦截规则' })).not.toBeInTheDocument()
     expect(screen.queryByText('页内')).not.toBeInTheDocument()
     expect(screen.queryByText(/MODULE/)).not.toBeInTheDocument()
     expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.MITMHacker })

@@ -370,6 +370,27 @@ export const RENYAN_MENU_MODEL: readonly RenyanMenuItem[] = [
 
 const sortMenu = (items: RenyanMenuItem[]) => [...items].sort((a, b) => a.order - b.order)
 
+const getMenuDestinationSignature = (item: RenyanMenuItem): string | null => {
+  if (item.route) return `route:${item.route}:${item.settingsSection ?? ''}`
+  if (item.action) return `action:${item.action}`
+  return null
+}
+
+// 每个一级分组内按导航目的地去重，避免二级、三级菜单出现多个指向同一页面的重复入口。
+const dedupeGroupDestinations = (group: RenyanMenuItem): RenyanMenuItem => {
+  const seen = new Set<string>()
+  const walk = (items: RenyanMenuItem[]): RenyanMenuItem[] =>
+    items.reduce<RenyanMenuItem[]>((kept, item) => {
+      const signature = getMenuDestinationSignature(item)
+      if (signature && seen.has(signature)) return kept
+      if (signature) seen.add(signature)
+      kept.push({ ...item, children: walk(item.children) })
+      return kept
+    }, [])
+
+  return { ...group, children: walk(group.children) }
+}
+
 export const buildRenyanMenu = (options: BuildRenyanMenuOptions = {}): RenyanMenuItem[] => {
   const featureFlags = { ...DEFAULT_RENYAN_FEATURE_FLAGS, ...options.featureFlags }
   const capabilities = new Set(options.capabilities || DEFAULT_RENYAN_CAPABILITIES)
@@ -386,7 +407,7 @@ export const buildRenyanMenu = (options: BuildRenyanMenuOptions = {}): RenyanMen
 
   return sortMenu(
     RENYAN_MENU_MODEL.map((item) => filterItem(item)).filter((item): item is RenyanMenuItem => item !== null),
-  )
+  ).map(dedupeGroupDestinations)
 }
 
 export const flattenRenyanMenu = (items: readonly RenyanMenuItem[]): RenyanMenuItem[] =>

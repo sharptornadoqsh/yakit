@@ -45,37 +45,21 @@ describe('睿眼菜单模型', () => {
     )
 
     expect(groups['workbench']).toEqual(['安全概览', '最近任务', '风险趋势'])
-    expect(groups['interactive-proxy']).toEqual(['代理控制台', '劫持会话', '拦截规则', '证书与代理设置'])
-    expect(groups['traffic-center']).toEqual(['历史流量', '请求详情', '响应详情', '流量筛选'])
+    expect(groups['interactive-proxy']).toEqual(['代理控制台'])
+    expect(groups['traffic-center']).toEqual(['历史流量'])
     expect(groups['vulnerability-detection']).toEqual([
       '通用检测',
       '专项检测',
       '端口检测',
-      '检测任务',
       '扫描结果',
       '风险结果',
       '安全测试报告',
     ])
-    expect(groups['brute-force']).toEqual(['爆破任务', '字典管理', '命中结果', '执行日志'])
-    expect(groups['packet-tools']).toEqual(['报文重放', 'WebSocket 调试', '报文差异', '编解码', '哈希摘要', '操作历史'])
-    expect(groups['plugin-center']).toEqual([
-      '插件仓库',
-      '批量导入',
-      '已安装插件',
-      '本地插件',
-      '插件开发',
-      '插件日志',
-      '插件配置',
-    ])
-    expect(groups['team-collaboration']).toEqual(['服务连接', '用户管理', '角色权限', '组织管理'])
-    expect(groups['project-security']).toEqual([
-      '项目管理',
-      '安全概览',
-      '风险与漏洞',
-      '扫描结果',
-      '项目导入导出',
-      '客户端测试总览',
-    ])
+    expect(groups['brute-force']).toEqual(['爆破任务', '字典管理'])
+    expect(groups['packet-tools']).toEqual(['报文重放', 'WebSocket 调试', '报文差异', '编解码'])
+    expect(groups['plugin-center']).toEqual(['插件仓库', '批量导入', '插件开发'])
+    expect(groups['team-collaboration']).toEqual(['服务连接', '用户管理', '角色权限'])
+    expect(groups['project-security']).toEqual(['项目管理', '安全概览', '风险与漏洞', '扫描结果', '客户端测试总览'])
     expect(groups['system-settings']).toEqual([
       '引擎',
       '网络与 DNS',
@@ -87,6 +71,17 @@ describe('睿眼菜单模型', () => {
       '快捷键帮助',
       '关于',
     ])
+  })
+
+  it('同一一级分组内不出现指向同一目的地的重复入口', () => {
+    buildRenyanMenu().forEach((group) => {
+      const signatures = flattenRenyanMenu(group.children)
+        .filter(isRenyanMenuItemNavigable)
+        .map((item) =>
+          item.route ? `route:${item.route}:${item.settingsSection ?? ''}` : `action:${item.action ?? ''}`,
+        )
+      expect(new Set(signatures).size).toBe(signatures.length)
+    })
   })
 
   it('公开已有真实页面并隐藏尚未交付能力', () => {

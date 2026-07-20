@@ -90,7 +90,8 @@ body.ruiyan-workspace-active {
   color-scheme: light;
 }
 
-.ruiyan-app-shell {
+.ruiyan-app-shell,
+body.ruiyan-workspace-active {
   --Colors-Use-Main-Primary: var(--ruiyan-color-primary);
   --Colors-Use-Main-Hover: var(--ruiyan-color-primary-hover);
   --Colors-Use-Main-Bg: var(--ruiyan-color-primary-soft);
@@ -106,6 +107,9 @@ body.ruiyan-workspace-active {
   --Colors-Use-Neutral-Text-2-Primary: var(--ruiyan-color-text-secondary);
   --Colors-Use-Neutral-Text-3-Secondary: var(--ruiyan-color-text-secondary);
   --Colors-Use-Neutral-Disable: var(--ruiyan-color-text-tertiary);
+}
+
+.ruiyan-app-shell {
   color: var(--ruiyan-color-text);
   font-family: var(--ruiyan-font-sans);
 }
