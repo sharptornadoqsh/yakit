@@ -37,6 +37,7 @@ import { setClipboardText } from '@/utils/clipboard'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useStore } from '@/store'
 import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
+import { LoginRequiredState } from '@/components/yakitUI/RenyanState/LoginRequiredState'
 interface QueryAccountAdminRequest {
   departmentId?: number
   keywords: string
@@ -84,7 +85,11 @@ export const AccountAdminPage: React.FC<AccountAdminPageProp> = (props) => {
     }))
   })
 
-  if (!userInfo.isLogin || userInfo.role !== 'admin') {
+  if (!userInfo.isLogin) {
+    return <LoginRequiredState />
+  }
+
+  if (userInfo.role !== 'admin') {
     return <RenyanState type="noPermission" />
   }
 

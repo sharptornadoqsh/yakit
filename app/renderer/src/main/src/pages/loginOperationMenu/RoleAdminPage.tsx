@@ -21,6 +21,7 @@ import styles from './RoleAdminPage.module.scss'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useStore } from '@/store'
 import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
+import { LoginRequiredState } from '@/components/yakitUI/RenyanState/LoginRequiredState'
 interface RoleListRequest {
   limit: number
   page: number
@@ -247,6 +248,10 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
         yakitNotify('error', t('RoleAdminPage.deleteRoleFailed', { error: err }))
       })
       .finally(() => setTimeout(() => setLoading(false), 300))
+  }
+
+  if (!userInfo.isLogin) {
+    return <LoginRequiredState />
   }
 
   if (!canManageRoles) {

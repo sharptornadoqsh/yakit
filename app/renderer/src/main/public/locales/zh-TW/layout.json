@@ -64,6 +64,9 @@
       "errorDescription": "目前資料來源未傳回有效結果。",
       "noPermissionTitle": "無存取權限",
       "noPermissionDescription": "目前帳號無權存取此內容。",
+      "loginRequiredTitle": "需要登入",
+      "loginRequiredDescription": "目前尚未登入或登入狀態已失效，請重新登入後繼續存取。",
+      "loginRequiredAction": "重新登入",
       "offlineTitle": "服務離線",
       "offlineDescription": "目前服務無法使用，請檢查連線狀態。"
     },

@@ -64,6 +64,9 @@
       "errorDescription": "The current data source did not return a valid result.",
       "noPermissionTitle": "Access denied",
       "noPermissionDescription": "The current account cannot access this content.",
+      "loginRequiredTitle": "Sign-in required",
+      "loginRequiredDescription": "Your session is missing or has expired. Sign in again to continue.",
+      "loginRequiredAction": "Sign in again",
       "offlineTitle": "Service offline",
       "offlineDescription": "The current service is unavailable. Check the connection."
     },

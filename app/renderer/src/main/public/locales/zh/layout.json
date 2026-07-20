@@ -64,6 +64,9 @@
       "errorDescription": "当前数据源未返回有效结果。",
       "noPermissionTitle": "无访问权限",
       "noPermissionDescription": "当前身份无权访问此内容。",
+      "loginRequiredTitle": "需要登录",
+      "loginRequiredDescription": "当前未登录或登录状态已失效，请重新登录后继续访问。",
+      "loginRequiredAction": "重新登录",
       "offlineTitle": "服务离线",
       "offlineDescription": "当前服务不可用，请检查连接状态。"
     },
