@@ -3,69 +3,7 @@
 }
 
 .private-domain {
-  padding: 20px;
-  color: var(--ruiyan-color-text);
-  background: radial-gradient(circle at 100% 0, rgb(22 119 255 / 7%), transparent 34%), var(--ruiyan-color-surface);
-
-  .private-domain-heading {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--ruiyan-color-border);
-  }
-
-  .private-domain-heading-icon {
-    display: grid;
-    width: 40px;
-    height: 40px;
-    flex: 0 0 auto;
-    place-items: center;
-    color: var(--ruiyan-color-primary);
-    font-size: 20px;
-    background: var(--ruiyan-color-primary-soft);
-    border: 1px solid rgb(22 119 255 / 16%);
-    border-radius: var(--ruiyan-radius-md);
-  }
-
-  .private-domain-heading-copy {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 3px;
-
-    strong {
-      color: var(--ruiyan-color-text);
-      font-size: 15px;
-    }
-
-    small {
-      color: var(--ruiyan-color-text-secondary);
-      font-size: 11px;
-    }
-  }
-
-  .ant-form-item-label > label {
-    color: var(--ruiyan-color-text-secondary);
-    font-size: 11px;
-    font-weight: 600;
-  }
-
-  .ant-input,
-  .ant-input-affix-wrapper,
-  .ant-select-selector {
-    border-color: var(--ruiyan-color-border);
-    border-radius: var(--ruiyan-radius-sm) !important;
-    background: var(--ruiyan-color-surface-muted);
-  }
-
-  .ant-input:focus,
-  .ant-input-affix-wrapper-focused,
-  .ant-select-focused .ant-select-selector {
-    border-color: var(--ruiyan-color-primary) !important;
-    box-shadow: var(--ruiyan-shadow-focus) !important;
-  }
+  padding: 24px;
   .login-title-show {
     .icon-box {
       text-align: center;
@@ -95,8 +33,6 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    padding-top: 16px;
-    border-top: 1px solid var(--ruiyan-color-border);
   }
   .form-label {
     display: flex;

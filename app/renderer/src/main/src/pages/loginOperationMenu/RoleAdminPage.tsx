@@ -20,17 +20,7 @@ import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import styles from './RoleAdminPage.module.scss'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { useStore } from '@/store'
-import {
-  RuiYanButton,
-  RuiYanDetailPanel,
-  RuiYanEmptyState,
-  RuiYanErrorState,
-  RuiYanFormSection,
-  RuiYanLoadingState,
-  RuiYanPanel,
-  RuiYanSplitPane,
-  RuiYanStatusBadge,
-} from '@/components/renyanUI'
+import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 interface RoleListRequest {
   limit: number
   page: number
@@ -65,10 +55,6 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
       total_page: 0,
     },
   })
-  const [selectedRole, setSelectedRole] = useState<API.RoleList>()
-  const [roleDetail, setRoleDetail] = useState<API.NewRoleRequest>()
-  const [detailStatus, setDetailStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  const detailRequestIdRef = useRef(0)
   const [roleFormShow, setRoleFormShow] = useState<boolean>(false)
   const roleInfoRef = useRef<API.RoleList>()
 
@@ -223,12 +209,6 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
     })
       .then((res) => {
         yakitNotify('success', t('RoleAdminPage.deleteRoleSuccess'))
-        if (selectedRole?.id === rid) {
-          detailRequestIdRef.current += 1
-          setSelectedRole(undefined)
-          setRoleDetail(undefined)
-          setDetailStatus('idle')
-        }
         setSelectList((s) => s.filter((ele) => ele.id !== rid))
         setResponse({
           data: response.data.filter((item) => item.id !== rid),
@@ -256,12 +236,6 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
     })
       .then((res) => {
         yakitNotify('success', t('RoleAdminPage.deleteRoleSuccess'))
-        if (selectedRole && deletableRoleIds.includes(selectedRole.id)) {
-          detailRequestIdRef.current += 1
-          setSelectedRole(undefined)
-          setRoleDetail(undefined)
-          setDetailStatus('idle')
-        }
         setQuery((prevQuery) => ({
           ...prevQuery,
           page: 1,
@@ -275,174 +249,86 @@ export const RoleAdminPage: React.FC<RoleAdminPageProp> = (props) => {
       .finally(() => setTimeout(() => setLoading(false), 300))
   }
 
-  const selectRole = useMemoizedFn((role: API.RoleList) => {
-    const requestId = detailRequestIdRef.current + 1
-    detailRequestIdRef.current = requestId
-    setSelectedRole(role)
-    setRoleDetail(undefined)
-    setDetailStatus('loading')
-    NetWorkApi<RolesDetailRequest, API.NewRoleRequest>({
-      method: 'get',
-      url: 'roles/detail',
-      params: { id: role.id },
-    })
-      .then((detail) => {
-        if (detailRequestIdRef.current !== requestId) return
-        setRoleDetail(detail)
-        setDetailStatus('ready')
-      })
-      .catch(() => {
-        if (detailRequestIdRef.current !== requestId) return
-        setDetailStatus('error')
-      })
-  })
-
   if (!canManageRoles) {
-    return <RuiYanErrorState title="无管理权限" description="当前账号不具备角色权限管理能力。" />
+    return <RenyanState type="noPermission" />
   }
 
   return (
     <div className={styles['roleAdminPage']}>
-      <RuiYanPanel title="角色权限" className={styles['role-panel']} bodyClassName={styles['role-panel-body']}>
-        <RuiYanSplitPane
-          className={styles['role-workspace']}
-          firstSize="64%"
-          first={
-            <TableVirtualResize<API.RoleList>
-              loading={loading}
-              query={query}
-              isRefresh={isRefresh}
-              isShowTotal={true}
-              extra={
-                <Space>
-                  <YakitPopconfirm
-                    title={t('RoleAdminPage.confirmDeleteSelectedRoles')}
-                    onConfirm={(e) => {
-                      e?.stopPropagation()
-                      onRemoveMultiple()
-                    }}
-                    placement="bottomRight"
-                    disabled={selectNum === 0}
-                  >
-                    <RuiYanButton size="small" variant="danger" disabled={selectNum === 0}>
-                      {t('YakitButton.batchDelete')}
-                    </RuiYanButton>
-                  </YakitPopconfirm>
-                  <RuiYanButton size="small" variant="primary" onClick={() => setRoleFormShow(true)}>
-                    {t('RoleAdminPage.createRole')}
-                  </RuiYanButton>
-                </Space>
-              }
-              data={response.data}
-              enableDrag={false}
-              renderKey="id"
-              columns={columns}
-              useUpAndDown
-              onRowClick={selectRole}
-              pagination={{
-                total: response.pagemeta.total,
-                limit: response.pagemeta.limit,
-                page: response.pagemeta.page,
-                onChange: (page) => {
-                  update(page)
-                },
+      <TableVirtualResize<API.RoleList>
+        loading={loading}
+        query={query}
+        isRefresh={isRefresh}
+        isShowTotal={true}
+        extra={
+          <Space>
+            <YakitPopconfirm
+              title={t('RoleAdminPage.confirmDeleteSelectedRoles')}
+              onConfirm={(e) => {
+                e?.stopPropagation()
+                onRemoveMultiple()
               }}
-              rowSelection={{
-                isAll: allCheck,
-                type: 'checkbox',
-                selectedRowKeys,
-                onSelectAll,
-                onChangeCheckboxSingle,
-                getCheckboxProps(record) {
-                  return {
-                    disabled: record.builtIn,
-                  }
-                },
-              }}
-            />
-          }
-          second={
-            <RuiYanDetailPanel className={styles['role-detail']} title="权限详情">
-              {!selectedRole || detailStatus === 'idle' ? (
-                <RuiYanEmptyState compact title="选择角色查看权限" description="权限信息来自当前服务的角色详情接口。" />
-              ) : detailStatus === 'loading' ? (
-                <RuiYanLoadingState compact title="权限详情读取中" />
-              ) : detailStatus === 'error' ? (
-                <RuiYanErrorState
-                  compact
-                  title="权限详情读取失败"
-                  action={
-                    <RuiYanButton size="small" onClick={() => selectRole(selectedRole)}>
-                      {t('YakitButton.retry')}
-                    </RuiYanButton>
-                  }
-                />
-              ) : (
-                <div className={styles['role-detail-content']}>
-                  <div className={styles['role-detail-heading']}>
-                    <div>
-                      <strong>{roleDetail?.name || selectedRole.name}</strong>
-                      <small>角色编号 {selectedRole.id}</small>
-                    </div>
-                    <RuiYanStatusBadge tone={selectedRole.builtIn ? 'info' : 'neutral'}>
-                      {selectedRole.builtIn ? '内置角色' : '自定义角色'}
-                    </RuiYanStatusBadge>
-                  </div>
-                  <RuiYanFormSection title="权限矩阵" description="服务返回的插件类型与插件标识">
-                    {roleDetail?.pluginType || roleDetail?.plugin?.length ? (
-                      <div className={styles['permission-tags']}>
-                        {(roleDetail?.pluginType || '')
-                          .split(',')
-                          .filter(Boolean)
-                          .map((type) => (
-                            <RuiYanStatusBadge key={`type-${type}`} tone="info">
-                              {type}
-                            </RuiYanStatusBadge>
-                          ))}
-                        {(roleDetail?.plugin || []).map((plugin) => (
-                          <RuiYanStatusBadge key={`plugin-${plugin.id}`}>{plugin.script_name}</RuiYanStatusBadge>
-                        ))}
-                      </div>
-                    ) : (
-                      <RuiYanEmptyState compact title="服务未返回插件权限" />
-                    )}
-                  </RuiYanFormSection>
-                  <RuiYanFormSection title="数据范围与条件限制" description="当前服务契约的返回边界">
-                    <RuiYanEmptyState
-                      compact
-                      title="服务未返回数据范围、条件限制或审批要求"
-                      description="界面不推断未提供的权限字段。"
-                    />
-                  </RuiYanFormSection>
-                </div>
-              )}
-            </RuiYanDetailPanel>
-          }
-        />
-        <YakitModal
-          visible={roleFormShow}
-          title={t('RoleAdminPage.createRole')}
-          destroyOnClose={true}
-          maskClosable={false}
-          width={600}
-          footer={null}
+              placement="bottomRight"
+              disabled={selectNum === 0}
+            >
+              <YakitButton size="small" disabled={selectNum === 0}>
+                {t('YakitButton.batchDelete')}
+              </YakitButton>
+            </YakitPopconfirm>
+            <YakitButton size="small" onClick={() => setRoleFormShow(true)}>
+              {t('RoleAdminPage.createRole')}
+            </YakitButton>
+          </Space>
+        }
+        data={response.data}
+        enableDrag={false}
+        renderKey="id"
+        columns={columns}
+        useUpAndDown
+        pagination={{
+          total: response.pagemeta.total,
+          limit: response.pagemeta.limit,
+          page: response.pagemeta.page,
+          onChange: (page) => {
+            update(page)
+          },
+        }}
+        rowSelection={{
+          isAll: allCheck,
+          type: 'checkbox',
+          selectedRowKeys,
+          onSelectAll,
+          onChangeCheckboxSingle,
+          getCheckboxProps(record) {
+            return {
+              disabled: record.builtIn,
+            }
+          },
+        }}
+      ></TableVirtualResize>
+      <YakitModal
+        visible={roleFormShow}
+        title={t('RoleAdminPage.createRole')}
+        destroyOnClose={true}
+        maskClosable={false}
+        width={600}
+        footer={null}
+        onCancel={() => {
+          setRoleFormShow(false)
+          roleInfoRef.current = undefined
+        }}
+      >
+        <RoleOperationForm
           onCancel={() => {
             setRoleFormShow(false)
             roleInfoRef.current = undefined
           }}
-        >
-          <RoleOperationForm
-            onCancel={() => {
-              setRoleFormShow(false)
-              roleInfoRef.current = undefined
-            }}
-            refresh={() => {
-              update(1)
-            }}
-            roleInfo={roleInfoRef.current}
-          ></RoleOperationForm>
-        </YakitModal>
-      </RuiYanPanel>
+          refresh={() => {
+            update(1)
+          }}
+          roleInfo={roleInfoRef.current}
+        ></RoleOperationForm>
+      </YakitModal>
     </div>
   )
 }

@@ -7,18 +7,17 @@ import { loginOut } from '@/utils/login'
 import { useMemoizedFn, useGetState } from 'ahooks'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { useStore } from '@/store'
-import connectionState from '@/assets/renyan/connection-state.svg'
+import productIcon from '@/assets/renyan-icon.svg'
 import { API } from '@/services/swagger/resposeType'
 import { YakitButton } from '../yakitUI/YakitButton/YakitButton'
-import { RuiYanButton, RuiYanIcon } from '@/components/renyanUI'
 import { YakitAutoComplete, defYakitAutoCompleteRef } from '../yakitUI/YakitAutoComplete/YakitAutoComplete'
 import { YakitInput } from '../yakitUI/YakitInput/YakitInput'
 import { InformationCircleIcon } from '@/assets/newIcon'
 import { CacheDropDownGV } from '@/yakitGV'
 import emiter from '@/utils/eventBus/eventBus'
 import { YakitAutoCompleteRefProps } from '../yakitUI/YakitAutoComplete/YakitAutoCompleteType'
-import { getRemoteConfigBaseUrlGV, getRemoteHttpSettingGV } from '@/utils/envfile'
-import { useUploadInfoByEnpriTrace } from '../layout/utils'
+import { getRemoteConfigBaseUrlGV, getRemoteHttpSettingGV, isEnpriTrace } from '@/utils/envfile'
+import { apiSystemConfig, useUploadInfoByEnpriTrace } from '../layout/utils'
 import { JSONParseLog, shouldWarnAboutRemoteHttpUrl } from '@/utils/tool'
 import { yakitAuth, yakitCodec, yakitProfile, yakitUILayout } from '@/services/electronBridge'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
@@ -271,21 +270,10 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
   ]
   return (
     <div className={`private-domain${pageMode ? ' private-domain-enterprise-page' : ''}`}>
-      {!enterpriseLogin && (
-        <header className="private-domain-heading">
-          <span className="private-domain-heading-icon">
-            <RuiYanIcon name="team" />
-          </span>
-          <span className="private-domain-heading-copy">
-            <strong>服务连接</strong>
-            <small>配置团队服务地址与网络代理</small>
-          </span>
-        </header>
-      )}
       {enterpriseLogin && !pageMode && (
         <div className="login-title-show">
           <div className="icon-box">
-            <img src={connectionState} className="type-icon-img" alt="睿眼服务连接" />
+            <img src={productIcon} className="type-icon-img" alt="" />
           </div>
           <div className="title-box">{t('ConfigPrivateDomain.enterpriseLogin')}</div>
         </div>
@@ -425,10 +413,12 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
           </Form.Item>
         ) : (
           <div className="form-btns">
-            <RuiYanButton onClick={() => onClose?.()}>{t('YakitButton.cancel')}</RuiYanButton>
-            <RuiYanButton variant="primary" type="submit" loading={loading}>
+            <YakitButton type="outline2" onClick={(e) => onClose && onClose()}>
+              {t('YakitButton.cancel')}
+            </YakitButton>
+            <YakitButton type="primary" htmlType="submit" loading={loading}>
               {t('YakitButton.ok')}
-            </RuiYanButton>
+            </YakitButton>
           </div>
         )}
       </Form>

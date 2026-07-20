@@ -1,104 +1,7 @@
 .accountAdminPage {
   height: 100%;
-  min-height: 0;
-  padding: 12px;
-  background: transparent;
-
-  .admin-panel {
-    height: 100%;
-    border-radius: var(--ruiyan-radius-lg);
-  }
-
-  .admin-panel-body {
-    display: flex;
-    min-height: 0;
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-  }
-
-  .account-workspace {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .account-detail {
-    height: 100%;
-    border: 0;
-    border-radius: 0;
-  }
-
-  .account-detail-content {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-
-  .account-detail-identity {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 10px;
-
-    > div {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-      gap: 2px;
-
-      strong,
-      small {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      strong {
-        color: var(--ruiyan-color-text);
-        font-size: 13px;
-      }
-
-      small {
-        color: var(--ruiyan-color-text-secondary);
-        font-size: 10px;
-      }
-    }
-  }
-
-  .account-detail-list {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    gap: 8px;
-
-    > div {
-      display: grid;
-      grid-template-columns: 72px minmax(0, 1fr);
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--ruiyan-color-border);
-      gap: 8px;
-    }
-
-    dt,
-    dd {
-      margin: 0;
-      font-size: 11px;
-      line-height: 18px;
-    }
-
-    dt {
-      color: var(--ruiyan-color-text-secondary);
-    }
-
-    dd {
-      overflow-wrap: anywhere;
-      color: var(--ruiyan-color-text);
-    }
-  }
-
   .card {
-    border: 1px solid var(--ruiyan-color-border);
-    border-radius: var(--ruiyan-radius-md);
+    border: none;
     &-title {
       display: flex;
       align-items: center;
@@ -106,7 +9,6 @@
       gap: 5px;
       &-text {
         font-size: 14px;
-        color: var(--ruiyan-color-text);
       }
     }
     &-extra {
@@ -143,7 +45,7 @@
         .del-icon,
         .plus-icon {
           svg {
-            color: var(--ruiyan-color-text);
+            color: var(--Colors-Use-Neutral-Text-1-Title);
           }
         }
       }
@@ -156,16 +58,14 @@
       align-items: center;
       margin: 8px 0;
       .first-title {
-        color: var(--ruiyan-color-text);
+        color: var(--Colors-Use-Neutral-Text-1-Title);
       }
       .second-title {
-        color: var(--ruiyan-color-text);
+        color: var(--Colors-Use-Neutral-Text-1-Title);
       }
       .right-outlined {
         padding: 0 8px;
-        color: var(--ruiyan-color-text);
-
-        svg {
+        color: var(--Colors-Use-Neutral-Text-1-Title) svg {
           width: 12px;
           height: 12px;
         }
@@ -180,9 +80,9 @@
         align-items: center;
         width: 20px;
         height: 20px;
-        color: #fff;
-        border-radius: var(--ruiyan-radius-sm);
-        background: linear-gradient(135deg, var(--ruiyan-color-primary), var(--ruiyan-color-teal));
+        color: var(--Colors-Use-Neutral-Text-1-Title);
+        border-radius: 50%;
+        background-color: var(--Colors-Use-Main-Primary);
         font-size: 14px;
       }
     }
@@ -201,14 +101,14 @@
       svg {
         width: 16px;
         &:hover {
-          color: var(--ruiyan-color-primary);
+          color: var(--Colors-Use-Main-Primary);
         }
       }
     }
     span {
       padding: 0 12px;
-      color: var(--ruiyan-color-text);
-      border-right: 1px solid var(--ruiyan-color-border);
+      color: var(--Colors-Use-Neutral-Text-1-Title);
+      border-right: 1px solid var(--Colors-Use-Neutral-Border);
       &:first-child {
         padding-left: 0;
       }
@@ -219,7 +119,7 @@
     .del-icon {
       svg {
         width: 16px;
-        color: var(--ruiyan-color-danger);
+        color: var(--Colors-Use-Error-Primary);
       }
     }
   }
