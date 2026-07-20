@@ -120,6 +120,7 @@ import { shallow } from 'zustand/shallow'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { SafeMarkdown } from '@/pages/assetViewer/reportRenders/markdownRender'
 import { HTTPFlow } from '@/components/HTTPFlowTable/HTTPFlowTable'
+import { RuiYanDetailPanel, RuiYanPageHeader, RuiYanToolbar } from '@/components/renyanUI'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -1307,7 +1308,12 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
   })
 
   return (
-    <div className={classNames(styles['yakit-risk-table'], riskWrapperClassName)} ref={riskTableRef}>
+    <div
+      className={classNames(styles['yakit-risk-table'], riskWrapperClassName, {
+        [styles['risk-workbench']]: !renderTitle,
+      })}
+      ref={riskTableRef}
+    >
       <ReactResizeDetector
         onResize={onTableResize}
         handleWidth={true}
@@ -1315,7 +1321,21 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
         refreshMode={'debounce'}
         refreshRate={50}
       />
+      {!renderTitle && (
+        <RuiYanPageHeader className={styles['workbench-header']} title={t('YakitRoute.vulnerabilityAndrisk')} />
+      )}
       <YakitResizeBox
+        style={{
+          flex: 1,
+          height: 'auto',
+          minHeight: 0,
+          width: renderTitle ? '100%' : 'auto',
+          margin: renderTitle ? 0 : 12,
+          boxSizing: 'border-box',
+          background: 'var(--ruiyan-color-surface, var(--Colors-Use-Basic-Background))',
+          border: renderTitle ? undefined : '1px solid var(--ruiyan-color-border, var(--Colors-Use-Neutral-Border))',
+          borderRadius: renderTitle ? undefined : 'var(--ruiyan-radius-md, 4px)',
+        }}
         firstMinSize={160}
         secondMinSize={200}
         isVer={true}
@@ -1332,12 +1352,12 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
             query={query}
             loading={loading}
             isRefresh={isRefresh}
-            titleHeight={32}
+            titleHeight={renderTitle ? 32 : 44}
             renderTitle={
               renderTitle ? (
                 renderTitle
               ) : (
-                <div className={styles['table-renderTitle']}>
+                <RuiYanToolbar className={styles['table-renderTitle']}>
                   <div className={styles['table-renderTitle-left']}>
                     {!advancedQuery && (
                       <Tooltip
@@ -1352,7 +1372,6 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
                         ></YakitButton>
                       </Tooltip>
                     )}
-                    <div className={styles['table-renderTitle-text']}>{t('YakitRoute.vulnerabilityAndrisk')}</div>
                     <YakitRadioButtons
                       value={type}
                       onChange={(e) => {
@@ -1455,7 +1474,7 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
                       </Badge>
                     </YakitDropdownMenu>
                   </div>
-                </div>
+                </RuiYanToolbar>
               )
             }
             renderKey="Id"
@@ -1485,14 +1504,22 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
         }
         secondNode={
           currentSelectItem && (
-            <YakitRiskDetails
-              info={currentSelectItem}
-              className={styles['yakit-risk-details']}
-              onClickIP={onClickIP}
-              border={yakitRiskDetailsBorder}
-              isShowExtra={!excludeColumnsKey.includes('action')}
-              onRetest={onRetest}
-            />
+            <RuiYanDetailPanel
+              className={classNames(styles['risk-detail-panel'], {
+                [styles['risk-detail-panel-borderless']]: !yakitRiskDetailsBorder,
+              })}
+              title={t('YakitRiskDetails.vulnerability_details')}
+              extra={<span className={styles['detail-record-id']}>ID {currentSelectItem.Id}</span>}
+            >
+              <YakitRiskDetails
+                info={currentSelectItem}
+                className={styles['yakit-risk-details']}
+                onClickIP={onClickIP}
+                border={yakitRiskDetailsBorder}
+                isShowExtra={!excludeColumnsKey.includes('action')}
+                onRetest={onRetest}
+              />
+            </RuiYanDetailPanel>
           )
         }
         {...ResizeBoxProps}

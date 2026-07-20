@@ -98,6 +98,7 @@ import importExportStyles from '@/pages/fingerprintManage/ImportExportModal/Impo
 import { grpcGetAIForge } from '@/pages/ai-agent/grpc'
 import { ReActChatEventEnum } from '@/pages/ai-agent/defaultConstant'
 import { JSONParseLog } from '@/utils/tool'
+import { RuiYanDetailPanel, RuiYanPageHeader, RuiYanToolbar } from '@/components/renyanUI'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -987,7 +988,12 @@ export const YakitAuditHoleTable: React.FC<YakitAuditHoleTableProps> = React.mem
   })
 
   return (
-    <div className={classNames(styles['yakit-audit-hole-table'], riskWrapperClassName)} ref={tableBoxRef}>
+    <div
+      className={classNames(styles['yakit-audit-hole-table'], riskWrapperClassName, {
+        [styles['audit-workbench']]: !renderTitle,
+      })}
+      ref={tableBoxRef}
+    >
       <ReactResizeDetector
         onResize={onTableResize}
         handleWidth={true}
@@ -995,7 +1001,21 @@ export const YakitAuditHoleTable: React.FC<YakitAuditHoleTableProps> = React.mem
         refreshMode={'debounce'}
         refreshRate={50}
       />
+      {!renderTitle && (
+        <RuiYanPageHeader className={styles['workbench-header']} title={t('YakitAuditHoleTable.auditRisk')} />
+      )}
       <YakitResizeBox
+        style={{
+          flex: 1,
+          height: 'auto',
+          minHeight: 0,
+          width: renderTitle ? '100%' : 'auto',
+          margin: renderTitle ? 0 : 12,
+          boxSizing: 'border-box',
+          background: 'var(--ruiyan-color-surface, var(--Colors-Use-Basic-Background))',
+          border: renderTitle ? undefined : '1px solid var(--ruiyan-color-border, var(--Colors-Use-Neutral-Border))',
+          borderRadius: renderTitle ? undefined : 'var(--ruiyan-radius-md, 4px)',
+        }}
         firstMinSize={160}
         secondMinSize={200}
         isVer={true}
@@ -1012,14 +1032,13 @@ export const YakitAuditHoleTable: React.FC<YakitAuditHoleTableProps> = React.mem
             scrollToIndex={scrollToIndex}
             loading={tableLoading}
             isRefresh={isRefresh}
-            titleHeight={32}
+            titleHeight={renderTitle ? 32 : 44}
             renderTitle={
               renderTitle ? (
                 renderTitle
               ) : (
-                <div className={styles['table-renderTitle']}>
+                <RuiYanToolbar className={styles['table-renderTitle']}>
                   <div className={styles['table-renderTitle-left']}>
-                    <div className={styles['table-renderTitle-text']}>{t('YakitAuditHoleTable.auditRisk')}</div>
                     <YakitRadioButtons
                       value={type}
                       onChange={(e) => {
@@ -1152,7 +1171,7 @@ export const YakitAuditHoleTable: React.FC<YakitAuditHoleTableProps> = React.mem
                       </Badge>
                     </YakitDropdownMenu>
                   </div>
-                </div>
+                </RuiYanToolbar>
               )
             }
             renderKey="Id"
@@ -1179,7 +1198,11 @@ export const YakitAuditHoleTable: React.FC<YakitAuditHoleTableProps> = React.mem
         }
         secondNode={
           currentSelectItem && (
-            <>
+            <RuiYanDetailPanel
+              className={styles['audit-detail-panel']}
+              title={t('YakitAuditHoleTable.riskDetails')}
+              extra={<span className={styles['detail-record-id']}>ID {currentSelectItem.Id}</span>}
+            >
               <YakitAuditRiskDetails
                 info={currentSelectItem}
                 onClickIP={onClickIP}
@@ -1192,7 +1215,7 @@ export const YakitAuditHoleTable: React.FC<YakitAuditHoleTableProps> = React.mem
                 setDisposalData={setDisposalData}
                 getSSARiskDisposal={getSSARiskDisposal}
               />
-            </>
+            </RuiYanDetailPanel>
           )
         }
         {...ResizeBoxProps}
