@@ -103,7 +103,14 @@ export const ModifyYakitPlugin: React.FC<ModifyYakitPluginProps> = memo((props) 
         closeOnBackdrop={false}
         onClose={onCancel}
       >
-        {visible && <PluginEditor ref={editorRef} title="编辑插件" onEditCancel={onModifyCallback} />}
+        {visible && (
+          <PluginEditor
+            ref={editorRef}
+            title="编辑插件"
+            onEditCancel={onModifyCallback}
+            enablePageCloseSubscribe={false}
+          />
+        )}
 
         <RuiYanModal
           open={unSavedHint}

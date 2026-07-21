@@ -11,13 +11,21 @@ import { registerShortcutKeyHandle } from '@/utils/globalShortcutKey/utils'
 import { ShortcutKeyPage } from '@/utils/globalShortcutKey/events/pageMaps'
 import useShortcutKeyTrigger from '@/utils/globalShortcutKey/events/useShortcutKeyTrigger'
 import { getStorageYakitMultipleShortcutKeyEvents } from '@/utils/globalShortcutKey/events/multiple/yakitMultiple'
+import useListenWidth from '@/pages/pluginHub/hooks/useListenWidth'
+import { HubButton } from '@/pages/pluginHub/hubExtraOperate/funcTemplate'
+import { OutlineXIcon } from '@/assets/icon/outline'
+import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import emiter from '@/utils/eventBus/eventBus'
 
 interface AddYakitPluginProps {}
 
 export const AddYakitPlugin: React.FC<AddYakitPluginProps> = memo((props) => {
   const {} = props
 
+  const { t } = useI18nNamespaces(['yakitUi'])
   const editorRef = useRef<PluginEditorRefProps>(null)
+  const shortcutRef = useRef<HTMLDivElement>(null)
+  const wrapperWidth = useListenWidth(shortcutRef)
 
   const { queryPagesDataById } = usePageInfo(
     (s) => ({
@@ -43,7 +51,6 @@ export const AddYakitPlugin: React.FC<AddYakitPluginProps> = memo((props) => {
     }
   }, [])
 
-  const shortcutRef = useRef<HTMLDivElement>(null)
   const [inViewport] = useInViewport(shortcutRef)
   useEffect(() => {
     if (inViewport) {
@@ -58,9 +65,30 @@ export const AddYakitPlugin: React.FC<AddYakitPluginProps> = memo((props) => {
     }
   })
 
+  const onCancel = useMemoizedFn(() => {
+    emiter.emit('requestCloseFirstMenu', {
+      menuName: '',
+      route: YakitRoute.AddYakitScript,
+    })
+  })
+
   return (
     <div className={styles['add-yakit-plugin']} ref={shortcutRef}>
-      <PluginEditor ref={editorRef} />
+      <PluginEditor
+        ref={editorRef}
+        enablePageCloseSubscribe={true}
+        headerExtra={
+          <HubButton
+            width={wrapperWidth}
+            iconWidth={1000}
+            type="outline2"
+            size="large"
+            icon={<OutlineXIcon />}
+            name={t('YakitButton.cancel')}
+            onClick={onCancel}
+          />
+        }
+      />
     </div>
   )
 })

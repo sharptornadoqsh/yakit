@@ -92,12 +92,13 @@ interface PluginEditorProps {
   title?: string
   headerExtra?: ReactNode
   onEditCancel?: (data: ModifyPluginCallback) => void
+  enablePageCloseSubscribe?: boolean
 }
 
 export const PluginEditor: React.FC<PluginEditorProps> = memo(
   forwardRef((props, ref) => {
     const { t } = useI18nNamespaces(['plugin', 'yakitUi'])
-    const { title = t('PluginEditor.newPlugin'), headerExtra, onEditCancel } = props
+    const { title = t('PluginEditor.newPlugin'), headerExtra, onEditCancel, enablePageCloseSubscribe = false } = props
 
     const userinfo = useStore((s) => s.userInfo)
     const isLogin = useMemo(() => userinfo.isLogin, [userinfo])
@@ -860,6 +861,8 @@ export const PluginEditor: React.FC<PluginEditorProps> = memo(
       }
     })
     useEffect(() => {
+      if (!enablePageCloseSubscribe) return
+
       setSubscribeClose(YakitRoute.AddYakitScript, {
         close: async () => {
           // const unsaved = await handleCheckUnSaved()
@@ -922,7 +925,7 @@ export const PluginEditor: React.FC<PluginEditorProps> = memo(
       return () => {
         removeSubscribeClose(YakitRoute.AddYakitScript)
       }
-    }, [])
+    }, [enablePageCloseSubscribe])
     /** ---------- 新建功能页关闭时的二次确认 End ---------- */
 
     // 新建功能专属，关闭页面逻辑
@@ -948,6 +951,7 @@ export const PluginEditor: React.FC<PluginEditorProps> = memo(
               </div>
 
               <div className={styles['header-btn-group']}>
+                {headerExtra}
                 {isOnline && !isAuthors && (
                   <HubButton
                     width={wrapperWidth}
@@ -1003,8 +1007,6 @@ export const PluginEditor: React.FC<PluginEditorProps> = memo(
                   name={t('YakitButton.save')}
                   onClick={onBtnLocalSave}
                 />
-
-                {headerExtra}
               </div>
             </div>
 

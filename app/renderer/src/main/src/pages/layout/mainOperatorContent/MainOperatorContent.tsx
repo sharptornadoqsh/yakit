@@ -184,6 +184,7 @@ import { RenyanPageHeader } from '@/components/layout/RenyanPageHeader'
 import { isRuiYanTargetRoute, RuiYanButton, RuiYanModal, RuiYanPage, showRuiYanModal } from '@/components/renyanUI'
 import { RenyanState } from '@/components/yakitUI/RenyanState/RenyanState'
 import { RENYAN_SHELL_ENABLED } from '@/routes/renyanMenu'
+import { onModalSecondaryConfirm } from './modalSecondaryConfirm'
 
 const BatchAddNewGroup = React.lazy(() => import('./BatchAddNewGroup'))
 const BatchEditGroup = React.lazy(() => import('./BatchEditGroup/BatchEditGroup'))
@@ -778,11 +779,14 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
     emiter.on('switchMenuItem', onSwitchMenuItem)
     /**关闭一级菜单 */
     emiter.on('onCloseFirstMenu', onCloseFirstMenu)
+    /**经过关闭检查后关闭一级菜单 */
+    emiter.on('requestCloseFirstMenu', onRequestCloseFirstMenu)
     /**更新单例页面标签名 */
     emiter.on('onUpdateSingletonPageName', onUpdateSingletonPageName)
     return () => {
       emiter.off('switchMenuItem', onSwitchMenuItem)
       emiter.off('onCloseFirstMenu', onCloseFirstMenu)
+      emiter.off('requestCloseFirstMenu', onRequestCloseFirstMenu)
       emiter.off('onUpdateSingletonPageName', onUpdateSingletonPageName)
     }
   }, [])
@@ -819,6 +823,9 @@ export const MainOperatorContent: React.FC<MainOperatorContentProps> = React.mem
       }
       removeMenuPage(data)
     } catch (error) {}
+  })
+  const onRequestCloseFirstMenu = useMemoizedFn((data: OnlyPageCache) => {
+    onBeforeRemovePage(data)
   })
   /**
    * @name 渲染端通信-从顶部菜单里打开一个指定页面
@@ -6498,53 +6505,4 @@ const judgeDataIsFuncOrSettingForConfirm = async (
   } else {
     showHint(data)
   }
-}
-
-// 多开页面的一级页面关闭的确认弹窗
-const onModalSecondaryConfirm = (
-  props?: YakitSecondaryConfirmProps,
-  visibleRef?: React.MutableRefObject<boolean>,
-  route?: YakitRoute,
-) => {
-  if (visibleRef) visibleRef.current = true
-  let m = YakitModalConfirm({
-    width: 420,
-    type: 'white',
-    onCancelText: '不保存',
-    onOkText: '保存',
-    keyboard: false,
-    zIndex: 1010,
-    onCloseX: () => {
-      m.destroy()
-    },
-    footerStyle: { padding: '0 24px 24px' },
-    footer: undefined,
-    ...(props || {}),
-    onOk: () => {
-      if (visibleRef) {
-        visibleRef.current = false
-      }
-      if (route) {
-        keepSearchNameMapStore.removeKeepSearchRouteNameMap(route)
-      }
-      if (props?.onOk) {
-        props.onOk(m)
-      } else {
-        m.destroy()
-      }
-    },
-    onCancel: () => {
-      if (visibleRef) {
-        visibleRef.current = false
-      }
-      if (props?.onCancel) {
-        props?.onCancel(m)
-      } else {
-        m.destroy()
-      }
-    },
-    content: props?.content,
-  })
-  props?.getModal?.(m)
-  return m
 }
