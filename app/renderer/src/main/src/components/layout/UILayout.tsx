@@ -1236,7 +1236,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
   }, [projectName, engineLink, temporaryProjectId, currentProject])
   /**  yakit是否进入首页 */
   const pageShowHome = useMemo(() => {
-    const flag = engineLink && !isJudgeLicense && (RENYAN_SHELL_ENABLED || !showProjectManage)
+    const flag = engineLink && !isJudgeLicense && !showProjectManage
     return flag
   }, [engineLink, isJudgeLicense, showProjectManage])
 
@@ -2014,13 +2014,15 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
               <YakitSpin spinning={switchEngineLoading}>
                 {isJudgeLicense ? (
                   <EnterpriseJudgeLogin setJudgeLicense={setJudgeLicense} setJudgeLogin={(v: boolean) => {}} />
-                ) : showProjectManage && !RENYAN_SHELL_ENABLED ? (
-                  <SoftwareSettings
-                    engineMode={engineMode || 'local'}
-                    onEngineModeChange={handleOperations}
-                    onFinish={softwareSettingFinish}
-                    projectListRefreshTrigger={projectListRefreshTrigger}
-                  />
+                ) : showProjectManage ? (
+                  RENYAN_SHELL_ENABLED ? null : (
+                    <SoftwareSettings
+                      engineMode={engineMode || 'local'}
+                      onEngineModeChange={handleOperations}
+                      onFinish={softwareSettingFinish}
+                      projectListRefreshTrigger={projectListRefreshTrigger}
+                    />
+                  )
                 ) : (
                   props.children
                 )}

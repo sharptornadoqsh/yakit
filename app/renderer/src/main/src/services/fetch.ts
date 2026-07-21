@@ -1,8 +1,6 @@
 import { UserInfoProps } from '@/store'
-import { loginOutLocal } from '@/utils/login'
 import { failed } from '@/utils/notification'
 import { AxiosRequestConfig, AxiosResponse } from './axios'
-import { globalUserLogout } from '@/utils/envfile'
 import { yakitNetwork } from './electronBridge'
 import i18n from '@/i18n/i18n'
 const tOriginal = i18n.getFixedT(null, 'utils')
@@ -75,11 +73,6 @@ export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, res
   }
 }
 
-// token过期，退出
-export const tokenOverdue = (res) => {
-  if (res.userInfo) loginOutLocal(res.userInfo)
-  // 异常过期 无法通过接口更新连接状态 故只作退出远程处理
-  yakitNetwork.logoutDynamicControl({ loginOut: false })
-  globalUserLogout()
-  failed(tOriginal('servicesFetch.loginExpired'))
-}
+// token过期处理：睿眼定制为“登录一次长期有效”。
+// 收到 401 时不再自动登出、不清空 token、不提示登录过期，单次请求失败仍由各业务通过 reject 自行处理。
+export const tokenOverdue = (_res?: any) => {}

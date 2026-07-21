@@ -8,6 +8,7 @@ const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
 const runningTasks = new Map()
 
 const ECHO_TEST_MSG = 'Hello Yakit!'
+const LOCAL_ENGINE_CHECK_TIMEOUT_MS = 60_000
 const LOCAL_ENGINE_START_TIMEOUT_MS = 180_000
 
 /** 各版本下的数据库环境变量 */
@@ -51,7 +52,6 @@ module.exports = {
 
           let stdout = ''
           let stderr = ''
-          const timeoutMs = 11000
           let killed = false
           let successDetected = false
           const taskKey = 'check_' + checkId
@@ -84,9 +84,12 @@ module.exports = {
           const timeoutId = setTimeout(() => {
             if (checkId !== currentCheckId || successDetected || killed) return
             killFun(true)
-            engineLogOutputFileAndUI(win, `----- 检查随机密码模式超时 -----`)
-            reject({ status: 'timeout', message: '检查随机密码模式超时' })
-          }, timeoutMs)
+            engineLogOutputFileAndUI(win, `----- 检查随机密码模式超时 (${LOCAL_ENGINE_CHECK_TIMEOUT_MS / 1000}s) -----`)
+            reject({
+              status: 'timeout',
+              message: `检查随机密码模式超时 (${LOCAL_ENGINE_CHECK_TIMEOUT_MS / 1000}s)`,
+            })
+          }, LOCAL_ENGINE_CHECK_TIMEOUT_MS)
 
           subprocess.stdout.on('data', (data) => {
             if (checkId !== currentCheckId) return // 已过期任务不打印

@@ -22,6 +22,7 @@ const productConfig = require('../../../../product/renyan.json')
 const { resolveBuildSha, resolveEdition } = require('../../../../product/build')
 
 const devMode = process.env.NODE_ENV !== 'production'
+const skipDevTypeCheck = devMode && process.env.REACT_APP_SKIP_DEV_TYPE_CHECK === 'true'
 const AUX_ENTRY = path.resolve(__dirname, 'src/auxWindow/aux-entry.tsx')
 // Windows 保留设备名 aux，不可用 aux.html
 const AUX_HTML_TEMPLATE = path.resolve(__dirname, 'public/yakit-aux.html')
@@ -139,6 +140,10 @@ module.exports = {
     addWebpackExternals({ './cptable': 'var cptable' }),
     removeModuleScopePlugin(),
     (config) => {
+      if (skipDevTypeCheck) {
+        config.plugins = config.plugins.filter((plugin) => plugin.constructor?.name !== 'ForkTsCheckerWebpackPlugin')
+      }
+
       if (config.mode !== 'development') {
         config.output.path = OUTPUT_PATH
         config.output.publicPath = './'
@@ -211,7 +216,7 @@ module.exports = {
       ...config,
       hot: true,
       devMiddleware: {
-        writeToDisk: true,
+        writeToDisk: !skipDevTypeCheck,
       },
       client: {
         overlay: {

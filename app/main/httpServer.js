@@ -1,7 +1,7 @@
 const axios = require('axios')
 const https = require('https')
 const { ipcMain } = require('electron')
-const { USER_INFO, expireUserInfo, resetUserInfo, HttpSetting } = require('./state')
+const { USER_INFO, resetUserInfo, HttpSetting } = require('./state')
 const url = require('url')
 const { HttpsProxyAgent } = require('hpagent')
 const { printLogOutputFile } = require('./logFile')
@@ -112,7 +112,7 @@ service.interceptors.response.use(
       return {
         ...responseData,
         code: responseCode,
-        ...(responseCode === 401 ? { userInfo: expireUserInfo() } : {}),
+        ...(responseCode === 401 ? { userInfo: USER_INFO } : {}),
       }
     }
     const res = {
@@ -129,7 +129,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data.message,
-        userInfo: expireUserInfo(),
+        userInfo: USER_INFO,
       }
       return Promise.resolve(res)
     }
@@ -137,7 +137,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data?.message || error.response.data.reason,
-        userInfo: expireUserInfo(),
+        userInfo: USER_INFO,
       }
       return Promise.resolve(res)
     }
@@ -145,7 +145,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data.message,
-        userInfo: expireUserInfo(),
+        userInfo: USER_INFO,
       }
       return Promise.resolve(res)
     }

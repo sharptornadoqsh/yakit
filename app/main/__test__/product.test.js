@@ -145,6 +145,24 @@ describe('睿眼产品配置', () => {
     expect(source).toContain('${LOCAL_ENGINE_START_TIMEOUT_MS / 1000}s')
   })
 
+  it('本地引擎能力检查为系统冷启动保留等待时间', () => {
+    const source = fs.readFileSync(path.resolve('app/main/handlers/newEngineStatus.js'), 'utf8')
+
+    expect(source).toContain('const LOCAL_ENGINE_CHECK_TIMEOUT_MS = 60_000')
+    expect(source).toContain('}, LOCAL_ENGINE_CHECK_TIMEOUT_MS)')
+    expect(source).toContain('${LOCAL_ENGINE_CHECK_TIMEOUT_MS / 1000}s')
+  })
+
+  it('免许可开发脚本跳过启动期类型检查', () => {
+    const commandSource = fs.readFileSync(path.resolve('start-enterprise-no-license-dev.cmd'), 'utf8')
+    const rendererConfigSource = fs.readFileSync(path.resolve('app/renderer/src/main/config-overrides.js'), 'utf8')
+
+    expect(commandSource).toContain('set "REACT_APP_SKIP_DEV_TYPE_CHECK=true"')
+    expect(rendererConfigSource).toContain("process.env.REACT_APP_SKIP_DEV_TYPE_CHECK === 'true'")
+    expect(rendererConfigSource).toContain("plugin.constructor?.name !== 'ForkTsCheckerWebpackPlugin'")
+    expect(rendererConfigSource).toContain('writeToDisk: !skipDevTypeCheck')
+  })
+
   it('普通模式缺少旧系统标记时不记录文件缺失错误', () => {
     const source = fs.readFileSync(path.resolve('app/main/handlers/utils/network.js'), 'utf8')
 
