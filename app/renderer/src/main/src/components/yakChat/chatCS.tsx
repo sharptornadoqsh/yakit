@@ -81,12 +81,8 @@ import classNames from 'classnames'
 import styles from './chatCS.module.scss'
 import { YakitDrawer } from '../yakitUI/YakitDrawer/YakitDrawer'
 import { SolidPaperairplaneIcon } from '@/assets/icon/solid'
-import {
-  SolidCloudpluginIcon,
-  SolidPrivatepluginIcon,
-  SolidYakitPluginGrayIcon,
-  SolidYakitPluginIcon,
-} from '@/assets/icon/colors'
+import { SolidCloudpluginIcon, SolidPrivatepluginIcon } from '@/assets/icon/colors'
+import { RuiYanIcon } from '@/components/renyanUI'
 import { YakitCheckbox } from '../yakitUI/YakitCheckbox/YakitCheckbox'
 import {
   HybridScanRequest,
@@ -2521,7 +2517,7 @@ const PromptWidget: React.FC<PromptWidgetProps> = memo((props) => {
       case 'BlueTeam_code':
         return isActive ? <OutlineChartPieActiveIcon /> : <OutlineChartPieIcon />
       case 'yak_memo':
-        return isActive ? <SolidYakitPluginIcon /> : <SolidYakitPluginGrayIcon />
+        return <RuiYanIcon name="plugin" opacity={isActive ? 1 : 0.48} />
       default:
         return isActive ? <OutlineSparklesActiveIcon /> : <OutlineSparklesIcon />
     }

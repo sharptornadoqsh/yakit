@@ -60,18 +60,6 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
     <YakitMenu
       data={[
         {
-          key: 'official_website',
-          label: t('HelpDoc.officialWebsite'),
-        },
-        {
-          key: 'Github',
-          label: 'Github',
-          children: [
-            { label: t('HelpDoc.featureRequest'), key: 'feature_request' },
-            { label: 'BUG', key: 'report_bug' },
-          ],
-        },
-        {
           key: 'aboutUs',
           label: `${t('HelpDoc.aboutUs')} · ${productConfig.shortName}`,
         },
@@ -82,15 +70,6 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
   const menuSelect = useMemoizedFn((type: string) => {
     if (show) setShow(false)
     switch (type) {
-      case 'report_bug':
-        yakitShell.openExternal(`${productConfig.issuesUrl}/new?template=bug_report.yml`)
-        return
-      case 'feature_request':
-        yakitShell.openExternal(`${productConfig.issuesUrl}/new?template=feature_request.yml`)
-        return
-      case 'official_website':
-        yakitShell.openExternal(productConfig.repositoryUrl)
-        return
       case 'aboutUs':
         setAboutVisible(true)
         return
@@ -154,13 +133,10 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
           footer={
             <div className={styles['about-footer']}>
               <div className={styles['about-legal-links']}>
-                <RuiYanButton variant="ghost" onClick={() => yakitShell.openExternal(productConfig.licenseUrl)}>
+                <RuiYanButton variant="ghost" onClick={() => yakitShell.openLegalDocument('license')}>
                   开源许可证
                 </RuiYanButton>
-                <RuiYanButton
-                  variant="ghost"
-                  onClick={() => yakitShell.openExternal(productConfig.thirdPartyNoticesUrl)}
-                >
+                <RuiYanButton variant="ghost" onClick={() => yakitShell.openLegalDocument('third-party')}>
                   第三方通知
                 </RuiYanButton>
               </div>
@@ -180,10 +156,10 @@ export const HelpDoc: React.FC<HelpDocProps> = React.memo((props) => {
           footer={
             <div className={styles['about-footer']}>
               <div className={styles['about-legal-links']}>
-                <YakitButton type="text" onClick={() => yakitShell.openExternal(productConfig.licenseUrl)}>
+                <YakitButton type="text" onClick={() => yakitShell.openLegalDocument('license')}>
                   开源许可证
                 </YakitButton>
-                <YakitButton type="text" onClick={() => yakitShell.openExternal(productConfig.thirdPartyNoticesUrl)}>
+                <YakitButton type="text" onClick={() => yakitShell.openLegalDocument('third-party')}>
                   第三方通知
                 </YakitButton>
               </div>

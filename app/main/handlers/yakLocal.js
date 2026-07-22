@@ -9,13 +9,25 @@ const path = require('path')
 const { setLocalCache } = require('../localCache')
 const { getYakitHome } = require('../filePath')
 const { assertTrustedAppSender, normalizePid } = require('../security')
+const {
+  getDefaultDatabaseEnvironment,
+  getDefaultDatabaseName,
+  initializeDefaultDatabases,
+} = require('../defaultDatabase')
 const isWindows = process.platform === 'win32'
 
 if (process.platform === 'darwin' || process.platform === 'linux') {
   process.env.PATH = process.env.PATH + ':/usr/local/bin/'
 }
 
-let dbFile = 'default-yakit.db'
+let currentEdition = process.env.RENDER_PLATFORM || process.env.REACT_APP_PLATFORM || ''
+let dbFile = getDefaultDatabaseName(currentEdition)
+
+try {
+  initializeDefaultDatabases(getYakitHome())
+} catch (error) {
+  console.warn(`默认数据库名称迁移失败：${error}`)
+}
 
 function getRandomInt(max) {
   return Math.floor(Math.random() * max)
@@ -29,12 +41,21 @@ function generateWindowsSudoCommand(file, args) {
 const getLatestYakLocalEngine = require('./upgradeUtil').getLatestYakLocalEngine
 
 function sudoExec(cmd, opt, callback) {
+  const databaseEnvironment = getDefaultDatabaseEnvironment('yakit', currentEdition)
   if (isWindows) {
-    childProcess.exec(cmd, { maxBuffer: 1000 * 1000 * 1000, env: { YAK_DEFAULT_DATABASE_NAME: dbFile } }, (err) => {
-      callback(err)
-    })
+    childProcess.exec(
+      cmd,
+      { maxBuffer: 1000 * 1000 * 1000, env: { ...process.env, YAKIT_HOME: getYakitHome(), ...databaseEnvironment } },
+      (err) => {
+        callback(err)
+      },
+    )
   } else {
-    _sudoPrompt.exec(cmd, { ...opt, env: { YAKIT_HOME: getYakitHome(), YAK_DEFAULT_DATABASE_NAME: dbFile } }, callback)
+    _sudoPrompt.exec(
+      cmd,
+      { ...opt, env: { ...process.env, YAKIT_HOME: getYakitHome(), ...databaseEnvironment } },
+      callback,
+    )
   }
 }
 
@@ -261,7 +282,8 @@ module.exports = {
   register: (win, getClient) => {
     ipcMain.handle('set-release-edition-raw', (e, type) => {
       setLocalCache('REACT_APP_PLATFORM', type)
-      dbFile = type === 'enterprise' ? 'company-default-yakit.db' : 'default-yakit.db'
+      currentEdition = type
+      dbFile = getDefaultDatabaseName(type)
       return ''
     })
 

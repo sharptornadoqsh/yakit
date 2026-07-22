@@ -55,6 +55,7 @@ import { RemoteEngine } from './RemoteEngine/RemoteEngine'
 import { RemoteLinkInfo } from './RemoteEngine/RemoteEngineType'
 import { DownloadYakit } from './update/DownloadYakit'
 import { DownloadYaklang } from './update/DownloadYaklang'
+import { productConfig } from '@/config/product'
 import { HelpDoc } from './HelpDoc/HelpDoc'
 import { SolidCheckCircleIcon, SolidHomeIcon } from '@/assets/icon/solid'
 import { setNowProjectDescription } from '@/pages/globalVariable'
@@ -729,6 +730,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
   }, [engineLink, engineMode])
   // 监听UI上的更新yakit或yaklang更新功能
   const handleActiveDownloadModal = useMemoizedFn((type: string) => {
+    if (!productConfig.clientUpdateEnabled && type !== 'yaklang') return
     if (yaklangKillPss || yakitDownload) return
     if (type === 'intranetYakit') {
       setYakitDownload(true)
@@ -2032,16 +2034,11 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
               <RuiYanModal
                 open={showProjectManage}
                 width={960}
-                title="项目管理与导入导出"
-                description="管理项目、切换数据源以及执行项目导入导出"
+                title={t('UILayout.projectWorkspaceTitle')}
+                description={t('UILayout.projectWorkspaceDescription')}
                 onClose={softwareSettingFinish}
                 closeOnBackdrop={false}
                 bodyClassName={styles['renyan-project-modal-body']}
-                footer={
-                  <RuiYanButton variant="secondary" onClick={softwareSettingFinish}>
-                    关闭
-                  </RuiYanButton>
-                }
               >
                 <ProjectManage
                   engineMode={engineMode || 'local'}
@@ -2052,7 +2049,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
               </RuiYanModal>
             )}
 
-            {engineLink && (yaklangKillPss || yakitDownload) && (
+            {engineLink && (yaklangKillPss || (productConfig.clientUpdateEnabled && yakitDownload)) && (
               <div className={styles['ui-layout-body-mask']}>
                 <AllKillEngineConfirm
                   title={yaklangKillPssText.title}
@@ -2065,12 +2062,14 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
                   onSuccess={() => (yaklangKillBuildInEngine ? killedEngineToBuildInEngine() : killedEngineToUpdate())}
                 />
                 {/* 更新yakit */}
-                <DownloadYakit
-                  system={system}
-                  visible={yakitDownload}
-                  setVisible={setYakitDownload}
-                  intranetYakit={intranetYakit}
-                />
+                {productConfig.clientUpdateEnabled && (
+                  <DownloadYakit
+                    system={system}
+                    visible={yakitDownload}
+                    setVisible={setYakitDownload}
+                    intranetYakit={intranetYakit}
+                  />
+                )}
               </div>
             )}
 

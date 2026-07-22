@@ -1,10 +1,11 @@
 import { ReactNode } from 'react'
-import { SolidCollectionPluginIcon, SolidSparklesPluginIcon, SolidYakitPluginIcon } from '@/assets/icon/colors'
+import { SolidCollectionPluginIcon, SolidSparklesPluginIcon } from '@/assets/icon/colors'
+import { RuiYanIcon } from '@/components/renyanUI'
 import { AIForge } from '../ai-agent/type/forge'
 
 /** @name forge-类型 */
 export const DefaultForgeTypeList: { key: AIForge['ForgeType']; name: string; icon: ReactNode; color: string }[] = [
-  { key: 'yak', name: 'Yak模板', icon: <SolidYakitPluginIcon />, color: 'warning' },
+  { key: 'yak', name: 'Yak模板', icon: <RuiYanIcon name="plugin" />, color: 'warning' },
   { key: 'config', name: '简易模板', icon: <SolidCollectionPluginIcon />, color: 'cyan' },
   { key: 'skillmd', name: '技能模板', icon: <SolidSparklesPluginIcon />, color: 'blue' },
 ]

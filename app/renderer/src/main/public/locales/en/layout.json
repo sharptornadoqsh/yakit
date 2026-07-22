@@ -253,8 +253,10 @@
     "remoteConnectionDisconnected": "Remote connection has been disconnected",
     "newEngineVersionFound": "New engine version found",
     "newEngineVersionFoundContent": "A new local engine version is available. Close the engine and use the new version?",
-    "enterProjectManageConfirmTitle": "Enter project management?",
-    "enterProjectManageConfirmContent": "If there are ongoing tasks, returning to the project management page will stop them all. Continue?",
+    "enterProjectManageConfirmTitle": "Enter the RuiYan project workspace",
+    "enterProjectManageConfirmContent": "The RuiYan project workspace keeps project data, task records, and analysis results together. Entering it stops active tasks; confirm to continue.",
+    "projectWorkspaceTitle": "RuiYan Project Workspace",
+    "projectWorkspaceDescription": "Manage local projects, data files, imports, and exports in one place",
     "samplingInProgress": "Sampling in progress",
     "resample": "Resample",
     "recordingInProgress": "Recording in progress"

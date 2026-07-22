@@ -3,6 +3,7 @@ const { launch, killAll, getChromePath } = require('chrome-launcher')
 const fs = require('fs')
 const path = require('path')
 const { getYakitHome } = require('../filePath')
+const { productConfig } = require('../product')
 const getMyUserDataDir = () => path.join(getYakitHome(), 'chrome-profile')
 
 const disableExtensionsExceptStr = (host, port, username, password) => `
@@ -39,7 +40,7 @@ const manifestStr = `
 {
     "version": "1.0.0",
     "manifest_version": 2,
-    "name": "YakitProxy",
+    "name": "${productConfig.shortName} Proxy",
     "permissions": [
         "proxy",
         "tabs",
@@ -57,7 +58,7 @@ const manifestStr = `
 `
 
 // 生成临时文件夹
-const tempFile = 'yakit-proxy'
+const tempFile = `${productConfig.artifactContainerPrefix.toLowerCase()}-proxy`
 // 生成临时文件名
 const exceptFileName = 'background.js'
 const manifestFileName = 'manifest.json'

@@ -26,6 +26,7 @@ vi.mock('../../../grpc', () => ({
 }))
 
 vi.mock('@/utils/envfile', () => ({
+  __PLATFORM__: 'enterprise',
   FetchSoftwareVersion: vi.fn(() => 'yakit'),
 }))
 
@@ -95,6 +96,7 @@ describe('本地引擎离线启动', () => {
     expect(grpcCheckAllowSecretLocal).toHaveBeenCalledWith({
       port: 9011,
       softwareVersion: FetchSoftwareVersion(),
+      version: 'enterprise',
     })
     expect(props.onLinkEngine).toHaveBeenCalledWith({ port: 9011, secret: 'test-secret' })
     expect(props.setYakitStatus).toHaveBeenCalledWith('')
@@ -162,6 +164,7 @@ describe('本地引擎离线启动', () => {
     expect(grpcCheckAllowSecretLocal).toHaveBeenCalledWith({
       port: 9022,
       softwareVersion: FetchSoftwareVersion(),
+      version: 'enterprise',
     })
     expect(props.onLinkEngine).toHaveBeenCalledTimes(1)
   })

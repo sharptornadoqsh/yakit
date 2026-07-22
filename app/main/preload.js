@@ -99,6 +99,7 @@ process.on('loaded', function () {
     },
     shell: {
       openExternal: (url) => invoke('shell-open-external', url),
+      openLegalDocument: (documentType) => invoke('open-product-legal-document', documentType),
       openAbsoluteFile: (targetPath) => invoke('shell-open-abs-file', targetPath),
       openSpecifiedFile: (targetPath) => invoke('open-specified-file', targetPath),
       openYakitPath: () => invoke('open-yakit-path'),

@@ -480,8 +480,8 @@ afterRequest = func(https, originReq, req, originRsp, rsp) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -548,8 +548,8 @@ afterRequest = func(https, originReq, req, originRsp, rsp) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -614,8 +614,8 @@ decodeSm4 = func(param) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -675,8 +675,8 @@ decodeSm2 = func(param) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -749,8 +749,8 @@ afterRequest = func(https, originReq, req, originRsp, rsp) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -804,8 +804,8 @@ afterRequest = func(https, originReq, req, originRsp, rsp) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -867,8 +867,8 @@ afterRequest = func(https, originReq, req, originRsp, rsp) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -936,8 +936,8 @@ decodeHmacMd5 = func(param) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -997,8 +997,8 @@ beforeRequest = func(https, originReq, req) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1068,8 +1068,8 @@ beforeRequest = func(https, originReq, req) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1145,8 +1145,8 @@ beforeRequest = func(https, originReq, req) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1241,8 +1241,8 @@ beforeRequest = func(https, originReq, req) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1337,8 +1337,8 @@ hash = func(param) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1399,8 +1399,8 @@ ts = func(param) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1454,8 +1454,8 @@ uuidv4 = func(param) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1530,8 +1530,8 @@ randstr = func(param) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1601,8 +1601,8 @@ customFailureChecker = func(https, req, rsp, fail) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1697,8 +1697,8 @@ retryHandler = func(https, retryCount, req, rsp, retry) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1821,8 +1821,8 @@ mirrorHTTPFlow = func(req, rsp, params) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1932,8 +1932,8 @@ beforeRequest = func(https, originReq, req) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2115,8 +2115,8 @@ afterRequest = func(https, originReq, req, originRsp, rsp) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2260,8 +2260,8 @@ afterRequest = func(https, originReq, req, originRsp, rsp) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2370,8 +2370,8 @@ hijackSaveHTTPFlow = func(flow, modify, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2468,8 +2468,8 @@ mockHTTPRequest = func(isHttps, url, req, mockResponse) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明：
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan Fuzzer 热加载使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {

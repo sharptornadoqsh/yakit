@@ -467,7 +467,7 @@ encrypt = func(rsp) {
     return rsp
 }
 
-// hijackHTTPResponseEx 是hijackHTTPResponse的扩展，能够获取到响应对应的请求，会在过滤后的响应到达Yakit MITM前被调用，可以通过该函数提前将响应修改或丢弃
+// hijackHTTPResponseEx 是hijackHTTPResponse的扩展，能够获取到响应对应的请求，会在过滤后的响应到达RuiYan MITM前被调用，可以通过该函数提前将响应修改或丢弃
 // !!! 通常实现hijackHTTPResponse 或 hijackHTTPResponseEx 其中一个函数即可
 // isHttps 请求是否为https请求
 // url 网站URL
@@ -476,7 +476,7 @@ encrypt = func(rsp) {
 // forward(req) 提交修改后的响应，如果未被调用，则使用原始的响应
 // drop() 丢弃响应
 hijackHTTPResponseEx = func(isHttps  /*bool*/, url  /*string*/, req/*[]byte*/, rsp /*[]byte*/, forward /*func(modifiedResponse []byte)*/, drop /*func()*/) {
-    // 这里要对劫持的响应做解密再返回给Yakit
+    // 这里要对劫持的响应做解密再返回给RuiYan
     rsp = decrypt(rsp)
     forward(rsp)
 }
@@ -489,7 +489,7 @@ hijackHTTPResponseEx = func(isHttps  /*bool*/, url  /*string*/, req/*[]byte*/, r
 // rsp hijackHTTPResponse/hijackHTTPResponseEx修改后的响应
 // 返回值: 修改后的响应,如果没有返回值则使用hijackHTTPResponse/hijackHTTPResponseEx修改后的响应
 afterRequest = func(ishttps, oreq/*原始请求*/ ,req/*hiajck修改之后的请求*/ ,orsp/*原始响应*/ ,rsp/*hijack修改后的响应*/){
-    // Yakit查看之后需要再加密回去
+    // RuiYan查看之后需要再加密回去
     // !!! 也可以不加密回去,这样客户端拿到的也是解密后的数据
     // 如果这里不加密,那么后续hijackSaveHTTPFlow也不需要再解密
     rsp = encrypt(rsp)
@@ -564,7 +564,7 @@ mockHTTPRequest = func(isHttps, url, req, mockResponse) {
                              \`{"ok":false, "message": "模拟环境禁止删除线上数据！"}\`
         mockResponse(forbiddenResponse)
     }
-    // 如果以上 if 条件都没有命中，函数会默认结束，Yakit将正常处理该请求（即将其发往后端服务器）。
+    // 如果以上 if 条件都没有命中，函数会默认结束，RuiYan将正常处理该请求（即将其发往后端服务器）。
 }`,
     isDefault: true,
   },
@@ -615,8 +615,8 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -696,8 +696,8 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -750,7 +750,7 @@ if YAK_MAIN {
 模版名称: [请求] hijackHTTPRequest 黑名单 drop 静态资源/敏感 host
 关键词: hijackHTTPRequest, drop, 黑名单, 静态资源, 噪音过滤, 广告统计屏蔽
 适用场景: MITM 抓包时希望直接丢弃静态资源（.css/.js/.png 等）或第三方统计/广告 host，减少数据库噪音，避免影响业务排查
-说明: yakit 的 MITM 过滤器只能"不入库"，drop() 才会真正阻断请求；本模板适用于希望浏览器都加载不到这些资源的场景
+说明: RuiYan 的 MITM 过滤器只能"不入库"，drop() 才会真正阻断请求；本模板适用于希望浏览器都加载不到这些资源的场景
 */
 
 // ===== HOT PATCH TEMPLATE START =====
@@ -794,8 +794,8 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -890,8 +890,8 @@ hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1003,8 +1003,8 @@ hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1111,8 +1111,8 @@ mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1198,8 +1198,8 @@ mirrorFilteredHTTPFlow = func(isHttps, url, req, rsp, body) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1250,7 +1250,7 @@ if YAK_MAIN {
 
 // ===== HOT PATCH TEMPLATE START =====
 // mirrorNewWebsite 离线指纹模板
-// 触发时机：每个新的 schema+host 仅触发一次（由 yakit 引擎去重）
+// 触发时机：每个新的 schema+host 仅触发一次（由 RuiYan 引擎去重）
 // 工作流程：从响应 header 取 Server/X-Powered-By；从 body 用关键字命中常见技术栈
 fingerprintRecords = {}
 TECH_KEYWORDS = [
@@ -1299,8 +1299,8 @@ mirrorNewWebsite = func(isHttps, url, req, rsp, body) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1393,8 +1393,8 @@ mirrorNewWebsitePath = func(isHttps, url, req, rsp, body) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1441,7 +1441,7 @@ if YAK_MAIN {
     temp: `/*
 模版名称: [入库] hijackSaveHTTPFlow 敏感关键字染色 + tag
 关键词: hijackSaveHTTPFlow, AddTag, Red, 关键字染色, 敏感词, 流量分类入库
-适用场景: 入库前根据请求/响应 body 命中的关键字给流量打 tag 并染色，便于在 yakit 历史中按 tag 检索定位
+适用场景: 入库前根据请求/响应 body 命中的关键字给流量打 tag 并染色，便于在 RuiYan 历史中按 tag 检索定位
 说明: flow.Request / flow.Response 是 str.Quote 后的字符串，需 Unquote/Quote 回去；染色通过 flow.Red() 等方法
 */
 
@@ -1495,8 +1495,8 @@ hijackSaveHTTPFlow = func(flow, modify, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1626,8 +1626,8 @@ hijackSaveHTTPFlow = func(flow, modify, drop) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1745,8 +1745,8 @@ mockHTTPRequest = func(isHttps, url, req, mockResponse) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1882,8 +1882,8 @@ mockHTTPRequest = func(isHttps, url, req, mockResponse) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan MITM 热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -1947,7 +1947,7 @@ export const AnalyzeHotPatchTempDefault = [
     temp: `/*
 模版名称: [分析] 敏感数据全量提取（手机号/JWT/Authorization）+ JSON 报告
 关键词: analyzeHTTPFlow, onAnalyzeHTTPFlowFinish, 手机号, Token, Authorization, JSON 报告, sync.NewMutex
-适用场景: 对历史流量做批量敏感数据扫描，输出汇总 JSON 报告到 yakit 临时目录；命中后自动给流量染色
+适用场景: 对历史流量做批量敏感数据扫描，输出汇总 JSON 报告到 RuiYan 临时目录；命中后自动给流量染色
 参考文章: yak-project-public 030 (2025-10-24) 流量分析热加载实战技巧 案例一
 */
 
@@ -2027,8 +2027,8 @@ onAnalyzeHTTPFlowFinish = func(totalCount, matchedCount) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2144,8 +2144,8 @@ onAnalyzeHTTPFlowFinish = func(totalCount, matchedCount) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2257,8 +2257,8 @@ analyzeHTTPFlow = func(flow, extract) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2329,7 +2329,7 @@ if YAK_MAIN {
     temp: `/*
 模版名称: [分析] 异常状态码报告（4xx/5xx 饼图 + 表格）
 关键词: analyzeHTTPFlow, onAnalyzeHTTPFlowFinish, report.New, 饼图, 表格, 异常状态码, Markdown 报告
-适用场景: 对历史流量做异常状态码（>= 400）统计，结束时生成包含 Markdown 描述、饼图、表格的完整报告（自动写入 yakit 数据库->报告页）
+适用场景: 对历史流量做异常状态码（>= 400）统计，结束时生成包含 Markdown 描述、饼图、表格的完整报告（自动写入 RuiYan 数据库->报告页）
 参考文章: yak-project-public 030 (2025-10-24) 流量分析热加载实战技巧 案例四
 说明: makeReport() 是可替换工厂；自测时替换成 mock 工厂以避免污染用户数据库
 */
@@ -2389,8 +2389,8 @@ onAnalyzeHTTPFlowFinish = func(totalCount, matchedCount) {
 ========== 模板自测块（YAK_MAIN 守卫）==========
 说明:
   - 用 \`yak xxx.yak\` 命令行运行时，YAK_MAIN = true，会调用 runSelfTest() 做 mock 自测
-  - 当本模板被复制到 yakit 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
-  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 yakit 实际使用
+  - 当本模板被复制到 RuiYan 历史分析热加载窗口使用时，YAK_MAIN = false，下方测试代码不会执行
+  - 修改模板后用 \`yak xxx.yak\` 一键自测，安全调试不影响 RuiYan 实际使用
 */
 
 func runSelfTest() {
@@ -2430,7 +2430,7 @@ func runSelfTest() {
     assert len(abnormalFlows) == 4, sprintf("expected 4 abnormal got %d", len(abnormalFlows))
     assert len(extractCalls) == 4, sprintf("expected 4 extract calls got %d", len(extractCalls))
 
-    // 替换 makeReport 为 mock，避免向 yakit 数据库写入真报告
+    // 替换 makeReport 为 mock，避免向 RuiYan 数据库写入真报告
     captured = {"markdown": [], "pie": [], "table_headers": [], "table_rows": [], "saved": false}
     makeReport = func() {
         mock = make(map[string]any)

@@ -4,6 +4,8 @@ const fs = require('fs')
 const path = require('path')
 const process = require('process')
 const { getYaklangEngineDir, getRemoteLinkDir, getYakitInstallDir } = require('../filePath')
+const { resolveApplicationDownloadPath } = require('../applicationArtifact')
+const { productConfig } = require('../product')
 const zip = require('node-stream-zip')
 const { exec } = require('child_process')
 const { printLogOutputFile } = require('../logFile')
@@ -281,7 +283,7 @@ module.exports = (win, getClient) => {
   const asyncInstallIntranetYakit = (filePath) => {
     return new Promise((resolve, reject) => {
       try {
-        const dest = path.join(getYakitInstallDir(), path.basename(filePath))
+        const dest = resolveApplicationDownloadPath(getYakitInstallDir(), filePath)
         fs.access(dest, fs.constants.F_OK, async (err) => {
           if (!err) {
             // 输出的名称（只获取文件名，不带扩展名）
@@ -322,6 +324,7 @@ module.exports = (win, getClient) => {
 
   /** 此处为内网版本直接安装 */
   ipcMain.handle('install-intranet-yakit', async (e, filePath) => {
+    if (!productConfig.clientUpdateEnabled) throw new Error('当前版本未配置睿眼客户端在线更新渠道')
     return await asyncInstallIntranetYakit(filePath)
   })
 

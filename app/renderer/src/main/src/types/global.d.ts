@@ -616,6 +616,7 @@ interface YakitBridge {
   }
   shell: {
     openExternal: (url: string) => Promise<unknown>
+    openLegalDocument: (documentType: 'license' | 'third-party') => Promise<unknown>
     openAbsoluteFile: (targetPath: string) => Promise<unknown>
     openSpecifiedFile: (targetPath: string) => Promise<unknown>
     openYakitPath: () => Promise<unknown>

@@ -776,7 +776,7 @@ td {
       throw new Error(`HTML report template not found: ${inputFile}`)
     }
     const reportNameFile = (reportName || 'html报告').replaceAll(/\\|\/|\:|\*|\?|\"|\<|\>|\|/g, '') || 'html报告'
-    const workDir = path.join(os.tmpdir(), `yakit-report-pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    const workDir = path.join(os.tmpdir(), `ruiyan-report-pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     const reportDir = path.join(workDir, reportNameFile)
     const outputZip = path.join(workDir, 'template.zip')
     let printWin = null

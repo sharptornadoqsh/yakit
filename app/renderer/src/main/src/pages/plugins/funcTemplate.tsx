@@ -53,7 +53,6 @@ import {
 import { SolidCheckIcon, SolidExclamationIcon, SolidThumbupIcon } from '@/assets/icon/solid'
 import {
   SolidOfficialpluginIcon,
-  SolidYakitPluginIcon,
   SolidPluginYakMitmIcon,
   SolidPluginProtScanIcon,
   SolidSparklesPluginIcon,
@@ -87,7 +86,7 @@ import {
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { API } from '@/services/swagger/resposeType'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
-import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
+import { RuiYanButton, RuiYanIcon, RuiYanModal } from '@/components/renyanUI'
 import { funcSearchType, pluginTypeToName } from './builtInData'
 import UnLogin from '@/assets/unLogin.png'
 import { v4 as uuidv4 } from 'uuid'
@@ -1242,7 +1241,7 @@ export const AuthorImg: React.FC<AuthorImgProps> = memo((props) => {
         return <SolidOfficialpluginIcon />
 
       case 'yakit':
-        return <SolidYakitPluginIcon />
+        return <RuiYanIcon name="plugin" />
 
       case 'mitm':
         return <SolidPluginYakMitmIcon />

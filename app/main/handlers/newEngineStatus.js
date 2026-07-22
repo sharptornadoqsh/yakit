@@ -3,25 +3,14 @@ const childProcess = require('child_process')
 const { GLOBAL_YAK_SETTING } = require('../state')
 const { getLocalYaklangEngine, getYakitHome } = require('../filePath')
 const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
+const { getDefaultDatabaseEnvironment } = require('../defaultDatabase')
 
 // 引擎连接过程中涉及到能中断的执行任务
 const runningTasks = new Map()
 
-const ECHO_TEST_MSG = 'Hello Yakit!'
+const ECHO_TEST_MSG = 'Hello RuiYan!'
 const LOCAL_ENGINE_CHECK_TIMEOUT_MS = 60_000
 const LOCAL_ENGINE_START_TIMEOUT_MS = 180_000
-
-/** 各版本下的数据库环境变量 */
-const DefaultDBFileEnv = {
-  irify: {
-    YAK_DEFAULT_PROFILE_DATABASE_NAME: 'irify-profile-rule.db',
-    YAK_DEFAULT_PROJECT_DATABASE_NAME: 'default-irify.db',
-    SSA_DATABASE_RAW: 'default-yakssa.db',
-  },
-  memfit: {
-    YAK_DEFAULT_PROJECT_DATABASE_NAME: 'default-memfit.db',
-  },
-}
 
 module.exports = {
   registerNewIPC: (win, callback, getClient, newClient, ipcEventPre) => {
@@ -37,7 +26,7 @@ module.exports = {
 
       return new Promise((resolve, reject) => {
         try {
-          const { port, softwareVersion } = params
+          const { port, softwareVersion, version } = params
           const command = getLocalYaklangEngine()
           const args = ['check-secret-local-grpc', '--port', String(port)]
 
@@ -47,7 +36,7 @@ module.exports = {
           const defaltEnv = { ...process.env, YAKIT_HOME: getYakitHome() }
           const subprocess = childProcess.spawn(command, args, {
             stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...defaltEnv, ...(DefaultDBFileEnv[softwareVersion] || {}) },
+            env: { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) },
           })
 
           let stdout = ''
@@ -248,7 +237,7 @@ module.exports = {
 
       return new Promise((resolve, reject) => {
         try {
-          const { softwareVersion } = params
+          const { softwareVersion, version } = params
           const command = getLocalYaklangEngine()
           const args = ['fixup-database']
 
@@ -258,7 +247,7 @@ module.exports = {
           const defaltEnv = { ...process.env, YAKIT_HOME: getYakitHome() }
           const subprocess = childProcess.spawn(command, args, {
             stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...defaltEnv, ...(DefaultDBFileEnv[softwareVersion] || {}) },
+            env: { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) },
           })
 
           let stdout = ''
@@ -611,7 +600,7 @@ module.exports = {
             detached: false,
             windowsHide: true,
             stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...defaltEnv, ...(DefaultDBFileEnv[softwareVersion] || {}) },
+            env: { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) },
           })
 
           subprocess.unref()

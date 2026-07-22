@@ -253,8 +253,10 @@
     "remoteConnectionDisconnected": "远程连接已断开",
     "newEngineVersionFound": "发现新引擎版本",
     "newEngineVersionFoundContent": "发现本地引擎存在新版本待使用，是否关闭引擎使用新版本？",
-    "enterProjectManageConfirmTitle": "是否进入项目管理",
-    "enterProjectManageConfirmContent": "如果有正在进行中的任务，回到项目管理页则都会停止，确定回到项目管理页面吗?",
+    "enterProjectManageConfirmTitle": "进入睿眼项目工作区",
+    "enterProjectManageConfirmContent": "睿眼项目工作区统一管理项目数据、任务记录与分析结果；进入后，当前运行中的任务将停止，请确认是否继续。",
+    "projectWorkspaceTitle": "睿眼项目工作区",
+    "projectWorkspaceDescription": "统一管理本地项目、数据文件与导入导出",
     "samplingInProgress": "采样中",
     "resample": "重新采样",
     "recordingInProgress": "录屏中"

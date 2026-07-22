@@ -15,6 +15,7 @@ const {
 } = require('../handlers/utils/network')
 const { testEngineAvaiableVersion } = require('../ipc')
 const { engineLogOutputFileAndUI } = require('../logFile')
+const { productConfig } = require('../product')
 const process = require('process')
 const childProcess = require('child_process')
 const spawn = require('cross-spawn')
@@ -73,6 +74,7 @@ module.exports = (win, getClient) => {
   }
   /** 获取Yakit最新版本号 */
   ipcMain.handle('fetch-latest-yakit-version', async (e, params) => {
+    if (!productConfig.clientUpdateEnabled) return app.getVersion()
     return await asyncFetchLatestYakitVersion(params)
   })
 

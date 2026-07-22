@@ -4,6 +4,7 @@ export type RuiYanIconName =
   | 'search'
   | 'plus'
   | 'replay'
+  | 'download'
   | 'environment'
   | 'bell'
   | 'user'
@@ -47,6 +48,13 @@ const glyphs: Record<RuiYanIconName, React.ReactNode> = {
     <>
       <path d="M7 7h7a5 5 0 1 1-4.6 7" />
       <path d="m7 3-4 4 4 4" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 4v10" />
+      <path d="m8 10 4 4 4-4" />
+      <path d="M5 19h14" />
     </>
   ),
   environment: (

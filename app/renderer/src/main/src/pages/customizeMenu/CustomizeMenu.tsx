@@ -1191,7 +1191,7 @@ const PluginLocalList: React.FC<PluginLocalListProps> = React.memo((props) => {
         }
       })
       .catch((e: any) => {
-        yakitNotify('error', 'Query Local Yak Script yakitFailed: ' + `${e}`)
+        yakitNotify('error', 'Query Local Yak Script Failed: ' + `${e}`)
       })
       .finally(() => {
         setTimeout(() => {

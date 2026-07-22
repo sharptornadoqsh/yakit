@@ -17,6 +17,7 @@ import {
   OutlineAtomIconByStatusProps,
 } from './AIModelListType'
 import styles from './AIModelList.module.scss'
+import { productConfig } from '@/config/product'
 import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
 import { useCreation, useInViewport, useMemoizedFn, useUpdateEffect } from 'ahooks'
 import { YakitRadioButtonsProps } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtonsType'
@@ -975,7 +976,7 @@ const AILocalModelList: React.FC<AILocalModelListProps> = React.memo(
       setVisible(false)
     })
     const code = useCreation(() => {
-      return 'sudo xattr -r -d com.apple.quarantine ~/yakit-projects/projects/libs/llama-server'
+      return `sudo xattr -r -d com.apple.quarantine "$HOME/Library/Application Support/${productConfig.defaultDataDirectory}/projects/libs/llama-server"`
     }, [])
     return llamaServerReady ? (
       <YakitSpin spinning={spinning}>
@@ -1005,9 +1006,11 @@ const AILocalModelList: React.FC<AILocalModelListProps> = React.memo(
             <div>
               {t('AILocalModelList.macNotice')}
               <YakitTag color="purple">sudo xattr -r</YakitTag>
-              <YakitTag color="purple">-d com.apple.quarantine ~/yakit-projects</YakitTag>
               <YakitTag color="purple">
-                /projects/libs/llama-server
+                -d com.apple.quarantine "$HOME/Library/Application Support/{productConfig.defaultDataDirectory}
+              </YakitTag>
+              <YakitTag color="purple">
+                /projects/libs/llama-server"
                 <CopyComponents copyText={code} className={styles['copy']} />
               </YakitTag>
               {t('AILocalModelList.macNoticeSuffix')}

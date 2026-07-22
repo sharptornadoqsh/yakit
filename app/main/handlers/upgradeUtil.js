@@ -7,6 +7,8 @@ const fs = require('fs')
 const EventEmitter = require('events')
 const zip = require('node-stream-zip')
 const { assertTrustedAppSender, validateOpenPath } = require('../security')
+const { resolveApplicationDownloadPath } = require('../applicationArtifact')
+const { productConfig } = require('../product')
 
 const {
   getYakitHome,
@@ -29,6 +31,12 @@ const {
 const { engineCancelRequestWithProgress, yakitCancelRequestWithProgress } = require('./utils/requestWithProgress')
 const { fetchSpecifiedYakVersionHash } = require('../handlers/utils/network')
 const { engineLogOutputFileAndUI } = require('../logFile')
+
+const assertClientUpdateEnabled = () => {
+  if (!productConfig.clientUpdateEnabled) {
+    throw new Error('当前版本未配置睿眼客户端在线更新渠道')
+  }
+}
 const {
   atomicInstallEngine,
   downloadAndVerifyArtifact,
@@ -82,7 +90,7 @@ const initMkbaseDir = async () => {
 const loadSecrets = () => {
   authMeta.splice(0, authMeta.length)
   try {
-    const data = fs.readFileSync(path.join(getRemoteLinkDir(), 'yakit-remote.json'))
+    const data = fs.readFileSync(getRemoteLinkFile())
     JSON.parse(data).forEach((i) => {
       if (!(i['host'] && i['port'])) {
         return
@@ -662,6 +670,7 @@ module.exports = {
 
     // asyncDownloadLatestYakit wrapper
     async function asyncDownloadLatestYakit(version, type) {
+      assertClientUpdateEnabled()
       return new Promise(async (resolve, reject) => {
         const { isEnterprise, isIRify, isMemfit } = type
         const IRifyCE = isIRify && !isEnterprise
@@ -692,7 +701,9 @@ module.exports = {
         }
         // 可能存在中文的下载文件夹，就判断下Downloads文件夹是否存在，不存在则新建一个
         if (!fs.existsSync(getYakitInstallDir())) fs.mkdirSync(getYakitInstallDir(), { recursive: true })
-        const dest = path.join(getYakitInstallDir(), path.basename(downloadUrl))
+        const dest = resolveApplicationDownloadPath(getYakitInstallDir(), downloadUrl, {
+          preserveFilename: isIRify || isMemfit,
+        })
         try {
           fs.unlinkSync(dest)
         } catch (e) {}
@@ -740,8 +751,9 @@ module.exports = {
     })
 
     const asyncDownloadLatestIntranetYakit = (filePath) => {
+      assertClientUpdateEnabled()
       return new Promise((resolve, reject) => {
-        const dest = path.join(getYakitInstallDir(), path.basename(filePath))
+        const dest = resolveApplicationDownloadPath(getYakitInstallDir(), filePath)
         // 校验getYakitInstallDir()目录下是否已经存在filePath文件，存在则直接返回
         fs.access(dest, fs.constants.F_OK, async (err) => {
           if (err) {
@@ -766,12 +778,6 @@ module.exports = {
 
     ipcMain.handle('download-latest-intranet-yakit', async (e, filePath) => {
       return await asyncDownloadLatestIntranetYakit(filePath)
-    })
-
-    ipcMain.handle('download-enpriTrace-latest-yakit', async (e, url) => {
-      return await new Promise((resolve, reject) => {
-        downloadIntranetYakitByDownloadUrl(resolve, reject, url)
-      })
     })
 
     ipcMain.handle('update-enpritrace-info', async () => {
@@ -1154,6 +1160,7 @@ module.exports = {
 
     // asyncDownloadLatestYakit wrapper
     async function asyncDownloadLatestYakit(version, type) {
+      assertClientUpdateEnabled()
       return new Promise(async (resolve, reject) => {
         try {
           const { isEnterprise, isIRify, isMemfit } = type
@@ -1185,7 +1192,9 @@ module.exports = {
           }
           // 可能存在中文的下载文件夹，就判断下Downloads文件夹是否存在，不存在则新建一个
           if (!fs.existsSync(getYakitInstallDir())) fs.mkdirSync(getYakitInstallDir(), { recursive: true })
-          const dest = path.join(getYakitInstallDir(), path.basename(downloadUrl))
+          const dest = resolveApplicationDownloadPath(getYakitInstallDir(), downloadUrl, {
+            preserveFilename: isIRify || isMemfit,
+          })
           try {
             fs.unlinkSync(dest)
           } catch (e) {}

@@ -45,10 +45,12 @@ export interface LocalLinkParams {
 export interface CheckAllowSecretLocal {
   port: number
   softwareVersion: SoftwareVersion
+  version: string
 }
 
 export interface FixupDatabase {
   softwareVersion: SoftwareVersion
+  version: string
 }
 
 interface FixupDatabaseJson {

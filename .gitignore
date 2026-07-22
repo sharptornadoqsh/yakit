@@ -8,8 +8,6 @@ bins/yak_darwin_amd64.zip
 bins/yak_darwin_amd64
 bins/yak_windows_amd64.zip
 bins/yak_windows_amd64.exe
-bins/scripts/google-chrome-plugin.zip
-
 *~
 *.un~
 .idea/

@@ -63,7 +63,7 @@
     "dumpPacketSize": "轉儲資料包大小",
     "dumpPacketSizeTip": "超過設定大小的資料包會轉儲為檔案，不會直接入庫",
     "autoPerformanceSampling": "自動效能取樣",
-    "autoPerformanceSamplingTip": "開啟後 CPU、記憶體過高會自動觸發效能取樣，採集檔案位於使用者主目錄下的 yakit-projects/pprof-log 資料夾",
+    "autoPerformanceSamplingTip": "開啟後 CPU、記憶體過高會自動觸發效能取樣，採集檔案儲存在使用者資料目錄下的 pprof-log 子目錄",
     "secondaryTabsNum": "二級頁籤數量",
     "pluginLogCount": "外掛日誌條數",
     "performance": "關閉效能提示",

@@ -20,6 +20,8 @@ describe('睿眼产品配置', () => {
       'artifactPrefix',
       'artifactContainerPrefix',
       'defaultDataDirectory',
+      'defaultDatabaseName',
+      'enterpriseDefaultDatabaseName',
       'updateChannel',
       'supportName',
       'copyright',
@@ -27,12 +29,106 @@ describe('睿眼产品配置', () => {
       'successColor',
       'warningColor',
       'errorColor',
-      'licenseUrl',
-      'thirdPartyNoticesUrl',
     ]
 
     requiredFields.forEach((field) => expect(productSource[field]).toBeTypeOf('string'))
+    expect(productSource.clientUpdateEnabled).toBeTypeOf('boolean')
     expect(productSource.shortName).toBe('RuiYan-Pentest')
+    expect(productSource.defaultDatabaseName).toBe('default-RuiYan.db')
+    expect(productSource.enterpriseDefaultDatabaseName).toBe('company-default-RuiYan.db')
+  })
+
+  it('缺少睿眼发布渠道时禁用客户端在线更新', () => {
+    const upgradeSource = fs.readFileSync(path.resolve('app/main/handlers/upgradeUtil.js'), 'utf8')
+    const legacyVersionSource = fs.readFileSync(path.resolve('app/main/uiOperate/yaklangAndYakit.js'), 'utf8')
+    const currentVersionSource = fs.readFileSync(path.resolve('app/main/newUiOperate/yaklangAndYakit.js'), 'utf8')
+    const funcDomainSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/components/layout/FuncDomain.tsx'),
+      'utf8',
+    )
+    const uiLayoutSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/components/layout/UILayout.tsx'),
+      'utf8',
+    )
+
+    expect(productSource.clientUpdateEnabled).toBe(false)
+    expect(upgradeSource).toContain('assertClientUpdateEnabled()')
+    expect(upgradeSource).not.toContain('download-enpriTrace-latest-yakit')
+    expect(legacyVersionSource).toContain('productConfig.clientUpdateEnabled')
+    expect(currentVersionSource).toContain('productConfig.clientUpdateEnabled')
+    expect(funcDomainSource).toContain('productConfig.clientUpdateEnabled')
+    expect(uiLayoutSource).toContain('productConfig.clientUpdateEnabled')
+  })
+
+  it('项目入口、默认数据库与外部产品身份统一使用睿眼名称', () => {
+    const uiLayoutSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/components/layout/UILayout.tsx'),
+      'utf8',
+    )
+    const projectManageSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/pages/softwareSettings/ProjectManage.tsx'),
+      'utf8',
+    )
+    const projectManageStyles = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/pages/softwareSettings/ProjectManage.module.scss'),
+      'utf8',
+    )
+    const yakLocalSource = fs.readFileSync(path.resolve('app/main/handlers/yakLocal.js'), 'utf8')
+    const defaultDatabaseSource = fs.readFileSync(path.resolve('app/main/defaultDatabase.js'), 'utf8')
+    const engineStatusSource = fs.readFileSync(path.resolve('app/main/handlers/engineStatus.js'), 'utf8')
+    const newEngineStatusSource = fs.readFileSync(path.resolve('app/main/handlers/newEngineStatus.js'), 'utf8')
+    const aboutHtml = fs.readFileSync(path.resolve('app/main/about.html'), 'utf8')
+    const zhLayout = JSON.parse(
+      fs.readFileSync(path.resolve('app/renderer/src/main/public/locales/zh/layout.json'), 'utf8'),
+    )
+    const enLayout = JSON.parse(
+      fs.readFileSync(path.resolve('app/renderer/src/main/public/locales/en/layout.json'), 'utf8'),
+    )
+    const zhTwLayout = JSON.parse(
+      fs.readFileSync(path.resolve('app/renderer/src/main/public/locales/zh-TW/layout.json'), 'utf8'),
+    )
+
+    expect(uiLayoutSource).toContain("title={t('UILayout.projectWorkspaceTitle')}")
+    expect(uiLayoutSource).toContain("description={t('UILayout.projectWorkspaceDescription')}")
+    expect(projectManageSource).not.toContain("styles['title-copy']")
+    expect(projectManageSource).toContain("styles['project-toolbar']")
+    expect(projectManageSource).toContain('<RuiYanIcon name="download" />')
+    expect(projectManageSource).toContain('getProjectDisplayText')
+    expect(projectManageSource).toContain('getProjectDisplayText(data.ProjectName, data.DatabasePath')
+    expect(projectManageSource).toContain(
+      'getProjectDisplayText(selectedProject.ProjectName, selectedProject.DatabasePath',
+    )
+    expect(projectManageSource).not.toContain('<span>{selectedProject.DatabasePath')
+    expect(projectManageStyles).toContain('grid-template-columns: 168px minmax(0, 1fr)')
+    expect(projectManageStyles).toContain('height: 36px')
+    expect(yakLocalSource).toContain('getDefaultDatabaseName')
+    expect(yakLocalSource).not.toContain("let dbFile = 'default-yakit.db'")
+    expect(yakLocalSource).toContain('getDefaultDatabaseEnvironment')
+    expect(yakLocalSource).not.toContain('YAK_DEFAULT_DATABASE_NAME')
+    expect(defaultDatabaseSource).toContain('YAK_DEFAULT_PROJECT_DATABASE_NAME')
+    expect(engineStatusSource).toContain('getDefaultDatabaseEnvironment')
+    expect(newEngineStatusSource).toContain('getDefaultDatabaseEnvironment')
+    expect(zhLayout.UILayout.enterProjectManageConfirmTitle).toBe('进入睿眼项目工作区')
+    expect(zhLayout.UILayout.enterProjectManageConfirmContent).toBe(
+      '睿眼项目工作区统一管理项目数据、任务记录与分析结果；进入后，当前运行中的任务将停止，请确认是否继续。',
+    )
+    expect(zhLayout.UILayout.projectWorkspaceTitle).toBe('睿眼项目工作区')
+    expect(enLayout.UILayout.projectWorkspaceTitle).toBe('RuiYan Project Workspace')
+    expect(zhTwLayout.UILayout.projectWorkspaceTitle).toBe('睿眼專案工作區')
+
+    expect(aboutHtml).not.toMatch(/yakit/i)
+    expect(
+      [
+        productSource.displayName,
+        productSource.shortName,
+        productSource.executableName,
+        productSource.linuxExecutableName,
+        productSource.artifactPrefix,
+        productSource.defaultDataDirectory,
+        productSource.defaultDatabaseName,
+        productSource.enterpriseDefaultDatabaseName,
+      ].join('\n'),
+    ).not.toMatch(/yakit/i)
   })
 
   it('按操作系统选择可执行文件名', () => {
@@ -44,6 +140,23 @@ describe('睿眼产品配置', () => {
   it('前端可见英文名称统一使用 RuiYan', () => {
     const packageMetadata = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
     const packageConfigSource = fs.readFileSync(path.resolve('packageScript/electron-builder.config.js'), 'utf8')
+    const networkSource = fs.readFileSync(path.resolve('app/main/handlers/utils/network.js'), 'utf8')
+    const upgradeSource = fs.readFileSync(path.resolve('app/main/handlers/upgradeUtil.js'), 'utf8')
+    const chromeLauncherSource = fs.readFileSync(path.resolve('app/main/handlers/chromelauncher.js'), 'utf8')
+    const artifactSource = fs.readFileSync(path.resolve('app/main/applicationArtifact.js'), 'utf8')
+    const hardwareSource = fs.readFileSync(path.resolve('app/main/uiOperate/hardware.js'), 'utf8')
+    const assetHandlerSource = fs.readFileSync(path.resolve('app/main/handlers/assets.js'), 'utf8')
+    const funcDomainSource = fs.readFileSync(
+      path.resolve('app/renderer/src/main/src/components/layout/FuncDomain.tsx'),
+      'utf8',
+    )
+    const websiteSource = fs.readFileSync(path.resolve('app/renderer/src/main/src/enums/website.ts'), 'utf8')
+    const visiblePluginIconFiles = [
+      'app/renderer/src/main/src/components/yakChat/chatCS.tsx',
+      'app/renderer/src/main/src/pages/aiForge/defaultConstant.tsx',
+      'app/renderer/src/main/src/pages/plugins/builtInData.tsx',
+      'app/renderer/src/main/src/pages/plugins/funcTemplate.tsx',
+    ]
     const collectStringValues = (value) => {
       if (typeof value === 'string') return [value]
       if (Array.isArray(value)) return value.flatMap(collectStringValues)
@@ -70,7 +183,62 @@ describe('睿眼产品配置', () => {
     expect(productSource.defaultDataDirectory).toBe('RuiYan-Pentest')
     expect(packageMetadata.name).toBe('ruiyan-pentest')
     expect(packageConfigSource).toContain("name: 'ruiyan-pentest'")
+    expect(packageConfigSource).toContain("to: 'bins/ruiyan-system-mode.txt'")
+    expect(packageConfigSource).not.toContain("to: 'bins/yakit-system-mode.txt'")
+    expect(networkSource).toContain("const SYSTEM_MODE_MARKER = 'ruiyan-system-mode.txt'")
+    expect(upgradeSource).toContain('resolveApplicationDownloadPath')
+    expect(upgradeSource).toContain('fs.readFileSync(getRemoteLinkFile())')
+    expect(upgradeSource).not.toContain("path.join(getRemoteLinkDir(), 'yakit-remote.json')")
+    expect(artifactSource).toContain('productConfig.artifactPrefix')
+    expect(hardwareSource).toContain('resolveApplicationDownloadPath(getYakitInstallDir(), filePath)')
+    expect(assetHandlerSource).toContain('ruiyan-report-pdf-')
+    expect(assetHandlerSource).not.toContain('yakit-report-pdf-')
+    expect(chromeLauncherSource).toContain('${productConfig.shortName} Proxy')
+    expect(chromeLauncherSource).not.toContain('"name": "YakitProxy"')
+    expect(chromeLauncherSource).not.toContain("const tempFile = 'yakit-proxy'")
+    expect(funcDomainSource).toContain('`${productConfig.artifactPrefix}-${cleanVersion}`')
+    expect(funcDomainSource).not.toContain('getReleaseEditionCompatibilityName().replace')
+    expect(funcDomainSource).not.toContain('YakitHistoryVersionAddress')
+    expect(websiteSource).not.toMatch(/github\.com\/yaklang\/yakit\/releases/i)
+    visiblePluginIconFiles.forEach((filePath) => {
+      const source = fs.readFileSync(path.resolve(filePath), 'utf8')
+      expect(source).toContain('RuiYanIcon')
+      expect(source).not.toMatch(/SolidYakitPlugin(?:Gray)?Icon/)
+    })
+
+    const visibleTemplateFiles = [
+      'app/renderer/src/main/src/defaultConstants/HTTPFuzzerPage.ts',
+      'app/renderer/src/main/src/defaultConstants/mitm.ts',
+      'app/renderer/src/main/src/store/globalHotPatch.ts',
+      'app/renderer/src/main/src/pages/pluginDebugger/defaultData.tsx',
+      'app/renderer/src/main/src/pages/invoker/data/MITMPluginTamplate.ts',
+    ]
+    visibleTemplateFiles.forEach((filePath) => {
+      const visibleLegacyLines = fs
+        .readFileSync(path.resolve(filePath), 'utf8')
+        .split(/\r?\n/)
+        .filter((line) => /[\u3400-\u9fff]|X-Yakit/i.test(line))
+        .filter((line) => /\byakit\b(?!\.)/i.test(line))
+      expect(visibleLegacyLines, filePath).toEqual([])
+    })
+    const visibleScriptErrors = [
+      'app/renderer/src/main/src/pages/invoker/batch/consts_importConfigYakCode.ts',
+      'app/renderer/src/main/src/pages/customizeMenu/CustomizeMenu.tsx',
+    ].map((filePath) => fs.readFileSync(path.resolve(filePath), 'utf8'))
+    expect(visibleScriptErrors.join('\n')).not.toMatch(/Load Yakit Plugin Config Failed|Yak Script yakitFailed/i)
     expect(displayedValues.join('\n')).not.toMatch(/renyan/i)
+    expect(displayedValues.join('\n')).not.toMatch(/yakit/i)
+
+    const visiblePathCopyFiles = [
+      'app/renderer/engine-link-startup/src/pages/StartupPage/components/QuestionModal/index.tsx',
+      'app/renderer/src/main/src/components/layout/update/InstallEngine.tsx',
+      'app/renderer/src/main/src/pages/cve/CVETable.tsx',
+      'app/renderer/src/main/src/pages/fingerprintManage/ImportExportModal/ImportExportModal.tsx',
+      'app/renderer/src/main/src/pages/ai-agent/aiModelList/AIModelList.tsx',
+    ]
+    visiblePathCopyFiles.forEach((filePath) => {
+      expect(fs.readFileSync(path.resolve(filePath), 'utf8')).not.toMatch(/yakit-projects/i)
+    })
 
     const visibleLogoFiles = [
       'app/renderer/src/main/src/assets/renyan-logo-light.svg',
@@ -123,6 +291,9 @@ describe('睿眼产品配置', () => {
     const filePathSource = fs.readFileSync(path.resolve('app/main/filePath.js'), 'utf8')
     expect(filePathSource).not.toContain("getPath('exe')")
     expect(filePathSource).not.toContain("'yakit-projects'")
+    expect(filePathSource).toContain("'ruiyan-local.json'")
+    expect(filePathSource).toContain("'ruiyan-extra-local.json'")
+    expect(filePathSource).toContain("'ruiyan-remote.json'")
     expect(filePathSource).toContain('if (!app.isPackaged)')
     expect(filePathSource).toContain('return path.resolve(app.getAppPath(), s)')
 
@@ -182,9 +353,19 @@ describe('睿眼产品配置', () => {
       path.resolve('app/renderer/src/main/src/components/layout/HelpDoc/HelpDoc.tsx'),
       'utf8',
     )
+    const preloadSource = fs.readFileSync(path.resolve('app/main/preload.js'), 'utf8')
+    const openWebsiteHandler = fs.readFileSync(path.resolve('app/main/handlers/openWebsiteByChrome.js'), 'utf8')
     expect(rendererAbout).not.toContain('megavector.cn/aboutUs')
-    expect(rendererAbout).toContain('productConfig.licenseUrl')
-    expect(rendererAbout).toContain('productConfig.thirdPartyNoticesUrl')
+    expect(rendererAbout).not.toContain('productConfig.repositoryUrl')
+    expect(rendererAbout).not.toContain('productConfig.issuesUrl')
+    expect(rendererAbout).toContain("yakitShell.openLegalDocument('license')")
+    expect(rendererAbout).toContain("yakitShell.openLegalDocument('third-party')")
+    expect(rendererAbout).not.toContain('productConfig.licenseUrl')
+    expect(rendererAbout).not.toContain('productConfig.thirdPartyNoticesUrl')
+    expect(preloadSource).toContain(
+      "openLegalDocument: (documentType) => invoke('open-product-legal-document', documentType)",
+    )
+    expect(openWebsiteHandler).toContain("ipcMain.handle('open-product-legal-document'")
   })
 
   it('启动时只显示品牌提示并在引擎完成后显示系统界面', () => {
@@ -306,6 +487,15 @@ describe('构建元数据', () => {
   })
 
   it('打包配置仅使用睿眼身份和原创图标', () => {
+    const installedFlagContent = [
+      'bins/flag.windows.txt',
+      'bins/flag.linux.txt',
+      'bins/flag.darwin.txt',
+      'bins/resources/flag.txt',
+    ]
+      .map((filePath) => fs.readFileSync(path.resolve(filePath), 'utf8'))
+      .join('\n')
+
     expect(builderConfig.appId).toBe(productSource.appId)
     expect(builderConfig.productName).toBe(productSource.displayName)
     expect(builderConfig.executableName).toBe(productSource.executableName)
@@ -314,6 +504,21 @@ describe('构建元数据', () => {
     expect(builderConfig.mac.icon).toBe('app/assets/renyan-icon.icns')
     expect(builderConfig.linux.executableName).toBe(productSource.linuxExecutableName)
     expect(builderConfig.nsis.shortcutName).toBe(productSource.displayName)
+    expect(builderConfig.releaseInfo.releaseNotes).toContain(productSource.displayName)
+    expect(builderConfig.publish).toBeUndefined()
+    expect(installedFlagContent).toMatch(/RuiYan/i)
+    expect(installedFlagContent).not.toMatch(/Yakit/i)
+    expect(
+      [
+        builderConfig.productName,
+        builderConfig.executableName,
+        builderConfig.artifactName,
+        builderConfig.nsis.shortcutName,
+        builderConfig.nsis.uninstallDisplayName,
+        builderConfig.releaseInfo.releaseNotes,
+        productSource.defaultDataDirectory,
+      ].join('\n'),
+    ).not.toMatch(/yakit/i)
     expect(builderConfig.nsis.include).toBeUndefined()
     expect(builderConfig.extraResources).toEqual(
       expect.arrayContaining([

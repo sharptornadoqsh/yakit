@@ -1,6 +1,6 @@
 import { forwardRef, memo, useEffect, useImperativeHandle, useRef } from 'react'
 import { useMemoizedFn } from 'ahooks'
-import { FetchSoftwareVersion } from '@/utils/envfile'
+import { __PLATFORM__, FetchSoftwareVersion } from '@/utils/envfile'
 import { debugToPrintLog } from '@/utils/logCollection'
 import { yakitEngine } from '@/utils/electronBridge'
 import { grpcCheckAllowSecretLocal } from '../../grpc'
@@ -34,7 +34,11 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
       debugToPrintLog('------ 开始执行本地引擎能力检查 ------')
       setLog(['正在检查本地引擎兼容能力...'])
       try {
-        const result = await grpcCheckAllowSecretLocal({ port, softwareVersion: FetchSoftwareVersion() })
+        const result = await grpcCheckAllowSecretLocal({
+          port,
+          softwareVersion: FetchSoftwareVersion(),
+          version: __PLATFORM__,
+        })
         setRestartLoading(false)
         if (result.ok && result.status === 'success' && result.json) {
           const currentVersion = result.json.version || (await yakitEngine.getCurrentYak().catch(() => ''))

@@ -7,24 +7,18 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronUpIcon,
-  ImportSvgIcon,
   OutlinePlusIcon,
-  PlusBoldSvgIcon,
   PlusIcon,
   QuestionMarkCircleIcon,
   ResizerIcon,
   TrashIcon,
 } from '@/assets/newIcon'
 import {
-  DocumentAddSvgIcon,
-  DocumentDownloadSvgIcon,
-  FolderOpenSvgIcon,
   ProjectDocumentTextSvgIcon,
   ProjectExportSvgIcon,
   ProjectFolderOpenSvgIcon,
   ProjectImportSvgIcon,
   ProjectViewGridSvgIcon,
-  TemporaryProjectSvgIcon,
 } from './icon'
 import ReactResizeDetector from 'react-resize-detector'
 import { CopyComponents, YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
@@ -32,7 +26,7 @@ import { formatTimestamp } from '@/utils/timeUtil'
 import { Cascader, Divider, Dropdown, DropdownProps, Form, Progress, Tooltip, Upload } from 'antd'
 import { YakitMenu, YakitMenuProp } from '@/components/yakitUI/YakitMenu/YakitMenu'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
-import { RuiYanButton, RuiYanDrawer, RuiYanModal } from '@/components/renyanUI'
+import { RuiYanButton, RuiYanDrawer, RuiYanIcon, RuiYanModal } from '@/components/renyanUI'
 import { randomString } from '@/utils/randomUtil'
 import { openABSFileLocated } from '@/utils/openWebsite'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
@@ -55,6 +49,7 @@ import { API } from '@/services/swagger/resposeType'
 import { useUploadInfoByEnpriTrace } from '@/components/layout/utils'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { Trans } from 'react-i18next'
+import { getProjectDisplayText } from './projectBranding'
 
 const { ipcRenderer } = window.require('electron')
 const { YakitPanel } = YakitCollapse
@@ -365,8 +360,9 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         name: t('ProjectManage.description'),
         style: { flex: 1 },
         render: (data) => {
+          const description = getProjectDisplayText(data.ProjectName, data.Description)
           try {
-            const arr: { Key: string; Value: string }[] = JSON.parse(data.Description)
+            const arr: { Key: string; Value: string }[] = JSON.parse(description)
             let str = ''
             arr.forEach((item) => {
               str += `${item.Key}：${item.Value}; `
@@ -380,9 +376,9 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
             )
           } catch (error) {
             return (
-              <Tooltip title={data.Description}>
+              <Tooltip title={description}>
                 <div style={{ overflow: 'hidden' }} className={'yakit-content-single-ellipsis'}>
-                  {data.Description}
+                  {description}
                 </div>
               </Tooltip>
             )
@@ -394,6 +390,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         name: t('ProjectManage.storagePath'),
         style: { flex: 1 },
         render: (data, index) => {
+          const databasePath = getProjectDisplayText(data.ProjectName, data.DatabasePath || '')
           return (
             <div
               className={classNames(styles['project-table-body-wrapper'], styles['database-path-wrapper'])}
@@ -401,14 +398,14 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
             >
               <div
                 className={styles['project-style']}
-                title={data.DatabasePath}
+                title={databasePath}
                 onClick={() => {
-                  if (data.DatabasePath) {
+                  if (databasePath) {
                     ipcRenderer
-                      .invoke('is-file-exists', data.DatabasePath)
+                      .invoke('is-file-exists', databasePath)
                       .then((flag: boolean) => {
                         if (flag) {
-                          openABSFileLocated(data.DatabasePath)
+                          openABSFileLocated(databasePath)
                         } else {
                           failed(t('ProjectManage.fileNotFound'))
                         }
@@ -417,9 +414,9 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                   }
                 }}
               >
-                {data.DatabasePath || '-'}
+                {databasePath || '-'}
               </div>
-              {data.DatabasePath && <CopyComponents copyText={data.DatabasePath} onAfterCopy={() => {}} />}
+              {databasePath && <CopyComponents copyText={databasePath} onAfterCopy={() => {}} />}
             </div>
           )
         },
@@ -764,7 +761,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
           failed(t('ProjectManage.copyFailed'))
           return
         }
-        setClipboardText(data.DatabasePath)
+        setClipboardText(getProjectDisplayText(data.ProjectName, data.DatabasePath))
         return
       case 'setCurrent':
         if (!data || !data.Id) {
@@ -1150,18 +1147,15 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
   return (
     <div className={styles['project-manage-wrapper']}>
       <div className={styles['project-manage-container']}>
-        <div className={styles['project-header']}>
-          <div className={styles['header-title']}>
-            <div className={styles['title-copy']}>
-              <div className={styles['title-style']}>{t('ProjectManage.title')}</div>
-              <div className={styles['description-style']}>{t('ProjectManage.pageDescription')}</div>
-            </div>
-            <div className={styles['total-style']}>
-              Total <span className={styles['total-number']}>{__data.ProjectToTal}</span>
-            </div>
+        <div className={styles['project-toolbar']}>
+          <div
+            className={styles['project-summary']}
+            aria-label={t('ProjectManage.projectCountAria', { count: __data.ProjectToTal })}
+          >
+            <span>{t('ProjectManage.projects')}</span>
+            <strong>{__data.ProjectToTal}</strong>
           </div>
           <YakitInput.Search
-            size="large"
             placeholder={t('ProjectManage.inputProjectName')}
             value={params.ProjectName}
             onChange={(e) =>
@@ -1171,7 +1165,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 ProjectName: e.target.value,
               })
             }
-            style={{ width: 288 }}
+            style={{ width: 260 }}
             onSearch={() => {
               if (getParams().ProjectName) {
                 setFiles([])
@@ -1188,8 +1182,8 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         </div>
 
         <div className={styles['project-workspace']}>
-          <aside className={styles['project-group-panel']} aria-label="项目分组">
-            <div className={styles['project-group-title']}>项目分组</div>
+          <aside className={styles['project-group-panel']} aria-label={t('ProjectManage.projectGroups')}>
+            <div className={styles['project-group-title']}>{t('ProjectManage.projectGroups')}</div>
             <div className={styles['project-group-list']}>
               {typeFilter.map((item) => (
                 <button
@@ -1207,7 +1201,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
             </div>
 
             <div className={styles['current-project-card']}>
-              <div className={styles['current-project-label']}>当前项目</div>
+              <div className={styles['current-project-label']}>{t('ProjectManage.currentProject')}</div>
               <div className={styles['current-project-name']}>{latestProject?.ProjectName || '[default]'}</div>
               <div className={styles['current-project-meta']}>
                 {latestProject ? formatTimestamp(latestProject.UpdateAt) : '- -'}
@@ -1217,7 +1211,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 disabled={!latestProject}
                 onClick={() => setSelectedProject(latestProject)}
               >
-                查看详情
+                {t('ProjectManage.viewDetails')}
               </RuiYanButton>
             </div>
           </aside>
@@ -1235,15 +1229,8 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                   }
                 }}
               >
-                <div className={styles['btn-body']}>
-                  <div className={styles['body-title']}>
-                    <TemporaryProjectSvgIcon className={styles['temporary-project-icon']} />
-                    {t('ProjectManage.temporaryProject')}
-                  </div>
-                  <div className={styles['icon-style']}>
-                    <PlusBoldSvgIcon />
-                  </div>
-                </div>
+                <RuiYanIcon name="environment" />
+                <span>{t('ProjectManage.temporaryProject')}</span>
               </button>
 
               <button
@@ -1251,15 +1238,8 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 className={classNames(styles['btn-wrapper'], styles['new-project-wrapper'])}
                 onClick={() => operateFunc('newProject')}
               >
-                <div className={styles['btn-body']}>
-                  <div className={styles['body-title']}>
-                    <DocumentAddSvgIcon />
-                    {t('ProjectManage.newProject')}
-                  </div>
-                  <div className={styles['icon-style']}>
-                    <PlusBoldSvgIcon />
-                  </div>
-                </div>
+                <RuiYanIcon name="plus" />
+                <span>{t('ProjectManage.newProject')}</span>
               </button>
 
               <button
@@ -1267,15 +1247,8 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 className={classNames(styles['btn-wrapper'], styles['new-folder-wrapper'])}
                 onClick={() => operateFunc('newFolder')}
               >
-                <div className={styles['btn-body']}>
-                  <div className={styles['body-title']}>
-                    <FolderOpenSvgIcon />
-                    {t('YakitButton.newFolder')}
-                  </div>
-                  <div className={styles['icon-style']}>
-                    <PlusBoldSvgIcon />
-                  </div>
-                </div>
+                <RuiYanIcon name="project" />
+                <span>{t('YakitButton.newFolder')}</span>
               </button>
 
               {/* { engineMode !== "remote" && ( */}
@@ -1284,15 +1257,8 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 className={classNames(styles['btn-wrapper'], styles['import-wrapper'])}
                 onClick={() => operateFunc('import')}
               >
-                <div className={styles['btn-body']}>
-                  <div className={styles['body-title']}>
-                    <DocumentDownloadSvgIcon />
-                    {t('YakitButton.import')}
-                  </div>
-                  <div className={styles['icon-style']}>
-                    <ImportSvgIcon />
-                  </div>
-                </div>
+                <RuiYanIcon name="download" />
+                <span>{t('YakitButton.import')}</span>
               </button>
               {/* )} */}
             </div>
@@ -1443,7 +1409,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                             return (
                               <div
                                 key={i.index}
-                                style={{ height: 48 + 1 }}
+                                style={{ height: 44 }}
                                 className={classNames(styles['table-opt'], {
                                   [styles['table-opt-selected']]:
                                     selectedProject?.Id === i.data.Id ||
@@ -1524,15 +1490,15 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
 
       <RuiYanDrawer
         open={!!selectedProject}
-        title={selectedProject?.ProjectName || '项目详情'}
-        description="查看项目元数据，并使用真实项目服务完成后续操作"
+        title={selectedProject?.ProjectName || t('ProjectManage.projectDetails')}
+        description={t('ProjectManage.projectDetailsDescription')}
         width={640}
         onClose={() => setSelectedProject(undefined)}
         footer={
           selectedProject ? (
             <>
               <RuiYanButton variant="secondary" onClick={() => setSelectedProject(undefined)}>
-                关闭
+                {t('YakitButton.close')}
               </RuiYanButton>
               {selectedProject.ProjectName !== '[default]' && (selectedProject.OnlineSubTaskID || '').length === 0 && (
                 <RuiYanButton
@@ -1564,8 +1530,10 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         {selectedProject ? (
           <div className={styles['project-detail']}>
             <div className={styles['project-detail-tags']}>
-              <YakitTag color="info">项目</YakitTag>
-              {latestProject?.Id === selectedProject.Id ? <YakitTag color="success">当前使用</YakitTag> : null}
+              <YakitTag color="info">{t('ProjectManage.projects')}</YakitTag>
+              {latestProject?.Id === selectedProject.Id ? (
+                <YakitTag color="success">{t('ProjectManage.currentUse')}</YakitTag>
+              ) : null}
               {(selectedProject.OnlineSubTaskID || '').length > 0 ? (
                 <YakitTag color="info">{t('ProjectManage.server')}</YakitTag>
               ) : null}
@@ -1573,19 +1541,22 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
 
             <dl className={styles['project-detail-list']}>
               <div>
-                <dt>项目名称</dt>
+                <dt>{t('ProjectManage.projectName')}</dt>
                 <dd>{selectedProject.ProjectName}</dd>
               </div>
               <div>
                 <dt>{t('ProjectManage.description')}</dt>
-                <dd>{selectedProject.Description || '-'}</dd>
+                <dd>{getProjectDisplayText(selectedProject.ProjectName, selectedProject.Description) || '-'}</dd>
               </div>
               <div>
                 <dt>{t('ProjectManage.storagePath')}</dt>
                 <dd className={styles['project-detail-path']}>
-                  <span>{selectedProject.DatabasePath || '-'}</span>
+                  <span>{getProjectDisplayText(selectedProject.ProjectName, selectedProject.DatabasePath) || '-'}</span>
                   {selectedProject.DatabasePath ? (
-                    <CopyComponents copyText={selectedProject.DatabasePath} onAfterCopy={() => {}} />
+                    <CopyComponents
+                      copyText={getProjectDisplayText(selectedProject.ProjectName, selectedProject.DatabasePath)}
+                      onAfterCopy={() => {}}
+                    />
                   ) : null}
                 </dd>
               </div>
@@ -1594,7 +1565,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 <dd>{selectedProject.FileSize || '-'}</dd>
               </div>
               <div>
-                <dt>创建时间</dt>
+                <dt>{t('ProjectManage.createdAt')}</dt>
                 <dd>{formatTimestamp(selectedProject.CreatedAt)}</dd>
               </div>
               <div>

@@ -51,7 +51,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 
 }
 
-// hijackHTTPRequest 会在过滤后的请求到达Yakit MITM前被调用，可以通过该函数提前将请求修改或丢弃
+// hijackHTTPRequest 会在过滤后的请求到达RuiYan MITM前被调用，可以通过该函数提前将请求修改或丢弃
 // isHttps 请求是否为https请求
 // url 网站URL
 // req 请求
@@ -70,7 +70,7 @@ hijackHTTPRequest = func(isHttps, url, req, forward /*func(modifiedRequest []byt
 }
 
 
-// hijackHTTPResponse 会在过滤后的响应到达Yakit MITM前被调用，可以通过该函数提前将响应修改或丢弃
+// hijackHTTPResponse 会在过滤后的响应到达RuiYan MITM前被调用，可以通过该函数提前将响应修改或丢弃
 // isHttps 请求是否为https请求
 // url 网站URL
 // rsp 响应
@@ -84,7 +84,7 @@ hijackHTTPResponse = func(isHttps  /*bool*/, url  /*string*/, rsp /*[]byte*/, fo
     // }
 }
 
-// hijackHTTPResponseEx 是hijackHTTPResponse的扩展，能够获取到响应对应的请求，会在过滤后的响应到达Yakit MITM前被调用，可以通过该函数提前将响应修改或丢弃
+// hijackHTTPResponseEx 是hijackHTTPResponse的扩展，能够获取到响应对应的请求，会在过滤后的响应到达RuiYan MITM前被调用，可以通过该函数提前将响应修改或丢弃
 // !!! 通常实现hijackHTTPResponse 或 hijackHTTPResponseEx 其中一个函数即可
 // isHttps 请求是否为https请求
 // url 网站URL

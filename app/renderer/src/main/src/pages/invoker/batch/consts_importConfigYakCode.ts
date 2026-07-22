@@ -30,7 +30,7 @@ defer func{
 defer func{
     err := recover()
     if err != nil {
-        yakit.Error("Load Yakit Plugin Config Failed: %s", err)
+        yakit.Error("Load RuiYan Plugin Config Failed: %s", err)
     }
 }
 

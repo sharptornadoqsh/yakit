@@ -8,7 +8,10 @@ export interface ProductConfig {
   linuxExecutableName: string
   artifactPrefix: string
   defaultDataDirectory: string
+  defaultDatabaseName: string
+  enterpriseDefaultDatabaseName: string
   updateChannel: string
+  clientUpdateEnabled: boolean
   supportName: string
   copyright: string
   primaryColor: string
@@ -17,10 +20,6 @@ export interface ProductConfig {
   errorColor: string
   edition: string
   tagline: string
-  repositoryUrl: string
-  issuesUrl: string
-  licenseUrl: string
-  thirdPartyNoticesUrl: string
   upstreamDocumentationUrl: string
 }
 

@@ -8,7 +8,4 @@ export enum WebsiteGV {
   PluginParamsHelp = 'https://yaklang.com/products/Plugin-repository/plugins/plugin_create',
   /** @name WebFuzzer-帮助文档地址 */
   WebFuzzerAddress = 'https://www.yaklang.com/products/Web%20Fuzzer/fuzz-sequence',
-
-  /** @name yakit历史安装包地址 */
-  YakitHistoryVersionAddress = 'https://github.com/yaklang/yakit/releases',
 }

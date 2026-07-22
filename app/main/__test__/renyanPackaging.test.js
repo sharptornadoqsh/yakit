@@ -1,3 +1,6 @@
+// @vitest-environment node
+
+import crypto from 'crypto'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -59,12 +62,13 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(workflow.jobs['build-windows-x64'].env.RENYAN_PACKAGE_ARCHITECTURE).toBe('x64')
     expect(workflow.jobs['build-linux-x64'].env.RENYAN_PACKAGE_ARCHITECTURE).toBe('x64')
     expect(workflow.jobs['build-linux-arm64'].env.RENYAN_PACKAGE_ARCHITECTURE).toBe('arm64')
-    expect(workflow.env.RUIYAN_CHROME_EXTENSION_URL).toBe(
-      'https://yaklang.oss-accelerate.aliyuncs.com/chrome-extension/yakit-chrome-extension-v0.0.7.zip',
-    )
-    expect(workflow.env.RUIYAN_CHROME_EXTENSION_SHA256).toBe(
-      '5b250638ce76c95e9bc2c25db48049eac1f7af25fe34187e2b0997b872811f6d',
-    )
+    const extensionArchivePath = path.resolve('bins/scripts/google-chrome-plugin.zip')
+    const extensionArchiveSha256 = crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(extensionArchivePath))
+      .digest('hex')
+    expect(workflow.env).not.toHaveProperty('RUIYAN_CHROME_EXTENSION_URL')
+    expect(workflow.env.RUIYAN_CHROME_EXTENSION_SHA256).toBe(extensionArchiveSha256)
     expect(workflow.permissions).toEqual({ contents: 'read' })
     expect(workflow.on.workflow_dispatch.inputs.target).toMatchObject({
       default: 'macos-both',
@@ -98,7 +102,7 @@ describe('睿眼多平台安装文件工作流', () => {
     Object.values(workflow.jobs).forEach((job) => {
       const setupNode = job.steps.find((step) => step.uses === 'actions/setup-node@v6')
       const uploadArtifact = job.steps.find((step) => step.uses === 'actions/upload-artifact@v7')
-      const prepareChromeExtension = job.steps.find((step) => step.name === '准备固定浏览器扩展')
+      const verifyChromeExtension = job.steps.find((step) => step.name === '校验仓库内置浏览器扩展')
       expect(job.steps.some((step) => step.uses === 'actions/checkout@v7')).toBe(true)
       expect(setupNode.with['node-version']).toBe('22.12.0')
       expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/src/main/yarn.lock')
@@ -108,8 +112,10 @@ describe('睿眼多平台安装文件工作流', () => {
       expect(uploadArtifact.with.path).toBe('${{ steps.metadata.outputs.artifact_path }}')
       expect(uploadArtifact.with.archive).toBe(false)
       expect(uploadArtifact.with).not.toHaveProperty('name')
-      expect(prepareChromeExtension.run).toContain('RUIYAN_CHROME_EXTENSION_URL')
-      expect(prepareChromeExtension.run).toContain('RUIYAN_CHROME_EXTENSION_SHA256')
+      expect(verifyChromeExtension.run).toContain('bins/scripts/google-chrome-plugin.zip')
+      expect(verifyChromeExtension.run).toContain('RUIYAN_CHROME_EXTENSION_SHA256')
+      expect(verifyChromeExtension.run).not.toContain('curl')
+      expect(verifyChromeExtension.run).not.toContain('RUIYAN_CHROME_EXTENSION_URL')
 
       job.steps
         .filter((step) => JSON.stringify(step).includes('${{ secrets.'))
@@ -124,8 +130,65 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(source).not.toContain('build-renders-memfit')
     expect(source).not.toContain('yarn add')
     expect(source).not.toContain('http://')
+    expect(source).not.toContain('yakit-chrome-extension')
     expect(source).not.toContain('git push')
     expect(source).not.toContain('gh release')
+  })
+
+  it('仓库内置浏览器扩展仅包含睿眼可见身份', () => {
+    const archivePath = path.resolve('bins/scripts/google-chrome-plugin.zip')
+    const archive = new AdmZip(fs.readFileSync(archivePath))
+    const entries = archive.getEntries()
+    const entryNames = entries.map((entry) => entry.entryName)
+    const entryByName = new Map(entries.map((entry) => [entry.entryName, entry]))
+    const extractRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-extension-test-'))
+    const extractedPath = (entryName) => path.join(extractRoot, ...entryName.split('/'))
+
+    try {
+      archive.extractAllTo(extractRoot, true)
+      const readEntry = (entryName) => fs.readFileSync(extractedPath(entryName), 'utf8')
+
+      expect(entryNames).toEqual([...entryNames].sort())
+      expect(entryNames.join('\n')).not.toMatch(/yakit/i)
+      expect(entryByName.has('images/ruiyan-logo.png')).toBe(true)
+      expect(entryByName.has('images/ruiyan-icon.svg')).toBe(true)
+      expect(entryByName.has('images/yakitlogo.png')).toBe(false)
+      expect(entryByName.has('images/yak.svg')).toBe(false)
+
+      const manifest = JSON.parse(readEntry('manifest.json'))
+      expect(manifest.name).toBe('RuiYan Chrome Endpoint')
+      expect(manifest.description).toBe('Browser endpoint for RuiYan MITM and proxy workflows')
+      expect(manifest.web_accessible_resources.flatMap((item) => item.resources)).toContain('images/ruiyan-icon.svg')
+      expect(readEntry('index.html')).toContain('<title>RuiYan Proxy</title>')
+      expect(readEntry('sidepanel.html')).toContain('<title>RuiYan Proxy</title>')
+      expect(readEntry('proxy/options.html')).toContain('<title>RuiYan 代理设置</title>')
+      expect(readEntry('proxy.js')).toContain('RuiYan MITM')
+      expect(readEntry('proxy.js')).not.toContain('Yakit MITM')
+
+      const textExtensions = new Set(['.css', '.html', '.js', '.json', '.svg', '.txt'])
+      const textPayload = entries
+        .filter((entry) => !entry.isDirectory && textExtensions.has(path.extname(entry.entryName)))
+        .map((entry) => readEntry(entry.entryName))
+        .join('\n')
+      const legacyTokens = [...new Set(textPayload.match(/yakit[\w-]*/gi) || [])].sort()
+      expect(legacyTokens).toEqual(['yakit_badge', 'yakit_inject_script', 'yakit_to_extension_page'])
+      expect(textPayload).not.toMatch(
+        /#f28b44|#f4a061|#e87633|#fff5eb|#fff7e6|#ff6b00|#ffd591|rgba\(242,\s*139,\s*68|rgba\(255,\s*107,\s*0/i,
+      )
+
+      const expectedAssets = [
+        ['images/icon16.png', 'product/brand/icons/16x16.png'],
+        ['images/icon48.png', 'product/brand/icons/48x48.png'],
+        ['images/icon128.png', 'product/brand/icons/128x128.png'],
+        ['images/ruiyan-logo.png', 'product/brand/renyan-logo-light.png'],
+        ['images/ruiyan-icon.svg', 'product/brand/renyan-icon.svg'],
+      ]
+      expectedAssets.forEach(([entryName, sourcePath]) => {
+        expect(fs.readFileSync(extractedPath(entryName)).equals(fs.readFileSync(path.resolve(sourcePath)))).toBe(true)
+      })
+    } finally {
+      fs.rmSync(extractRoot, { recursive: true, force: true })
+    }
   })
 
   it('固定签名工具版本并提供全部睿眼打包命令', () => {

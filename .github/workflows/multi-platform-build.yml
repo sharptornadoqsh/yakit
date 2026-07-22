@@ -53,8 +53,7 @@ permissions:
   contents: read
 
 env:
-  RUIYAN_CHROME_EXTENSION_URL: https://yaklang.oss-accelerate.aliyuncs.com/chrome-extension/yakit-chrome-extension-v0.0.7.zip
-  RUIYAN_CHROME_EXTENSION_SHA256: 5b250638ce76c95e9bc2c25db48049eac1f7af25fe34187e2b0997b872811f6d
+  RUIYAN_CHROME_EXTENSION_SHA256: f3a19aeb5bcd5cbcb94d6d648147b6e173dd1ed6db753f91882d58f3e6a20b41
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.target }}-${{ inputs.edition }}
@@ -100,12 +99,10 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
-      - name: 准备固定浏览器扩展
+      - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
-          mkdir -p bins/scripts
-          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
-          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
+          node -e "const fs=require('fs');const crypto=require('crypto');const file='bins/scripts/google-chrome-plugin.zip';if(!fs.existsSync(file))throw new Error('仓库内置浏览器扩展不存在');const actual=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -256,12 +253,10 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
-      - name: 准备固定浏览器扩展
+      - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
-          mkdir -p bins/scripts
-          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
-          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
+          node -e "const fs=require('fs');const crypto=require('crypto');const file='bins/scripts/google-chrome-plugin.zip';if(!fs.existsSync(file))throw new Error('仓库内置浏览器扩展不存在');const actual=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -412,12 +407,10 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
-      - name: 准备固定浏览器扩展
+      - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
-          mkdir -p bins/scripts
-          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
-          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
+          node -e "const fs=require('fs');const crypto=require('crypto');const file='bins/scripts/google-chrome-plugin.zip';if(!fs.existsSync(file))throw new Error('仓库内置浏览器扩展不存在');const actual=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -531,12 +524,10 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
-      - name: 准备固定浏览器扩展
+      - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
-          mkdir -p bins/scripts
-          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
-          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
+          node -e "const fs=require('fs');const crypto=require('crypto');const file='bins/scripts/google-chrome-plugin.zip';if(!fs.existsSync(file))throw new Error('仓库内置浏览器扩展不存在');const actual=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash
@@ -637,12 +628,10 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
-      - name: 准备固定浏览器扩展
+      - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
-          mkdir -p bins/scripts
-          curl --fail --location --show-error --silent "${RUIYAN_CHROME_EXTENSION_URL}" --output bins/scripts/google-chrome-plugin.zip
-          node -e "const fs=require('fs');const crypto=require('crypto');const actual=crypto.createHash('sha256').update(fs.readFileSync('bins/scripts/google-chrome-plugin.zip')).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
+          node -e "const fs=require('fs');const crypto=require('crypto');const file='bins/scripts/google-chrome-plugin.zip';if(!fs.existsSync(file))throw new Error('仓库内置浏览器扩展不存在');const actual=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');if(actual!==process.env.RUIYAN_CHROME_EXTENSION_SHA256)throw new Error('浏览器扩展摘要不匹配')"
 
       - name: 构建 RuiYan 渲染器
         shell: bash

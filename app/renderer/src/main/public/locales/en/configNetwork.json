@@ -63,7 +63,7 @@
     "dumpPacketSize": "Dump packet size",
     "dumpPacketSizeTip": "Packets larger than this will be dumped to files instead of stored directly",
     "autoPerformanceSampling": "Auto performance sampling",
-    "autoPerformanceSamplingTip": "When enabled, high CPU/memory usage triggers performance sampling and saves files under yakit-projects/pprof-log in the user's home directory",
+    "autoPerformanceSamplingTip": "When enabled, high CPU or memory usage triggers performance sampling and saves files in the pprof-log subdirectory of the application data directory",
     "secondaryTabsNum": "Secondary tab count",
     "pluginLogCount": "Plugin log count",
     "performance": "Close performance tips",

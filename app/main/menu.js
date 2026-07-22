@@ -41,8 +41,6 @@ const createMenuTemplate = ({ showAbout, openExternal = (target) => electron.she
     submenu: [
       { label: `关于 ${productConfig.displayName}`, click: showAbout },
       { type: 'separator' },
-      { label: '项目主页', click: () => openExternal(productConfig.repositoryUrl) },
-      { label: '问题反馈', click: () => openExternal(productConfig.issuesUrl) },
       { label: '上游开源文档', click: () => openExternal(productConfig.upstreamDocumentationUrl) },
     ],
   }

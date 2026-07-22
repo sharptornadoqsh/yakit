@@ -1,11 +1,11 @@
 import {
-  SolidYakitPluginIcon,
   SolidPluginYakMitmIcon,
   SolidPluginProtScanIcon,
   SolidSparklesPluginIcon,
   SolidDocumentSearchPluginIcon,
   SolidCollectionPluginIcon,
 } from '@/assets/icon/colors'
+import { RuiYanIcon } from '@/components/renyanUI'
 import { ReactNode } from 'react'
 import { CodecPluginTemplate } from '../invoker/data/CodecPluginTemplate'
 import { MITMPluginTemplate, PortScanPluginTemplate } from '../pluginDebugger/defaultData'
@@ -38,7 +38,7 @@ export const pluginTypeToName: Record<string, PluginTypeInfoProps> = {
   yak: {
     name: 'RuiYan 内置插件',
     description: '内置了众多网络安全常用库，可快速编写安全小工具，该原生模块只支持手动调用',
-    icon: <SolidYakitPluginIcon />,
+    icon: <RuiYanIcon name="plugin" />,
     color: 'warning',
     content: 'yakit.AutoInitYakit()\n\n# Input your code!\n\n',
     language: 'yak',

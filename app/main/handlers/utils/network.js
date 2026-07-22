@@ -12,6 +12,8 @@ const { HttpsProxyAgent } = require('hpagent')
 const electronIsDev = require('electron-is-dev')
 const { HttpSetting } = require('../../state')
 
+const SYSTEM_MODE_MARKER = 'ruiyan-system-mode.txt'
+
 const add_proxy = process.env.https_proxy || process.env.HTTPS_PROXY
 
 const agent = !!add_proxy
@@ -129,7 +131,7 @@ const getCheckTextUrl = async (version) => {
   const prefix = getYakEngineNamePrefix(version)
   let system_mode = ''
   try {
-    system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', 'yakit-system-mode.txt'))).toString('utf8')
+    system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', SYSTEM_MODE_MARKER))).toString('utf8')
   } catch (error) {
     if (error.code !== 'ENOENT') console.log('error', error)
   }
@@ -238,7 +240,7 @@ const getYakEngineDownloadUrl = async (version) => {
   try {
     // 开发环境是不添加-legacy
     if (!electronIsDev) {
-      system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', 'yakit-system-mode.txt'))).toString('utf8')
+      system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', SYSTEM_MODE_MARKER))).toString('utf8')
     }
   } catch (error) {
     if (error.code !== 'ENOENT') console.log('error', error)
@@ -269,7 +271,7 @@ const getSuffix = () => {
   // 开发环境是不添加-legacy
   if (electronIsDev) return ''
   try {
-    system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', 'yakit-system-mode.txt'))).toString('utf8')
+    system_mode = fs.readFileSync(loadExtraFilePath(path.join('bins', SYSTEM_MODE_MARKER))).toString('utf8')
   } catch (error) {
     if (error.code !== 'ENOENT') console.log('error', error)
   }

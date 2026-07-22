@@ -83,14 +83,6 @@ const configOption = {
     '!README*',
   ],
   asar: true,
-  publish: [
-    {
-      provider: 'github',
-      owner: 'sharptornadoqsh',
-      repo: 'yakit',
-      channel: productConfig.updateChannel,
-    },
-  ],
   mac: {
     hardenedRuntime: true,
     gatekeeperAssess: false,
@@ -145,7 +137,7 @@ const configOption = {
   },
   releaseInfo: {
     releaseName: '${version}',
-    releaseNotes: `查看发布记录：${productConfig.repositoryUrl}/releases`,
+    releaseNotes: `${productConfig.displayName} 版本更新`,
   },
 }
 
@@ -157,7 +149,7 @@ const isLegacy = process.env.THE_LEGACY == 'true'
 if (isLegacy) {
   configOption.extraFiles.push({
     from: 'bins/yakit-system-mode.txt',
-    to: 'bins/yakit-system-mode.txt',
+    to: 'bins/ruiyan-system-mode.txt',
   })
 }
 

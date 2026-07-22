@@ -13,6 +13,7 @@ const {
   fetchSpecifiedYakVersionHash,
   fetchLatestYakitMemfitVersion,
 } = require('../handlers/utils/network')
+const { productConfig } = require('../product')
 
 module.exports = {
   registerNewIPC: (win, getClient, ipcEventPre) => {
@@ -50,6 +51,7 @@ module.exports = {
 
     /** 获取Yakit最新版本号 */
     const asyncFetchLatestYakitVersion = (params) => {
+      if (!productConfig.clientUpdateEnabled) return Promise.resolve(app.getVersion())
       const { config, releaseEditionName } = params
       return new Promise((resolve, reject) => {
         const versionFetchers = {

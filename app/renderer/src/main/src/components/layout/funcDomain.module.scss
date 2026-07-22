@@ -286,37 +286,6 @@
         .version-update-wrapper + .version-update-wrapper {
           margin-top: 16px;
         }
-
-        .history-version {
-          margin-top: 16px;
-          padding-bottom: 16px;
-          height: 36px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-
-          .content-style {
-            height: 20px;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-
-            font-size: 12px;
-            color: var(--Colors-Use-Neutral-Text-3-Secondary);
-            line-height: 20px;
-            cursor: pointer;
-
-            .icon-style {
-              color: var(--Colors-Use-Neutral-Disable);
-            }
-          }
-          .content-style:hover {
-            color: var(--Colors-Use-Main-Primary);
-            .icon-style {
-              color: var(--Colors-Use-Main-Primary);
-            }
-          }
-        }
       }
 
       .notice-info-wrapper {

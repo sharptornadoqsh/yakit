@@ -76,7 +76,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 
 }
 
-# hijackHTTPRequest 会在过滤后的请求到达 Yakit MITM 前被调用，可以通过该函数提前将请求修改或丢弃
+# hijackHTTPRequest 会在过滤后的请求到达 RuiYan MITM 前被调用，可以通过该函数提前将请求修改或丢弃
 hijackHTTPRequest = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, forward /*func(modifiedRequest []byte)*/, drop /*func()*/) {
 
 }

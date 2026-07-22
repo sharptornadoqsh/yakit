@@ -102,4 +102,4 @@ const showAboutWindow = (parentWindow) => {
   return aboutWindow
 }
 
-module.exports = { getAboutData, getLegalPath, showAboutWindow }
+module.exports = { getAboutData, getLegalPath, openLegalDocument, showAboutWindow }

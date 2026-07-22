@@ -1,4 +1,5 @@
 const { ipcMain } = require('electron')
+const { getDefaultDatabaseEnvironment } = require('../defaultDatabase')
 const childProcess = require('child_process')
 const _sudoPrompt = require('sudo-prompt')
 const { GLOBAL_YAK_SETTING } = require('../state')
@@ -70,7 +71,7 @@ const runWindowsTaskKill = (pid) => {
 //     }
 // }
 
-const ECHO_TEST_MSG = 'Hello Yakit!'
+const ECHO_TEST_MSG = 'Hello RuiYan!'
 
 module.exports = (win, callback, getClient, newClient) => {
   /** 获取本地引擎版本号 */
@@ -167,6 +168,7 @@ module.exports = (win, callback, getClient, newClient) => {
           env: {
             ...process.env,
             YAKIT_HOME: getYakitHome(),
+            ...getDefaultDatabaseEnvironment(version, version),
           },
         })
 

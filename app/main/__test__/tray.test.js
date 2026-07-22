@@ -71,7 +71,7 @@ describe('产品菜单与托盘', () => {
     expect(callbacks.showMainWindow).toHaveBeenCalledOnce()
   })
 
-  it('系统菜单包含产品关于入口和受控外部链接', () => {
+  it('系统菜单包含产品关于入口和上游开源文档', () => {
     const showAbout = vi.fn()
     const menu = createMenuTemplate({ showAbout })
     const helpMenu = menu.find((item) => item.role === 'help')
@@ -79,8 +79,6 @@ describe('产品菜单与托盘', () => {
     expect(helpMenu.submenu[0].label).toBe(`关于 ${productSource.displayName}`)
     expect(helpMenu.submenu.map((item) => item.label).filter(Boolean)).toEqual([
       `关于 ${productSource.displayName}`,
-      '项目主页',
-      '问题反馈',
       '上游开源文档',
     ])
   })

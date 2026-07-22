@@ -23,7 +23,6 @@ import { YakitMenu, YakitMenuItemProps, YakitMenuItemType } from '../yakitUI/Yak
 import {
   getCurrentVersionSource,
   VersionSource,
-  getReleaseEditionCompatibilityName,
   getReleaseEditionName,
   getRemoteI18nGV,
   isCommunityEdition,
@@ -39,7 +38,7 @@ import { YakitSwitch } from '../yakitUI/YakitSwitch/YakitSwitch'
 import { LocalGV } from '@/yakitGV'
 import { getLocalValue, setLocalValue } from '@/utils/kv'
 import { showPcapPermission } from '@/utils/ConfigPcapPermission'
-import { GithubSvgIcon, TerminalIcon } from '@/assets/newIcon'
+import { TerminalIcon } from '@/assets/newIcon'
 import { YakitInput } from '../yakitUI/YakitInput/YakitInput'
 import { NetWorkApi } from '@/services/fetch'
 import { API } from '@/services/swagger/resposeType'
@@ -110,7 +109,6 @@ import {
   grpcFetchLocalYakitVersion,
   grpcFetchLocalYakVersion,
 } from '@/apiUtils/grpc'
-import { WebsiteGV } from '@/enums/website'
 
 import renyanIcon from '@/assets/renyan-icon.svg'
 import { productConfig } from '@/config/product'
@@ -2025,10 +2023,9 @@ const UIOpUpdateYakit: React.FC<UIOpUpdateProps> = React.memo((props) => {
   })
 
   const handleOpenPath = useMemoizedFn(async () => {
-    const EditionName = getReleaseEditionCompatibilityName().replace(/\s+/g, '')
     const Version = lastVersion || version
     const cleanVersion = Version.startsWith('v') ? Version.substring(1) : Version
-    const filename = `${EditionName}-${cleanVersion}`
+    const filename = `${productConfig.artifactPrefix}-${cleanVersion}`
     try {
       const fileExists = await yakitShell.checkYakitInstallFile(filename)
       if (fileExists) {
@@ -2470,7 +2467,7 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
         const data = res.data || []
         try {
           data.forEach((item) => {
-            if (item.type === 'yakit') {
+            if (item.type === 'yakit' && productConfig.clientUpdateEnabled) {
               const content: UpdateContentProp = JSONParseLog(item.content, {
                 page: 'FuncDomain',
                 fun: 'fetchYakitAndYaklangVersionInfo-yakit',
@@ -2516,7 +2513,7 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
 
   useDebounceEffect(
     () => {
-      if (!isEnpriTrace()) return
+      if (!productConfig.clientUpdateEnabled || !isEnpriTrace()) return
       // 是否从内网读取版本号
       let intranet = false
       eeSystemConfig.forEach((item) => {
@@ -2536,6 +2533,7 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
 
   // 获取最新内网版本号
   const fetchIntranetYakitVersion = useMemoizedFn((isShowInfo: boolean = false) => {
+    if (!productConfig.clientUpdateEnabled) return
     if (isIntranet) {
       // 从内网读取版本号
       grpcFetchIntranetYakitVersion()
@@ -2579,6 +2577,10 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
 
   /** 获取最新Yakit版本号 */
   const fetchYakitLastVersion = useMemoizedFn(() => {
+    if (!productConfig.clientUpdateEnabled) {
+      setYakitLastVersion('')
+      return
+    }
     /** 社区版埋点 */
     if (isCommunityEdition()) visitorsStatisticsFun()
     grpcFetchLatestYakitVersion(undefined, true)
@@ -2672,11 +2674,13 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
       versionsInfoTime.current = setInterval(fetchYakitAndYaklangVersionInfo, 60000)
       fetchYakitAndYaklangVersionInfo()
 
-      // 获取本地的 yakit 版本号，启动定时器(获取最新的 yakit 版本号)
+      // 获取本地客户端版本号；仅在配置发布渠道后查询在线版本
       grpcFetchLocalYakitVersion(true).then((v: string) => setYakitVersion(`v${v}`))
       if (yakitTime.current) clearInterval(yakitTime.current)
-      fetchYakitLastVersion()
-      yakitTime.current = setInterval(fetchYakitLastVersion, 60000)
+      if (productConfig.clientUpdateEnabled) {
+        fetchYakitLastVersion()
+        yakitTime.current = setInterval(fetchYakitLastVersion, 60000)
+      }
 
       // 获取当前连接引擎的版本号，启动定时器(获取最新和本地引擎文件的版本号)
       yakitEngine.requestYakVersion()
@@ -2782,7 +2786,9 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
   const isUpdate = useMemo(() => {
     const unRead = messageList.filter((item) => !item.isRead).length > 0
     return (
-      (yakitLastVersion !== '' && removePrefixV(yakitLastVersion) !== removePrefixV(yakitVersion)) ||
+      (productConfig.clientUpdateEnabled &&
+        yakitLastVersion !== '' &&
+        removePrefixV(yakitLastVersion) !== removePrefixV(yakitVersion)) ||
       lowerYaklangLastVersion ||
       unRead
     )
@@ -2860,9 +2866,14 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
   })
 
   const notice = useMemo(() => {
-    const isUpdateYakit = yakitLastVersion !== '' && removePrefixV(yakitLastVersion) !== removePrefixV(yakitVersion)
+    const isUpdateYakit =
+      productConfig.clientUpdateEnabled &&
+      yakitLastVersion !== '' &&
+      removePrefixV(yakitLastVersion) !== removePrefixV(yakitVersion)
     const isUpdateYakitIntranet =
-      yakitLastIntranetVersion !== '' && removePrefixV(yakitLastIntranetVersion) !== removePrefixV(yakitVersion)
+      productConfig.clientUpdateEnabled &&
+      yakitLastIntranetVersion !== '' &&
+      removePrefixV(yakitLastIntranetVersion) !== removePrefixV(yakitVersion)
     const isUpdateYaklang = lowerYaklangLastVersion
 
     return (
@@ -2926,7 +2937,7 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
             <div className={styles['notice-version-wrapper']}>
               <div className={styles['version-wrapper']}>
                 {/* 企业版内网Yakit更新 - 无需显示更新内容 */}
-                {isEnpriTrace() && !isYakitIntranetDownloading && (
+                {productConfig.clientUpdateEnabled && isEnpriTrace() && !isYakitIntranetDownloading && (
                   <UIOpUpdateYakit
                     version={yakitVersion}
                     lastVersion={yakitLastIntranetVersion}
@@ -2940,17 +2951,19 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
                   />
                 )}
 
-                <UIOpUpdateYakit
-                  version={yakitVersion}
-                  lastVersion={yakitLastVersion}
-                  isUpdateWait={isYakitUpdateWait}
-                  onDownload={onDownload}
-                  role={userInfo.role}
-                  updateContent={communityYakit}
-                  onUpdateEdit={UpdateContentEdit}
-                  isUpdate={isUpdateYakit}
-                  onResetUpdateWait={() => setIsYakitUpdateWait(false)}
-                />
+                {productConfig.clientUpdateEnabled && (
+                  <UIOpUpdateYakit
+                    version={yakitVersion}
+                    lastVersion={yakitLastVersion}
+                    isUpdateWait={isYakitUpdateWait}
+                    onDownload={onDownload}
+                    role={userInfo.role}
+                    updateContent={communityYakit}
+                    onUpdateEdit={UpdateContentEdit}
+                    isUpdate={isUpdateYakit}
+                    onResetUpdateWait={() => setIsYakitUpdateWait(false)}
+                  />
+                )}
                 <UIOpUpdateYaklang
                   version={yaklangVersion}
                   lastVersion={yaklangLastVersion}
@@ -2965,14 +2978,6 @@ export const UIOpNotice: React.FC<UIOpNoticeProp> = React.memo((props) => {
                   isUpdate={isUpdateYaklang}
                   isUpdateYakit={isUpdateYakit}
                 />
-              </div>
-              <div className={styles['history-version']}>
-                <div
-                  className={styles['content-style']}
-                  onClick={() => yakitShell.openExternal(WebsiteGV.YakitHistoryVersionAddress)}
-                >
-                  <GithubSvgIcon className={styles['icon-style']} /> 历史版本
-                </div>
               </div>
             </div>
           ) : (

@@ -127,6 +127,31 @@ const _ensureDir = (dir) => {
   } catch (e) {}
 }
 
+const getAvailableArchivePath = (directory, filename) => {
+  const extension = path.extname(filename)
+  const stem = filename.slice(0, -extension.length)
+  let index = 1
+  let candidate = path.join(directory, `${stem}-legacy${extension}`)
+
+  while (fs.existsSync(candidate)) {
+    index += 1
+    candidate = path.join(directory, `${stem}-legacy-${index}${extension}`)
+  }
+
+  return candidate
+}
+
+const resolveBrandedFilePath = (directory, legacyFilename, brandedFilename) => {
+  _ensureDir(directory)
+  const legacyPath = path.join(directory, legacyFilename)
+  const brandedPath = path.join(directory, brandedFilename)
+  if (!fs.existsSync(legacyPath)) return brandedPath
+
+  const destination = fs.existsSync(brandedPath) ? getAvailableArchivePath(directory, brandedFilename) : brandedPath
+  fs.renameSync(legacyPath, destination)
+  return brandedPath
+}
+
 // --- 派生路径 getter ---
 
 const getYaklangEngineDir = () => path.join(getYakitHome(), 'yak-engine')
@@ -167,15 +192,16 @@ const loadExtraFilePath = (s) => {
 }
 
 const getBasicDir = () => path.join(getYakitHome(), 'base')
-const getLocalCachePath = () => path.join(getBasicDir(), 'yakit-local.json')
-const getExtraLocalCachePath = () => path.join(getBasicDir(), 'yakit-extra-local.json')
+const getLocalCachePath = () => resolveBrandedFilePath(getBasicDir(), 'yakit-local.json', 'ruiyan-local.json')
+const getExtraLocalCachePath = () =>
+  resolveBrandedFilePath(getBasicDir(), 'yakit-extra-local.json', 'ruiyan-extra-local.json')
 
 const getEngineLogDir = () => path.join(getYakitHome(), 'engine-log')
 const getRenderLogDir = () => path.join(getYakitHome(), 'render-log')
 const getPrintLogDir = () => path.join(getYakitHome(), 'print-log')
 
 const getRemoteLinkDir = () => path.join(getYakitHome(), 'auth')
-const getRemoteLinkFile = () => path.join(getRemoteLinkDir(), 'yakit-remote.json')
+const getRemoteLinkFile = () => resolveBrandedFilePath(getRemoteLinkDir(), 'yakit-remote.json', 'ruiyan-remote.json')
 
 const getCodeDir = () => path.join(getYakitHome(), 'code')
 
@@ -193,7 +219,7 @@ const getAiImageTemp = () => path.join(getYakitHome(), 'aiImageTemp')
 console.log(`---------- Global-Path Start ----------`)
 console.log(`config-dir: ${getAppConfigDir()}`)
 console.log(`config-path: ${getConfigPath()}`)
-console.log(`yakit-home: ${getYakitHome()}`)
+console.log(`ruiyan-home: ${getYakitHome()}`)
 console.log(`---------- Global-Path End ----------`)
 
 module.exports = {

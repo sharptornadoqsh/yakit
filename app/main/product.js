@@ -10,6 +10,8 @@ const requiredFields = [
   'linuxExecutableName',
   'artifactPrefix',
   'defaultDataDirectory',
+  'defaultDatabaseName',
+  'enterpriseDefaultDatabaseName',
   'updateChannel',
   'supportName',
   'copyright',
@@ -24,6 +26,10 @@ requiredFields.forEach((field) => {
     throw new Error(`Product configuration field is required: ${field}`)
   }
 })
+
+if (typeof productConfig.clientUpdateEnabled !== 'boolean') {
+  throw new Error('Product configuration field must be boolean: clientUpdateEnabled')
+}
 
 const getExecutableName = (platform = process.platform) =>
   platform === 'linux' ? productConfig.linuxExecutableName : productConfig.executableName

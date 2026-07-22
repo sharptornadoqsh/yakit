@@ -7,7 +7,10 @@
   "artifactPrefix": "RuiYan-Pentest",
   "artifactContainerPrefix": "RuiYan",
   "defaultDataDirectory": "RuiYan-Pentest",
+  "defaultDatabaseName": "default-RuiYan.db",
+  "enterpriseDefaultDatabaseName": "company-default-RuiYan.db",
   "updateChannel": "stable",
+  "clientUpdateEnabled": false,
   "supportName": "sharptornadoqsh",
   "copyright": "Copyright © 2026 sharptornadoqsh. 原项目贡献者保留权利声明。",
   "primaryColor": "#315EFB",
@@ -16,9 +19,5 @@
   "errorColor": "#E5484D",
   "edition": "社区版",
   "tagline": "自动化渗透与验证工作台",
-  "repositoryUrl": "https://github.com/sharptornadoqsh/yakit",
-  "issuesUrl": "https://github.com/sharptornadoqsh/yakit/issues",
-  "licenseUrl": "https://github.com/sharptornadoqsh/yakit/blob/qsh/LICENSE",
-  "thirdPartyNoticesUrl": "https://github.com/sharptornadoqsh/yakit/blob/qsh/product/legal/THIRD_PARTY_NOTICES.md",
   "upstreamDocumentationUrl": "https://www.yaklang.com/docs/intro"
 }

@@ -327,7 +327,8 @@
 }
 
 .renyan-project-modal-body {
-  height: calc(100vh - 176px);
+  height: min(720px, calc(100vh - 136px));
+  min-height: 520px;
   padding: 0;
   overflow: hidden;
 }
