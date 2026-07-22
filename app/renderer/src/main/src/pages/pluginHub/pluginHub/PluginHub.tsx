@@ -1,6 +1,7 @@
 import React, { memo, useEffect, useRef, useState } from 'react'
 import { useInViewport, useMemoizedFn } from 'ahooks'
 import { PluginSourceType, PluginToDetailInfo } from '../type'
+import { PluginHubSourceType } from '../defaultConstant'
 import { PluginHubList } from '../pluginHubList/PluginHubList'
 import { PluginHubDetail, PluginHubDetailRefProps } from '../pluginHubDetail/PluginHubDetail'
 import { YakitHint } from '@/components/yakitUI/YakitHint/YakitHint'
@@ -23,7 +24,7 @@ interface PluginHubProps {}
 
 const PluginHub: React.FC<PluginHubProps> = memo((props) => {
   const {} = props
-  const [active, setActive] = useState<PluginSourceType>()
+  const [active, setActive] = useState<PluginHubSourceType>()
 
   const wrapper = useRef<HTMLDivElement>(null)
   const [inViewport] = useInViewport(wrapper)
@@ -117,7 +118,7 @@ const PluginHub: React.FC<PluginHubProps> = memo((props) => {
           <PluginHubDetail
             ref={detailRef}
             rootElementId={wrapperId}
-            active={active}
+            active={active === 'team' ? undefined : (active as PluginSourceType)}
             onBack={onBack}
             embedded={true}
             autoOpenDetailTab={autoOpenDetailTab}

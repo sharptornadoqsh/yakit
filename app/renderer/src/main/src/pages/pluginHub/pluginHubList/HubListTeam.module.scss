@@ -1,0 +1,66 @@
+.wrapper {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 180px minmax(220px, 1fr) repeat(3, 150px) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.teamSelect {
+  width: 100%;
+}
+
+.pluginInfo {
+  display: flex;
+  min-width: 180px;
+  flex-direction: column;
+  gap: 4px;
+
+  span {
+    color: var(--Colors-Use-Neutral-Text-3-Secondary);
+    font-size: 12px;
+  }
+}
+
+.importResults {
+  padding: 12px;
+  border: 1px solid var(--Colors-Use-Neutral-Border);
+  border-radius: 8px;
+  background: var(--Colors-Use-Neutral-Bg-Hover);
+}
+
+.resultList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.result-failed {
+  color: var(--Colors-Use-Error-Primary);
+}
+
+.result-created,
+.result-updated,
+.result-success {
+  color: var(--Colors-Use-Success-Primary);
+}
+
+.result-skipped {
+  color: var(--Colors-Use-Warning-Primary);
+}
+
+@media (max-width: 1400px) {
+  .toolbar {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
+}

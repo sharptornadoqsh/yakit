@@ -21,7 +21,7 @@ const USER_INFO = createUserInfo()
 const resetUserInfo = () => Object.assign(USER_INFO, createUserInfo())
 const expireUserInfo = () => {
   const expiredUserInfo = { ...USER_INFO, token: null }
-  resetUserInfo()
+  if (!USER_INFO.isLogin || USER_INFO.platform === 'company') resetUserInfo()
   return expiredUserInfo
 }
 const HttpSetting = {

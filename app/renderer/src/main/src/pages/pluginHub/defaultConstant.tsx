@@ -13,8 +13,10 @@ import { ExportYakScriptStreamRequest } from '../plugins/local/PluginsLocalType'
 import { defaultFilter, defaultSearch } from '../plugins/builtInData'
 import { convertLocalPluginsRequestParams } from '../plugins/utils'
 
+export type PluginHubSourceType = PluginSourceType | 'team'
+
 interface HubNavigationItem {
-  value: PluginSourceType
+  value: PluginHubSourceType
   label: string | (() => ReactNode)
   icon?: ReactNode
 }
@@ -23,6 +25,11 @@ export const HubSideBarList: HubNavigationItem[] = [
   {
     value: 'online',
     label: 'PluginHubList.online',
+    icon: <OutlineOnlinePluginIcon />,
+  },
+  {
+    value: 'team',
+    label: () => '团队插件',
     icon: <OutlineOnlinePluginIcon />,
   },
   { value: 'own', label: 'PluginHubList.own', icon: <OutlineOwnPluginIcon /> },

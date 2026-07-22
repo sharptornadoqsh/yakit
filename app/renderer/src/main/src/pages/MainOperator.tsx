@@ -9,7 +9,7 @@ import {
   setYaklangCompletions,
 } from '../utils/monacoSpec/yakCompletionSchema'
 import { setUpYaklangMonaco } from '../utils/monacoSpec/yakEditor'
-import { useGetState, useMemoizedFn, useUpdateEffect } from 'ahooks'
+import { useMemoizedFn, useUpdateEffect } from 'ahooks'
 import { AutoSpin } from '../components/AutoSpin'
 import { addToTab } from './MainTabs'
 import Login from './Login'
@@ -58,7 +58,7 @@ import { grpcSetGlobalProxyRulesConfig } from '@/apiUtils/grpc'
 import { MITMConsts } from './mitm/MITMConsts'
 import { checkProxyVersion } from '@/utils/proxyConfigUtil'
 import { RuiYanAppShell } from '@/components/renyanUI'
-import { RENYAN_SHELL_EVENTS } from '@/routes/renyanMenu'
+import { useLoginPrompt } from '@/components/layout/hooks/useLoginPrompt'
 
 import './main.scss'
 import './GlobalClass.scss'
@@ -323,17 +323,6 @@ const Main: React.FC<MainProp> = React.memo((props) => {
   // 修改密码弹框
   const [passwordShow, setPasswordShow] = useState<boolean>(false)
 
-  // 登录框状态
-  const [loginshow, setLoginShow, getLoginShow] = useGetState<boolean>(false)
-
-  useEffect(() => {
-    const openLogin = (command: string) => {
-      if (command === RENYAN_SHELL_EVENTS.openLogin) setLoginShow(true)
-    }
-    emiter.on('onUIOpSettingMenuSelect', openLogin)
-    return () => emiter.off('onUIOpSettingMenuSelect', openLogin)
-  }, [])
-
   /** ---------- 远程控制 start ---------- */
   // 远程控制浮层
   const [controlShow, setControlShow] = useState<boolean>(false)
@@ -384,6 +373,7 @@ const Main: React.FC<MainProp> = React.memo((props) => {
   /** ---------- 远程控制 end ---------- */
   /** ---------- 登录状态变化的逻辑 start ---------- */
   const { userInfo, setStoreUserInfo } = useStore()
+  const { loginShow, closeLogin } = useLoginPrompt(userInfo.isLogin)
 
   useEffect(() => {
     ipcRenderer.on('fetch-signin-token', (e, res: UserInfoProps) => {
@@ -696,7 +686,7 @@ const Main: React.FC<MainProp> = React.memo((props) => {
             </div>
           </AutoSpin>
 
-          {loginshow && <Login visible={loginshow} onCancel={() => setLoginShow(false)}></Login>}
+          {loginShow && <Login visible={loginShow} onCancel={closeLogin}></Login>}
           <YakitModal
             visible={passwordShow}
             title={t('Main.setPassword')}

@@ -1,0 +1,8 @@
+{
+  "extends": "../app/renderer/src/main/tsconfig.json",
+  "include": ["../app/renderer/src/main/src"],
+  "exclude": [
+    "../app/renderer/src/main/env-cmdrc",
+    "../app/renderer/src/main/src/components/layout/hooks/__test__/useLoginPrompt.test.tsx"
+  ]
+}

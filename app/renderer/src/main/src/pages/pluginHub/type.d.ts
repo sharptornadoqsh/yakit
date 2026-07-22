@@ -1,5 +1,5 @@
-/** 插件来源类型(线上|我的|本地|回收站) */
-export type PluginSourceType = 'online' | 'own' | 'local' | 'recycle' | 'setting'
+/** 插件来源类型(线上|我的|本地|团队|回收站) */
+export type PluginSourceType = 'online' | 'own' | 'local' | 'team' | 'recycle' | 'setting'
 
 /** 跳转插件详情的必要信息 */
 export interface PluginToDetailInfo {

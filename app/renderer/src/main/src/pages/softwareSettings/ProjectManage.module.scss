@@ -16,18 +16,18 @@
 
     .project-toolbar {
       width: 100%;
-      min-height: 56px;
-      padding: 10px 16px;
+      min-height: 48px;
+      padding: 8px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 12px;
       border-bottom: 1px solid var(--ruiyan-color-border);
 
       .project-summary {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         color: var(--ruiyan-color-text-secondary);
         font-size: 12px;
         line-height: 20px;
@@ -44,7 +44,7 @@
       min-height: 0;
       flex: 1;
       display: grid;
-      grid-template-columns: 168px minmax(0, 1fr);
+      grid-template-columns: 152px minmax(0, 1fr);
       overflow: hidden;
     }
 
@@ -52,12 +52,13 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      padding: 16px 12px;
+      padding: 12px 10px;
+      background: color-mix(in srgb, var(--ruiyan-color-surface-muted) 42%, var(--ruiyan-color-surface));
       border-right: 1px solid var(--ruiyan-color-border);
     }
 
     .project-group-title {
-      padding: 0 8px 8px;
+      padding: 0 8px 6px;
       color: var(--ruiyan-color-text-tertiary);
       font-size: 11px;
       line-height: 18px;
@@ -66,23 +67,23 @@
     .project-group-list {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
 
     .project-group-item {
       width: 100%;
-      min-height: 34px;
+      min-height: 32px;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 7px 9px;
+      padding: 6px 8px;
       color: var(--ruiyan-color-text-secondary);
       font: inherit;
       font-size: 12px;
       text-align: left;
       background: transparent;
       border: 0;
-      border-radius: 4px;
+      border-radius: 5px;
       cursor: pointer;
 
       &:hover,
@@ -107,13 +108,16 @@
     }
 
     .current-project-card {
-      margin-top: auto;
-      padding: 14px 8px 0;
-      border-top: 1px solid var(--ruiyan-color-border);
+      margin-top: 16px;
+      padding: 10px;
+      background: var(--ruiyan-color-surface);
+      border: 1px solid var(--ruiyan-color-border);
+      border-radius: 6px;
 
       > button {
         width: 100%;
-        margin-top: 10px;
+        min-height: 30px;
+        margin-top: 8px;
       }
     }
 
@@ -124,7 +128,7 @@
     }
 
     .current-project-name {
-      margin-top: 5px;
+      margin-top: 4px;
       overflow: hidden;
       color: var(--ruiyan-color-text);
       font-size: 13px;
@@ -147,8 +151,8 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      padding: 14px 16px 16px;
+      gap: 8px;
+      padding: 12px 14px 14px;
       overflow: hidden;
     }
 
@@ -156,22 +160,40 @@
       width: 100%;
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
+      justify-content: space-between;
+      gap: 8px 16px;
+
+      .project-operate-group {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .project-collaboration-operate {
+        margin-left: auto;
+        padding-left: 14px;
+        border-left: 1px solid var(--ruiyan-color-border);
+      }
 
       .btn-wrapper {
-        height: 36px;
-        padding: 0 12px;
+        height: 32px;
+        padding: 0 10px;
         display: inline-flex;
         align-items: center;
-        gap: 7px;
+        gap: 6px;
         color: var(--ruiyan-color-text-secondary);
         font: inherit;
         font-size: 12px;
         background: transparent;
         border: 1px solid var(--ruiyan-color-border);
-        border-radius: 5px;
+        border-radius: 4px;
         cursor: pointer;
+        transition:
+          color 120ms ease,
+          background-color 120ms ease,
+          border-color 120ms ease;
 
         &:hover,
         &:focus-visible {
@@ -188,8 +210,21 @@
       }
 
       .new-project-wrapper {
-        color: var(--ruiyan-color-primary);
-        border-color: color-mix(in srgb, var(--ruiyan-color-primary) 30%, transparent);
+        color: #fff;
+        background: var(--ruiyan-color-primary);
+        border-color: var(--ruiyan-color-primary);
+
+        &:hover,
+        &:focus-visible {
+          color: #fff;
+          background: color-mix(in srgb, var(--ruiyan-color-primary) 88%, #000);
+          border-color: color-mix(in srgb, var(--ruiyan-color-primary) 88%, #000);
+        }
+      }
+
+      .project-collaboration-operate .btn-wrapper {
+        background: var(--ruiyan-color-surface-muted);
+        border-color: transparent;
       }
     }
 
@@ -236,7 +271,9 @@
       width: 100%;
       flex: 1;
       overflow: hidden;
-      border-top: 1px solid var(--ruiyan-color-border);
+      background: var(--ruiyan-color-surface);
+      border: 1px solid var(--ruiyan-color-border);
+      border-radius: 6px;
       .project-table-body {
         width: 100%;
         height: 100%;
@@ -245,7 +282,7 @@
 
         .table-header-wrapper {
           width: 100%;
-          height: 36px;
+          height: 38px;
           padding: 6px 0 6px 4px;
           display: flex;
           gap: 4px;
@@ -257,6 +294,12 @@
 
           background: var(--ruiyan-color-surface-muted);
           border-bottom: 1px solid var(--ruiyan-color-border);
+
+          > div:last-child {
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+          }
 
           .header-titles {
             height: 24px;
@@ -294,6 +337,7 @@
             align-items: center;
             gap: 4px;
             cursor: pointer;
+            transition: background-color 120ms ease;
             .opt-content {
               flex: 1;
               height: 100%;
@@ -355,7 +399,7 @@
           }
 
           .table-empty-wrapper {
-            padding: 100px;
+            padding: 64px 32px;
             .title-style {
               margin-top: 24px;
               height: 16px;
@@ -450,11 +494,31 @@
   .project-manage-wrapper {
     .project-manage-container {
       .project-workspace {
-        grid-template-columns: 144px minmax(0, 1fr);
+        grid-template-columns: 132px minmax(0, 1fr);
+      }
+
+      .project-group-panel {
+        padding-inline: 8px;
       }
 
       .project-list-panel {
-        padding-inline: 12px;
+        padding: 10px;
+      }
+    }
+  }
+}
+
+@media (max-width: 1160px) {
+  .project-manage-wrapper {
+    .project-manage-container {
+      .project-operate {
+        justify-content: flex-start;
+
+        .project-collaboration-operate {
+          margin-left: 0;
+          padding-left: 0;
+          border-left: 0;
+        }
       }
     }
   }
@@ -498,16 +562,20 @@
   }
 }
 .project-name-wrapper {
-  color: var(--Colors-Use-Neutral-Text-1-Title);
+  color: var(--ruiyan-color-text);
   .opt-project-icon {
-    color: #56c991;
+    color: var(--ruiyan-color-primary);
   }
   .opt-floder-icon {
-    color: #ffb660;
+    color: var(--ruiyan-color-text-tertiary);
   }
 }
 .database-path-wrapper {
-  color: var(--Colors-Use-Main-Primary);
+  color: var(--ruiyan-color-text-secondary);
+
+  &:hover {
+    color: var(--ruiyan-color-primary);
+  }
 }
 // 表格操作区样式
 .project-operate-wrapper {
@@ -515,7 +583,7 @@
   height: 100%;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   .btn-wrapper {
     width: 24px;
     height: 24px;
@@ -540,14 +608,7 @@
   }
 
   .divider-style {
-    width: 1px;
-    height: 100%;
-    padding: 6px 0;
-    .boder-style {
-      width: 1px;
-      height: 100%;
-      border-left: 1px solid var(--Colors-Use-Neutral-Border);
-    }
+    display: none;
   }
   .btn-style {
     color: var(--Colors-Use-Neutral-Text-3-Secondary);

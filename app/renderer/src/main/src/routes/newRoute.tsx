@@ -199,6 +199,7 @@ const YakRunnerScanHistory = React.lazy(() => import('@/pages/yakRunnerScanHisto
 const SSACompileHistory = React.lazy(() => import('@/pages/ssaCompileHistory/SSACompileHistory'))
 const MemoryBase = React.lazy(() => import('@/pages/memoryBase/MemoryBase'))
 const ConfigManagement = React.lazy(() => import('@/pages/configManagement/ConfigManagement'))
+const TeamCollaborationPage = React.lazy(() => import('@/pages/teamCollaboration/TeamCollaborationPage'))
 const AITool = React.lazy(() => import('@/pages/aiTool/AITool'))
 const AIForge = React.lazy(() => import('@/pages/aiForge/AIForge'))
 
@@ -212,6 +213,10 @@ export const YakitRouteToPageInfo: Record<
   { label: string; labelUi?: string; describe?: string; describeUi?: string }
 > = {
   'new-home': { label: '首页', labelUi: 'YakitRoute.home' },
+  'team-collaboration': {
+    label: '团队协作',
+    describe: '管理团队项目、成员权限、共享测试资料与同步记录',
+  },
   httpHacker: {
     label: '交互代理',
     labelUi: 'YakitRoute.MITM',
@@ -473,6 +478,7 @@ export const SingletonPageRoute: YakitRoute[] = [
   YakitRoute.AI_Memory,
   YakitRoute.AI_Tool,
   YakitRoute.AI_Forge,
+  YakitRoute.TeamCollaboration,
 ]
 /** 不需要软件安全边距的页面路由 */
 export const NoPaddingRoute: YakitRoute[] = [
@@ -803,6 +809,12 @@ export const RouteToPage: (props: PageItemProps) => ReactNode = (props) => {
       return <NewPayload />
     case YakitRoute.ConfigManagement:
       return <ConfigManagement />
+    case YakitRoute.TeamCollaboration:
+      return (
+        <Suspense fallback={<RenyanState type="loading" />}>
+          <TeamCollaborationPage />
+        </Suspense>
+      )
     case YakitRoute.AccountAdminPage:
       return <AccountAdminPage />
     case YakitRoute.RoleAdminPage:
@@ -1923,6 +1935,12 @@ export const PrivateAllMenus: Record<string, PrivateRouteMenuProps> = {
     hoverIcon: <PrivateSolidProjectManagerIcon />,
     ...YakitRouteToPageInfo[YakitRoute.YakRunner_Project_Manager],
   },
+  [YakitRoute.TeamCollaboration]: {
+    page: YakitRoute.TeamCollaboration,
+    icon: <PrivateOutlineProjectManagerIcon />,
+    hoverIcon: <PrivateSolidProjectManagerIcon />,
+    ...YakitRouteToPageInfo[YakitRoute.TeamCollaboration],
+  },
   [YakitRoute.YakRunner_Code_Scan]: {
     page: YakitRoute.YakRunner_Code_Scan,
     icon: <PrivateOutlineCodeScanIcon />,
@@ -2124,6 +2142,15 @@ export const PrivateExpertRouteMenu: PrivateRouteMenuProps[] = isIRify()
         labelUi: 'YakitRoute.dataProcessing',
         children: routeToChildren([YakitRoute.Codec, YakitRoute.DataCompare]),
       },
+      ...(isEnpriTrace()
+        ? [
+            {
+              page: undefined,
+              label: '团队协作',
+              children: routeToChildren([YakitRoute.TeamCollaboration]),
+            },
+          ]
+        : []),
       {
         page: undefined,
         label: '数据库',

@@ -50,6 +50,7 @@ import { useUploadInfoByEnpriTrace } from '@/components/layout/utils'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { Trans } from 'react-i18next'
 import { getProjectDisplayText } from './projectBranding'
+import { ProjectShareModal } from './projectShare/ProjectShareModal'
 
 const { ipcRenderer } = window.require('electron')
 const { YakitPanel } = YakitCollapse
@@ -272,6 +273,10 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
 
   const [typeShow, setTypeShow] = useState<boolean>(false)
   const [timeShow, setTimeShow] = useState<boolean>(false)
+  const [projectShareModal, setProjectShareModal] = useState<{ open: boolean; mode: 'share' | 'import' }>({
+    open: false,
+    mode: 'share',
+  })
   const { eeSystemConfig } = useEeSystemConfig()
   const projectHeader: HeaderProp<ProjectDescription>[] = useMemo(() => {
     let header: HeaderProp<ProjectDescription>[] = [
@@ -1218,49 +1223,73 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
 
           <section className={styles['project-list-panel']}>
             <div className={styles['project-operate']}>
-              <button
-                type="button"
-                className={classNames(styles['btn-wrapper'], styles['new-temporary-project-wrapper'])}
-                onClick={async () => {
-                  if (await getTemporaryProjectId()) {
-                    setDetectionTemporaryProjectVisible(true)
-                  } else {
-                    await creatTemporaryProject()
-                  }
-                }}
-              >
-                <RuiYanIcon name="environment" />
-                <span>{t('ProjectManage.temporaryProject')}</span>
-              </button>
+              <div className={styles['project-operate-group']} aria-label="本地项目操作">
+                <button
+                  type="button"
+                  className={classNames(styles['btn-wrapper'], styles['new-temporary-project-wrapper'])}
+                  onClick={async () => {
+                    if (await getTemporaryProjectId()) {
+                      setDetectionTemporaryProjectVisible(true)
+                    } else {
+                      await creatTemporaryProject()
+                    }
+                  }}
+                >
+                  <RuiYanIcon name="environment" />
+                  <span>{t('ProjectManage.temporaryProject')}</span>
+                </button>
 
-              <button
-                type="button"
-                className={classNames(styles['btn-wrapper'], styles['new-project-wrapper'])}
-                onClick={() => operateFunc('newProject')}
-              >
-                <RuiYanIcon name="plus" />
-                <span>{t('ProjectManage.newProject')}</span>
-              </button>
+                <button
+                  type="button"
+                  className={classNames(styles['btn-wrapper'], styles['new-project-wrapper'])}
+                  onClick={() => operateFunc('newProject')}
+                >
+                  <RuiYanIcon name="plus" />
+                  <span>{t('ProjectManage.newProject')}</span>
+                </button>
 
-              <button
-                type="button"
-                className={classNames(styles['btn-wrapper'], styles['new-folder-wrapper'])}
-                onClick={() => operateFunc('newFolder')}
-              >
-                <RuiYanIcon name="project" />
-                <span>{t('YakitButton.newFolder')}</span>
-              </button>
+                <button
+                  type="button"
+                  className={classNames(styles['btn-wrapper'], styles['new-folder-wrapper'])}
+                  onClick={() => operateFunc('newFolder')}
+                >
+                  <RuiYanIcon name="project" />
+                  <span>{t('YakitButton.newFolder')}</span>
+                </button>
 
-              {/* { engineMode !== "remote" && ( */}
-              <button
-                type="button"
-                className={classNames(styles['btn-wrapper'], styles['import-wrapper'])}
-                onClick={() => operateFunc('import')}
+                {/* { engineMode !== "remote" && ( */}
+                <button
+                  type="button"
+                  className={classNames(styles['btn-wrapper'], styles['import-wrapper'])}
+                  onClick={() => operateFunc('import')}
+                >
+                  <RuiYanIcon name="download" />
+                  <span>{t('YakitButton.import')}</span>
+                </button>
+              </div>
+
+              <div
+                className={classNames(styles['project-operate-group'], styles['project-collaboration-operate'])}
+                aria-label="团队项目操作"
               >
-                <RuiYanIcon name="download" />
-                <span>{t('YakitButton.import')}</span>
-              </button>
-              {/* )} */}
+                <button
+                  type="button"
+                  className={classNames(styles['btn-wrapper'], styles['share-team-project-wrapper'])}
+                  onClick={() => setProjectShareModal({ open: true, mode: 'share' })}
+                >
+                  <RuiYanIcon name="project" />
+                  <span>分享当前团队项目</span>
+                </button>
+                <button
+                  type="button"
+                  className={classNames(styles['btn-wrapper'], styles['import-team-project-wrapper'])}
+                  onClick={() => setProjectShareModal({ open: true, mode: 'import' })}
+                >
+                  <RuiYanIcon name="download" />
+                  <span>通过密令导入</span>
+                </button>
+                {/* )} */}
+              </div>
             </div>
 
             {search.name && (
@@ -1480,6 +1509,12 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         loading={modalLoading}
         setLoading={setModalLoading}
         onModalSubmit={onModalSubmit}
+      />
+
+      <ProjectShareModal
+        open={projectShareModal.open}
+        mode={projectShareModal.mode}
+        onClose={() => setProjectShareModal((current) => ({ ...current, open: false }))}
       />
 
       <TransferProject

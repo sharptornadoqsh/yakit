@@ -5,6 +5,7 @@ import { HubListRecycle } from './HubListRecycle'
 import { HubListOwn } from './HubListOwn'
 import { HubListLocal } from './HubListLocal'
 import { HubListOnline } from './HubListOnline'
+import { HubListTeam } from './HubListTeam'
 import { PageNodeItemProps, PluginHubPageInfoProps, usePageInfo } from '@/store/pageInfo'
 import { shallow } from 'zustand/shallow'
 import { YakitRoute } from '@/enums/yakitRoute'
@@ -16,14 +17,14 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 
 import classNames from 'classnames'
 import styles from './PluginHubList.module.scss'
-import { HubSideBarList } from '../defaultConstant'
+import { HubSideBarList, PluginHubSourceType } from '../defaultConstant'
 import { JSONParseLog } from '@/utils/tool'
 
 interface PluginHubListProps {
   /** 根元素的id */
   rootElementId?: string
-  active?: PluginSourceType
-  setActive: (active: PluginSourceType) => void
+  active?: PluginHubSourceType
+  setActive: (active: PluginHubSourceType) => void
   isDetail: boolean
   /** 进入指定插件的详情页 */
   toPluginDetail: (info: PluginToDetailInfo) => void
@@ -204,7 +205,7 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
       <nav className={styles['hub-navigation']} aria-label={t('PluginHubList.list')}>
         <div className={styles['hub-navigation-tabs']} role="tablist">
           {HubSideBarList.map((item) => {
-            const type = item.value as PluginSourceType
+            const type = item.value as PluginHubSourceType
             const label = typeof item.label === 'string' ? t(item.label) : item.label()
             return (
               <button
@@ -250,6 +251,16 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
               externalSearchParams={searchParams}
               onChangeLocal={(searchParams) => onChangeActive('local', searchParams)}
             />
+          </div>
+        )}
+
+        {rendered.current.has('team') && (
+          <div
+            className={classNames(styles['side-content'], {
+              [styles['side-hidden-content']]: active !== 'team',
+            })}
+          >
+            <HubListTeam onInstall={handleUpdatePluginInfo} />
           </div>
         )}
 
