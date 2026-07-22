@@ -2036,6 +2036,7 @@ const UILayout: React.FC<UILayoutProp> = (props) => {
                 width={960}
                 title={t('UILayout.projectWorkspaceTitle')}
                 description={t('UILayout.projectWorkspaceDescription')}
+                closable={false}
                 onClose={softwareSettingFinish}
                 closeOnBackdrop={false}
                 bodyClassName={styles['renyan-project-modal-body']}

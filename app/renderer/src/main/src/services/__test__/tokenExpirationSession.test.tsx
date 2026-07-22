@@ -96,4 +96,16 @@ describe('token expiration session', () => {
     expect(mocks.globalUserLogout).toHaveBeenCalledTimes(1)
     expect(mocks.notifyError).toHaveBeenCalledTimes(1)
   })
+
+  it('同一企业会话的并发过期响应只退出并提示一次', () => {
+    mocks.isCommunityEdition.mockReturnValue(false)
+
+    tokenOverdue({ userInfo: companyUser })
+    tokenOverdue({ userInfo: companyUser })
+
+    expect(mocks.loginOutLocal).toHaveBeenCalledTimes(1)
+    expect(mocks.logoutDynamicControl).toHaveBeenCalledTimes(1)
+    expect(mocks.globalUserLogout).toHaveBeenCalledTimes(1)
+    expect(mocks.notifyError).toHaveBeenCalledTimes(1)
+  })
 })

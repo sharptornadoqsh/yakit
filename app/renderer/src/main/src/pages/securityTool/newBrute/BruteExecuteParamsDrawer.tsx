@@ -244,7 +244,11 @@ const SelectPayload: React.FC<SelectPayloadProps> = React.memo((props) => {
             <React.Fragment key={item.Name}></React.Fragment>
           )
         }
-        return <YakitSelect.Option key={item.Name}>{item.Name}</YakitSelect.Option>
+        return (
+          <YakitSelect.Option key={item.Name} value={item.Name}>
+            {item.Name}
+          </YakitSelect.Option>
+        )
       })}
     </YakitSelect>
   )

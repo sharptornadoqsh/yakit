@@ -16,17 +16,14 @@ import Login from './Login'
 import SetPassword from './SetPassword'
 import { useEeSystemConfig, UserInfoProps, useStore, yakitDynamicStatus } from '@/store'
 import { SimpleQueryYakScriptSchema } from './invoker/batch/QueryYakScriptParam'
-import { refreshToken } from '@/utils/login'
 import { getLocalValue, getRemoteValue, setLocalValue, setRemoteValue } from '@/utils/kv'
 import { NetWorkApi } from '@/services/fetch'
 import { API } from '@/services/swagger/resposeType'
 import {
-  globalUserLogin,
   isCommunityEdition,
   isCommunityIRify,
   isEnpriTrace,
   isEnpriTraceAgent,
-  isEnterpriseOrSimpleEdition,
   isIRify,
   isMemfit,
 } from '@/utils/envfile'
@@ -59,6 +56,7 @@ import { MITMConsts } from './mitm/MITMConsts'
 import { checkProxyVersion } from '@/utils/proxyConfigUtil'
 import { RuiYanAppShell } from '@/components/renyanUI'
 import { useLoginPrompt } from '@/components/layout/hooks/useLoginPrompt'
+import { useUserSession } from '@/components/layout/hooks/useUserSession'
 
 import './main.scss'
 import './GlobalClass.scss'
@@ -374,36 +372,9 @@ const Main: React.FC<MainProp> = React.memo((props) => {
   /** ---------- 登录状态变化的逻辑 start ---------- */
   const { userInfo, setStoreUserInfo } = useStore()
   const { loginShow, closeLogin } = useLoginPrompt(userInfo.isLogin)
-
-  useEffect(() => {
-    ipcRenderer.on('fetch-signin-token', (e, res: UserInfoProps) => {
-      // 刷新用户信息
-      setStoreUserInfo(res)
-      // 刷新引擎
-      globalUserLogin(res.token)
-    })
-    return () => {
-      ipcRenderer.removeAllListeners('fetch-signin-token')
-    }
-  }, [])
-
-  useEffect(() => {
-    // 企业版初始进入页面（已登录）已获取用户信息 因此刷新
-    if (isEnterpriseOrSimpleEdition()) {
-      ipcRenderer.send('company-refresh-in')
-    }
-  }, [])
+  useUserSession(userInfo, setStoreUserInfo)
 
   /** ---------- 登录状态变化的逻辑 end ---------- */
-  // 刷新登录状态的token
-  useEffect(() => {
-    ipcRenderer.on('refresh-token', (e, res: any) => {
-      refreshToken(userInfo)
-    })
-    return () => {
-      ipcRenderer.removeAllListeners('refresh-token')
-    }
-  }, [])
   // 加载补全
   useEffect(() => {
     ipcRenderer.invoke('GetYakitCompletionRaw').then((data: { RawJson: Uint8Array }) => {

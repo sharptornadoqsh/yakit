@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import { Select } from 'antd'
 import { describe, expect, it, vi } from 'vitest'
 import {
   RuiYanBreadcrumb,
@@ -187,6 +188,22 @@ describe('睿眼公共组件', () => {
 
     expect(screen.getByRole('dialog', { name: '高级配置' })).toHaveTextContent('配置真实代理参数')
     expect(screen.getByRole('button', { name: '代理设置' })).toBeInTheDocument()
+  })
+
+  it('抽屉内的下拉选项挂载到当前对话框', async () => {
+    render(
+      <RuiYanDrawer open title="额外参数" onClose={vi.fn()}>
+        <Select aria-label="爆破用户字典">
+          <Select.Option value="user_top10">user_top10</Select.Option>
+        </Select>
+      </RuiYanDrawer>,
+    )
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '爆破用户字典' }))
+
+    const dialog = screen.getByRole('dialog', { name: '额外参数' })
+    const option = await screen.findByRole('option', { name: 'user_top10' })
+    expect(dialog).toContainElement(option)
   })
 
   it('命令式弹窗返回可销毁句柄并沿用统一对话框结构', async () => {

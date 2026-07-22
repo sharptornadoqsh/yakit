@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import classNames from 'classnames'
+import { ConfigProvider } from 'antd'
 import { RuiYanIcon, type RuiYanIconName } from './RuiYanIcons'
 import styles from './RuiYanUI.module.scss'
 
@@ -623,28 +624,30 @@ const RuiYanOverlay: React.FC<RuiYanOverlayProps> = ({
         if (closeOnBackdrop && event.target === event.currentTarget) onClose()
       }}
     >
-      <div
-        ref={containerRef}
-        className={styles[kind]}
-        style={width ? { width } : undefined}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-      >
-        <header className={styles[`${kind}-header`]}>
-          <div className={styles['overlay-heading']}>
-            <h2 id={titleId}>{title}</h2>
-            {description ? <p>{description}</p> : null}
+      <ConfigProvider getPopupContainer={() => containerRef.current || document.body}>
+        <div
+          ref={containerRef}
+          className={styles[kind]}
+          style={width ? { width } : undefined}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          tabIndex={-1}
+        >
+          <header className={styles[`${kind}-header`]}>
+            <div className={styles['overlay-heading']}>
+              <h2 id={titleId}>{title}</h2>
+              {description ? <p>{description}</p> : null}
+            </div>
+            {closable ? <RuiYanIconButton icon={<RuiYanIcon name="close" />} label="关闭" onClick={onClose} /> : null}
+          </header>
+          <div className={classNames(styles['overlay-content'], navigation && styles['overlay-content-split'])}>
+            {navigation ? <aside className={styles['overlay-navigation']}>{navigation}</aside> : null}
+            <div className={classNames(styles[`${kind}-body`], bodyClassName)}>{children}</div>
           </div>
-          {closable ? <RuiYanIconButton icon={<RuiYanIcon name="close" />} label="关闭" onClick={onClose} /> : null}
-        </header>
-        <div className={classNames(styles['overlay-content'], navigation && styles['overlay-content-split'])}>
-          {navigation ? <aside className={styles['overlay-navigation']}>{navigation}</aside> : null}
-          <div className={classNames(styles[`${kind}-body`], bodyClassName)}>{children}</div>
+          {footer ? <footer className={styles[`${kind}-footer`]}>{footer}</footer> : null}
         </div>
-        {footer ? <footer className={styles[`${kind}-footer`]}>{footer}</footer> : null}
-      </div>
+      </ConfigProvider>
     </div>,
     document.body,
   )

@@ -7,6 +7,8 @@ import { yakitNetwork } from './electronBridge'
 import i18n from '@/i18n/i18n'
 const tOriginal = i18n.getFixedT(null, 'utils')
 
+let tokenExpirationHandled = false
+
 export interface AxiosResponseInfoProps {
   message?: string
   reason?: string
@@ -84,10 +86,16 @@ export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, res
 
 export const tokenOverdue = (res?: TokenOverdueResponse) => {
   if (isCommunityEdition()) return
+  if (tokenExpirationHandled) return
+  tokenExpirationHandled = true
 
   const userInfo = res?.userInfo || res?.data?.userInfo
   if (userInfo) loginOutLocal(userInfo)
   yakitNetwork.logoutDynamicControl({ loginOut: false })
   void globalUserLogout()
   failed(tOriginal('servicesFetch.loginExpired'))
+}
+
+export const resetTokenExpirationState = (_token?: string) => {
+  tokenExpirationHandled = false
 }
