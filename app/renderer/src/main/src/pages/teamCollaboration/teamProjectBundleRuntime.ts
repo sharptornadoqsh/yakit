@@ -90,6 +90,36 @@ const saveMapping = async (mapping: TeamProjectMapping) => {
 
 const getProjectType = async () => ((await import('@/utils/envfile')).isIRify() ? 'ssa_project' : 'project')
 
+const exportProjectArchive = async (
+  ipc: ProjectTransferIpc,
+  project: LocalProjectReference,
+  projectType: string,
+): Promise<string> => {
+  const currentProject = await ipc.invoke('GetCurrentProjectEx', { Type: projectType })
+  const currentProjectId = currentProject?.Id ?? currentProject?.id
+  const isCurrentProject =
+    currentProjectId !== undefined && currentProjectId !== null && String(currentProjectId) === String(project.id)
+
+  if (isCurrentProject) {
+    await ipc.invoke('SetCurrentProject', { Id: 0, ProjectName: '', Type: projectType })
+  }
+  try {
+    return await runProjectTransfer(ipc, {
+      channel: 'ExportProject',
+      params: { Id: project.id, Password: '' },
+      requireTargetPath: true,
+    })
+  } finally {
+    if (isCurrentProject) {
+      await ipc.invoke('SetCurrentProject', {
+        Id: currentProjectId,
+        ProjectName: currentProject?.ProjectName || currentProject?.name || project.name,
+        Type: projectType,
+      })
+    }
+  }
+}
+
 const importProjectArchive = async (
   ipc: ProjectTransferIpc,
   filePath: string,
@@ -124,12 +154,10 @@ export const createDefaultTeamProjectBundleDependencies = (): TeamProjectBundleD
   const ipc = window.require('electron').ipcRenderer as ProjectTransferIpc
 
   return {
-    exportLocalProject: async (project) =>
-      runProjectTransfer(ipc, {
-        channel: 'ExportProject',
-        params: { Id: project.id, Password: '' },
-        requireTargetPath: true,
-      }),
+    exportLocalProject: async (project) => {
+      const projectType = project.type || (await getProjectType())
+      return exportProjectArchive(ipc, project, projectType)
+    },
     inspectArchive: (filePath) => ipc.invoke('InspectProjectArchive', filePath) as Promise<ProjectArchiveInfo>,
     readArchiveChunk: (input) => ipc.invoke('ReadProjectArchiveChunk', input) as Promise<ProjectArchiveChunk>,
     createManagedArchive: (input) => ipc.invoke('CreateProjectArchive', input),
@@ -143,11 +171,7 @@ export const createDefaultTeamProjectBundleDependencies = (): TeamProjectBundleD
       const projectId = Number(existingProject.id)
       if (!Number.isSafeInteger(projectId) || projectId <= 0) throw new Error('同名本地项目标识无效')
       const projectType = existingProject.type || (await getProjectType())
-      const backupPath = await runProjectTransfer(ipc, {
-        channel: 'ExportProject',
-        params: { Id: projectId, Password: '' },
-        requireTargetPath: true,
-      })
+      const backupPath = await exportProjectArchive(ipc, existingProject, projectType)
       const backup = (await ipc.invoke('InspectProjectArchive', backupPath)) as ProjectArchiveInfo
       if (!Number.isSafeInteger(backup?.size) || backup.size <= 0) throw new Error('同名本地项目备份为空')
 

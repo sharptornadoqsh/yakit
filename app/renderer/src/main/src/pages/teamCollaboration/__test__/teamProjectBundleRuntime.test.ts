@@ -73,6 +73,93 @@ describe('项目导入导出流适配', () => {
     expect(ipc.removeListener).toHaveBeenCalledTimes(3)
   })
 
+  it('导出当前项目时关闭数据库连接，导出结束后恢复原项目', async () => {
+    const ipc = createIpc()
+    Object.defineProperty(window, 'require', {
+      configurable: true,
+      value: vi.fn(() => ({ ipcRenderer: ipc })),
+    })
+    vi.mocked(ipc.invoke).mockImplementation(async (channel, _params, token) => {
+      if (channel === 'GetCurrentProjectEx') {
+        return { Id: 7, ProjectName: '当前项目', Type: 'project' }
+      }
+      if (channel === 'ExportProject') {
+        queueMicrotask(() => {
+          ipc.emit(`${token}-data`, { TargetPath: 'D:/export/current.yakitproject', Percent: 1 })
+          ipc.emit(`${token}-end`)
+        })
+      }
+      return undefined
+    })
+
+    const dependencies = createDefaultTeamProjectBundleDependencies()
+
+    await expect(dependencies.exportLocalProject({ id: 7, name: '当前项目', type: 'project' })).resolves.toBe(
+      'D:/export/current.yakitproject',
+    )
+    expect(ipc.invoke).toHaveBeenCalledWith('SetCurrentProject', { Id: 0, ProjectName: '', Type: 'project' })
+    expect(ipc.invoke).toHaveBeenLastCalledWith('SetCurrentProject', {
+      Id: 7,
+      ProjectName: '当前项目',
+      Type: 'project',
+    })
+  })
+
+  it('导出非当前项目时不切换项目数据库', async () => {
+    const ipc = createIpc()
+    Object.defineProperty(window, 'require', {
+      configurable: true,
+      value: vi.fn(() => ({ ipcRenderer: ipc })),
+    })
+    vi.mocked(ipc.invoke).mockImplementation(async (channel, _params, token) => {
+      if (channel === 'GetCurrentProjectEx') {
+        return { Id: 8, ProjectName: '其他项目', Type: 'project' }
+      }
+      if (channel === 'ExportProject') {
+        queueMicrotask(() => {
+          ipc.emit(`${token}-data`, { TargetPath: 'D:/export/background.yakitproject', Percent: 1 })
+          ipc.emit(`${token}-end`)
+        })
+      }
+      return undefined
+    })
+
+    const dependencies = createDefaultTeamProjectBundleDependencies()
+
+    await expect(dependencies.exportLocalProject({ id: 7, name: '待导出项目', type: 'project' })).resolves.toBe(
+      'D:/export/background.yakitproject',
+    )
+    expect(ipc.invoke).not.toHaveBeenCalledWith('SetCurrentProject', expect.anything())
+  })
+
+  it('当前项目导出失败后仍恢复原项目', async () => {
+    const ipc = createIpc()
+    Object.defineProperty(window, 'require', {
+      configurable: true,
+      value: vi.fn(() => ({ ipcRenderer: ipc })),
+    })
+    vi.mocked(ipc.invoke).mockImplementation(async (channel, _params, token) => {
+      if (channel === 'GetCurrentProjectEx') {
+        return { Id: 7, ProjectName: '当前项目', Type: 'project' }
+      }
+      if (channel === 'ExportProject') {
+        queueMicrotask(() => ipc.emit(`${token}-error`, '导出失败'))
+      }
+      return undefined
+    })
+
+    const dependencies = createDefaultTeamProjectBundleDependencies()
+
+    await expect(dependencies.exportLocalProject({ id: 7, name: '当前项目', type: 'project' })).rejects.toThrow(
+      '导出失败',
+    )
+    expect(ipc.invoke).toHaveBeenLastCalledWith('SetCurrentProject', {
+      Id: 7,
+      ProjectName: '当前项目',
+      Type: 'project',
+    })
+  })
+
   it('使用服务端 type 查询参数分页读取归档分块', async () => {
     Object.defineProperty(window, 'require', {
       configurable: true,
