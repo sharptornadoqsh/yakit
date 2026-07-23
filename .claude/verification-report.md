@@ -19,16 +19,19 @@
 
 ## 自动验证证据
 
-- 最终报告：`D:\\CodexBuildCache\\yakit-team-sharing-acceptance\\dual-client-20260724-acceptance-06\\acceptance-report.json`。
+- 最终报告：`D:\\CodexBuildCache\\yakit-team-sharing-acceptance\\dual-client-20260724-acceptance-08\\acceptance-report.json`。
 - 结果：`passed`，二十四项检查全部通过，失败项为零。
-- 脚本 SHA-256：`b56365748862e067d9dda8b9c01f02443dcaf615439f172d6f02c1800bb24e7b`。
+- 来源提交：`a9629ccb5e9558d14ebeb6a6eaf249bf427f0977`；`sourceDirty` 为 `false`。
+- 脚本 SHA-256：`08c59ce30b2c35f765bb85eae12a37a941607bcf90a4f5d89c5ab53af02b6523`，与当前文件一致。
 - 引擎版本：`1.4.8-beta3`；引擎 SHA-256：`808582299fa6e2211ec0268d112d6de1ee9eae9824f80cbbd50f16358ce8addf`。
-- 归档大小：`717196` 字节；SHA-256：`36d5669bb55bc5a64eb75d2dd27a6c823890d49c50a59a3f7745002488329472`。
-- 甲乙项目状态 SHA-256：`86d72c3f81d44fdfbc59f2c20a662f5537a0a795a2df8d032eb3c36e1528c850`。
-- 乙端插件正文 SHA-256：`9ea732a6a5ade6a34b814cd491fe3b52b4e8ede0f178d2cec0a6e30a6d652051`；执行记录数为一。
-- 甲端进程编号为 `25444`；乙端重启前后进程编号为 `20864` 与 `15860`。
+- 归档大小：`717196` 字节；SHA-256：`941c95c00dbb23aff93ac23763ace5cbe7bd1f6ef905204e1d70a5f5c52a2406`。
+- 甲乙项目状态 SHA-256：`f7a7777fb2af4a0fd756188d29ddf1fa8f5645afe84b0d2767a9ee25e513ccb4`。
+- 乙端插件正文 SHA-256：`df97ad30f91263588babcbfd8e1751e65cee314e49f42376ec831e55b21cef47`；执行记录数为一。
+- 甲端进程编号为 `25564`；乙端重启前后进程编号为 `23112` 与 `20540`。
 - 最终活动引擎进程计数为零，`19187` 与 `19188` 均可重新绑定。
-- `teamProjectBundleRuntime.test.ts` 九项测试通过，其中三项覆盖导出一致性修改。
+- 团队协作目录四个 Vitest 文件共四十四项测试通过，其中三项覆盖导出一致性修改。
+- 全仓 TypeScript 检查通过，两个目标 TypeScript 文件通过 ESLint。
+- 六个目标文件通过 Prettier 检查，Git 差异空白检查通过。
 
 ## 证据等级与边界
 

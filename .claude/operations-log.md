@@ -1780,13 +1780,18 @@
 - 新增测试先出现两项预期失败，实现后 `teamProjectBundleRuntime.test.ts` 九项全部通过。
 - `dual-client-20260724-acceptance-04` 揭示预写日志数据未进入归档，报告正确标记失败且进程全部退出。
 - `dual-client-20260724-acceptance-05` 证明结构化项目数据已跨归档恢复；插件执行采用不返回标准输出的引擎路径，报告正确标记失败。
-- 最终成功报告：`D:\\CodexBuildCache\\yakit-team-sharing-acceptance\\dual-client-20260724-acceptance-06\\acceptance-report.json`。
+- `dual-client-20260724-acceptance-07` 完成证据名称限定、甲端查询正文作为乙端输入及项目映射 `onlineUrl` 字段验证。
+- 最终成功报告：`D:\\CodexBuildCache\\yakit-team-sharing-acceptance\\dual-client-20260724-acceptance-08\\acceptance-report.json`。
 - 最终结果为 `passed`，二十四项检查全部通过，失败项为零。
-- 甲乙项目状态摘要均为 `86d72c3f81d44fdfbc59f2c20a662f5537a0a795a2df8d032eb3c36e1528c850`。
-- 乙端插件正文摘要为 `9ea732a6a5ade6a34b814cd491fe3b52b4e8ede0f178d2cec0a6e30a6d652051`，执行记录数为一。
-- 归档大小为 `717196` 字节，SHA-256 为 `36d5669bb55bc5a64eb75d2dd27a6c823890d49c50a59a3f7745002488329472`。
-- 甲端进程编号为 `25444`；乙端重启前后进程编号为 `20864` 与 `15860`，旧进程已退出。
+- 报告来源提交为 `a9629ccb5e9558d14ebeb6a6eaf249bf427f0977`，`sourceDirty` 为 `false`，脚本摘要与工作区文件一致。
+- 甲乙项目状态摘要均为 `f7a7777fb2af4a0fd756188d29ddf1fa8f5645afe84b0d2767a9ee25e513ccb4`。
+- 乙端插件正文摘要为 `df97ad30f91263588babcbfd8e1751e65cee314e49f42376ec831e55b21cef47`，执行记录数为一。
+- 归档大小为 `717196` 字节，SHA-256 为 `941c95c00dbb23aff93ac23763ace5cbe7bd1f6ef905204e1d70a5f5c52a2406`。
+- 甲端进程编号为 `25564`；乙端重启前后进程编号为 `23112` 与 `20540`，旧进程已退出。
 - 最终活动引擎进程计数为零，`19187` 与 `19188` 均可重新绑定。
+- 团队协作目录四个 Vitest 文件共四十四项测试通过。
+- `yarn ci:tsc` 通过；两个目标 TypeScript 文件通过 ESLint。
+- 六个目标文件通过 Prettier 检查，Git 差异空白检查通过。
 - 未执行 Yakit 构建、Webpack 生产构建、应用编译或安装包打包。
 
 ### 编码后声明
