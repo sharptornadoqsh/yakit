@@ -6,6 +6,8 @@ import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { setClipboardText } from '@/utils/clipboard'
 import { success, yakitFailed } from '@/utils/notification'
 import * as teamCollaboration from '@/services/teamCollaboration'
+import { restoreTeamProjectBundle } from '@/pages/teamCollaboration/teamProjectBundle'
+import { createDefaultTeamProjectBundleDependencies } from '@/pages/teamCollaboration/teamProjectBundleRuntime'
 import {
   buildProjectShareCreateRequest,
   getProjectSharePreviewItems,
@@ -79,6 +81,10 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, mode
   const [token, setToken] = useState('')
   const [preview, setPreview] = useState<ProjectSharePreview>()
   const [importedProjectId, setImportedProjectId] = useState<number>()
+  const [importedTeamId, setImportedTeamId] = useState<number>()
+  const [localProjectName, setLocalProjectName] = useState('')
+  const [importedLocalProject, setImportedLocalProject] = useState<{ id: number | string; name: string }>()
+  const [localImportError, setLocalImportError] = useState('')
 
   const selectedProject = useMemo(() => projects.find((item) => item.id === projectId), [projectId, projects])
 
@@ -87,6 +93,10 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, mode
     setToken('')
     setPreview(undefined)
     setImportedProjectId(undefined)
+    setImportedTeamId(undefined)
+    setImportedLocalProject(undefined)
+    setLocalImportError('')
+    setLocalProjectName('')
     setUses([])
     setSelectedShare(undefined)
   })
@@ -240,7 +250,9 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, mode
     setImportedProjectId(undefined)
     try {
       const response = await service.previewProjectShare(normalizedToken)
-      setPreview(unwrapData<ProjectSharePreview>(response))
+      const nextPreview = unwrapData<ProjectSharePreview>(response)
+      setPreview(nextPreview)
+      setLocalProjectName(`${nextPreview.project_name || '共享项目'}-本地副本`)
     } catch (error) {
       setPreview(undefined)
       yakitFailed(`项目密令预览失败：${error}`)
@@ -251,17 +263,65 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, mode
 
   const importProject = useMemoizedFn(async () => {
     if (!preview || !token.trim()) return
+    if (!preview.project_bundle_available) {
+      yakitFailed('该密令未包含完整项目归档，无法创建本地副本')
+      return
+    }
     setLoading(true)
+    setLocalImportError('')
     try {
       const response = await service.importProjectShare({ token: token.trim(), name: preview.project_name })
       const imported = unwrapData<any>(response)
       const nextProjectId = Number(imported.project_id ?? imported.id ?? imported.project?.id)
       if (!Number.isFinite(nextProjectId) || nextProjectId <= 0) throw new Error('服务端未返回新项目标识')
+      const nextTeamId = Number(imported.team_id ?? imported.TeamID ?? imported.team?.id ?? preview.team_id)
+      if (!Number.isFinite(nextTeamId) || nextTeamId <= 0) throw new Error('服务端未返回团队标识')
       setImportedProjectId(nextProjectId)
-      success(`团队项目已复制，新项目标识：${nextProjectId}`)
-      onImported?.(nextProjectId)
+      setImportedTeamId(nextTeamId)
+      try {
+        const restored = await restoreTeamProjectBundle(
+          {
+            teamId: nextTeamId,
+            projectId: nextProjectId,
+            localProjectName: localProjectName.trim() || `${preview.project_name || '共享项目'}-本地副本`,
+          },
+          createDefaultTeamProjectBundleDependencies(),
+        )
+        setImportedLocalProject(restored.localProject)
+        success(`项目密令已完整导入，本地项目：${restored.localProject.name}`)
+        onImported?.(nextProjectId)
+      } catch (error) {
+        const message = `${error}`
+        setLocalImportError(message)
+        yakitFailed(`在线项目已复制，但本地副本创建失败：${message}`)
+      }
     } catch (error) {
       yakitFailed(`导入团队项目失败：${error}`)
+    } finally {
+      setLoading(false)
+    }
+  })
+
+  const retryLocalImport = useMemoizedFn(async () => {
+    if (!preview || !importedProjectId || !importedTeamId) return
+    setLoading(true)
+    setLocalImportError('')
+    try {
+      const restored = await restoreTeamProjectBundle(
+        {
+          teamId: importedTeamId,
+          projectId: importedProjectId,
+          localProjectName: localProjectName.trim() || `${preview.project_name || '共享项目'}-本地副本`,
+        },
+        createDefaultTeamProjectBundleDependencies(),
+      )
+      setImportedLocalProject(restored.localProject)
+      success(`本地项目已创建：${restored.localProject.name}`)
+      onImported?.(importedProjectId)
+    } catch (error) {
+      const message = `${error}`
+      setLocalImportError(message)
+      yakitFailed(`本地副本创建失败：${message}`)
     } finally {
       setLoading(false)
     }
@@ -411,6 +471,10 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, mode
               setToken(event.target.value)
               setPreview(undefined)
               setImportedProjectId(undefined)
+              setImportedTeamId(undefined)
+              setImportedLocalProject(undefined)
+              setLocalImportError('')
+              setLocalProjectName('')
             }}
           />
         </Form.Item>
@@ -427,13 +491,35 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, mode
               <strong>{label.includes('时间') || label.includes('有效期') ? formatDateTime(value) : value}</strong>
             </div>
           ))}
-          <RuiYanButton variant="primary" loading={loading} disabled={!!importedProjectId} onClick={importProject}>
-            确认导入为新项目
+          {preview.project_bundle_available ? (
+            <Form.Item label="本地副本名称" required>
+              <YakitInput value={localProjectName} onChange={(event) => setLocalProjectName(event.target.value)} />
+            </Form.Item>
+          ) : (
+            <div className={styles.emptyText}>该项目尚未发布本地归档，当前密令不能执行完整导入。</div>
+          )}
+          <RuiYanButton
+            variant="primary"
+            loading={loading}
+            disabled={!!importedProjectId || !preview.project_bundle_available || !localProjectName.trim()}
+            onClick={importProject}
+          >
+            完整导入在线项目与本地副本
           </RuiYanButton>
+          {localImportError && importedProjectId ? (
+            <RuiYanButton variant="secondary" loading={loading} onClick={retryLocalImport}>
+              重试创建本地副本
+            </RuiYanButton>
+          ) : null}
         </div>
       ) : null}
 
-      {importedProjectId ? <div className={styles.successPanel}>新项目标识：{importedProjectId}</div> : null}
+      {importedProjectId ? (
+        <div className={styles.successPanel}>
+          在线项目标识：{importedProjectId}
+          {importedLocalProject ? `，本地项目：${importedLocalProject.name}` : ''}
+        </div>
+      ) : null}
     </div>
   )
 
@@ -445,7 +531,7 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({ open, mode
       description={
         mode === 'share'
           ? '请从服务端团队项目列表中选择项目，本地项目标识不参与分享。'
-          : '预览确认后，服务端将创建独立项目。'
+          : '预览确认后，服务端创建独立项目，并从归档恢复本地工作副本。'
       }
       closeOnBackdrop={false}
       onClose={close}

@@ -25,6 +25,7 @@ export interface ProjectSharePreview {
   created_by?: number
   test_data_count?: number
   test_result_count?: number
+  project_bundle_available?: boolean
 }
 
 export const buildProjectShareCreateRequest = (project: TeamProjectOption, value: ProjectShareFormValue) => ({
@@ -51,4 +52,5 @@ export const getProjectSharePreviewItems = (preview: ProjectSharePreview): Array
       preview.description ||
       `测试数据 ${preview.test_data_count || 0} 项，测试结果 ${preview.test_result_count || 0} 项`,
   ],
+  ['本地归档', preview.project_bundle_available ? '可完整导入' : '未发布'],
 ]

@@ -68,13 +68,14 @@ const companyUser = {
   token: '',
 }
 
+let handleAxios: typeof import('../fetch').handleAxios
 let tokenOverdue: typeof import('../fetch').tokenOverdue
 
 describe('token expiration session', () => {
   beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
-    ;({ tokenOverdue } = await import('../fetch'))
+    ;({ handleAxios, tokenOverdue } = await import('../fetch'))
   })
 
   it('retains a community session without showing an expiration notice', () => {
@@ -107,5 +108,39 @@ describe('token expiration session', () => {
     expect(mocks.logoutDynamicControl).toHaveBeenCalledTimes(1)
     expect(mocks.globalUserLogout).toHaveBeenCalledTimes(1)
     expect(mocks.notifyError).toHaveBeenCalledTimes(1)
+  })
+
+  it('接受第二版接口的全部成功状态码', () => {
+    const resolve = vi.fn()
+    const reject = vi.fn()
+    const response = { ok: true, data: { id: 71 } }
+
+    handleAxios({ code: 201, data: response } as never, resolve, reject)
+
+    expect(resolve).toHaveBeenCalledWith(response)
+    expect(reject).not.toHaveBeenCalled()
+  })
+
+  it('保留第二版接口的冲突状态和服务端错误码', () => {
+    const resolve = vi.fn()
+    const reject = vi.fn()
+
+    handleAxios(
+      {
+        code: 409,
+        message: '项目版本冲突',
+        data: { ok: false, error: { code: 'version_conflict', message: '项目版本冲突' } },
+      } as never,
+      resolve,
+      reject,
+    )
+
+    expect(resolve).not.toHaveBeenCalled()
+    expect(reject).toHaveBeenCalledTimes(1)
+    expect(reject.mock.calls[0][0]).toMatchObject({
+      status: 409,
+      code: 'version_conflict',
+      response: { status: 409, data: { code: 'version_conflict', message: '项目版本冲突' } },
+    })
   })
 })

@@ -152,7 +152,12 @@ describe('team collaboration service', () => {
       data: snapshot,
     })
 
-    const testData = { name: 'request', data_type: 'http-flow' }
+    const testData = {
+      name: 'request',
+      type: 'http-flow',
+      metadata: { protocol: 'http' },
+      content: JSON.stringify({ request: 'GET /' }),
+    }
     await createTestData(3, 7, testData)
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
       method: 'post',
@@ -160,7 +165,12 @@ describe('team collaboration service', () => {
       data: testData,
     })
 
-    const testResult = { name: 'finding', result_type: 'risk' }
+    const testResult = {
+      name: 'finding',
+      type: 'risk',
+      metadata: { scanner: 'baseline' },
+      content: JSON.stringify({ severity: 'high' }),
+    }
     await createTestResult(3, 7, testResult)
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
       method: 'post',
@@ -233,7 +243,7 @@ describe('team collaboration service', () => {
       method: 'get',
       url: 'v2/teams/3/plugins/5/download',
       params: {},
-      responseType: 'blob',
+      responseType: 'arraybuffer',
     })
   })
 })

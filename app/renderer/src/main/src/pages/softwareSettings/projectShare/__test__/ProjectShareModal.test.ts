@@ -1,5 +1,22 @@
 import { buildProjectShareCreateRequest, getProjectSharePreviewItems } from '../projectShareData'
 
+describe('项目密令归档状态', () => {
+  it('在预览中明确展示完整本地归档是否可用', () => {
+    expect(
+      getProjectSharePreviewItems({
+        project_name: '共享项目',
+        project_bundle_available: true,
+      }),
+    ).toContainEqual(['本地归档', '可完整导入'])
+    expect(
+      getProjectSharePreviewItems({
+        project_name: '旧项目',
+        project_bundle_available: false,
+      }),
+    ).toContainEqual(['本地归档', '未发布'])
+  })
+})
+
 describe('项目密令数据转换', () => {
   it('创建请求仅使用团队项目标识', () => {
     const result = buildProjectShareCreateRequest(
@@ -40,6 +57,7 @@ describe('项目密令数据转换', () => {
       ['创建时间', '2026-07-22T08:00:00Z'],
       ['有效期至', '2026-07-29T08:00:00Z'],
       ['内容摘要', '包含测试数据与结果'],
+      ['本地归档', '未发布'],
     ])
   })
 })

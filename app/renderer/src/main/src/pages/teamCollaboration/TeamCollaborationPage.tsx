@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
+import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
@@ -19,6 +20,8 @@ import {
   listTestResults,
   updateProjectSnapshot,
 } from '@/services/teamCollaboration'
+import { publishTeamProjectBundle, restoreTeamProjectBundle, type ProjectBundleProgress } from './teamProjectBundle'
+import { createDefaultTeamProjectBundleDependencies } from './teamProjectBundleRuntime'
 import styles from './TeamCollaborationPage.module.css'
 
 type ApiEntity = Record<string, any>
@@ -78,6 +81,19 @@ const userText = (record?: ApiEntity): string =>
 
 const callApi = (fn: ApiFunction, ...args: any[]) => fn(...args)
 
+const getLocalProjectName = (project?: ApiEntity): string => `${getValue(project, ['ProjectName', 'name'])}`
+
+export const createAvailableLocalProjectCopyName = (projectName: string, localProjects: ApiEntity[]): string => {
+  const names = new Set(localProjects.map((project) => getLocalProjectName(project)))
+  const baseName = `${projectName}-本地副本`
+  if (!names.has(baseName)) return baseName
+  for (let index = 2; index <= localProjects.length + 2; index += 1) {
+    const candidate = `${baseName}-${index}`
+    if (!names.has(candidate)) return candidate
+  }
+  return `${baseName}-${localProjects.length + 3}`
+}
+
 export const TeamCollaborationPage: React.FC = React.memo(() => {
   const [teams, setTeams] = useState<ApiEntity[]>([])
   const [teamMembers, setTeamMembers] = useState<ApiEntity[]>([])
@@ -89,6 +105,12 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   const [syncInfo, setSyncInfo] = useState<ApiEntity>()
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [localProjects, setLocalProjects] = useState<ApiEntity[]>([])
+  const [selectedLocalProjectId, setSelectedLocalProjectId] = useState('')
+  const [localCopyName, setLocalCopyName] = useState('')
+  const [bundleMessage, setBundleMessage] = useState('')
+  const [localProjectConflict, setLocalProjectConflict] = useState<ApiEntity>()
+  const [conflictCopyName, setConflictCopyName] = useState('')
   const [projectName, setProjectName] = useState('')
   const [testDataName, setTestDataName] = useState('')
   const [testResultName, setTestResultName] = useState('')
@@ -103,6 +125,10 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   const selectedProject = useMemo(
     () => projects.find((project) => getId(project) === selectedProjectId),
     [projects, selectedProjectId],
+  )
+  const selectedLocalProject = useMemo(
+    () => localProjects.find((project) => getId(project) === selectedLocalProjectId),
+    [localProjects, selectedLocalProjectId],
   )
   const canWrite = useMemo(() => hasWritePermission(selectedTeam), [selectedTeam])
 
@@ -200,9 +226,33 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     [loadSync],
   )
 
+  const loadLocalProjects = useCallback(async () => {
+    if (typeof window.require !== 'function') return
+    try {
+      const { ipcRenderer } = window.require('electron')
+      const response = await ipcRenderer.invoke('GetProjects', {
+        Type: 'all',
+        Pagination: { Page: 1, Limit: 1000, Order: 'desc', OrderBy: 'updated_at' },
+      })
+      const nextProjects = (Array.isArray(response?.Projects) ? response.Projects : []).filter(
+        (project: ApiEntity) => getValue(project, ['Type', 'type']) !== 'file',
+      )
+      setLocalProjects(nextProjects)
+      setSelectedLocalProjectId((current) => {
+        if (nextProjects.some((project: ApiEntity) => getId(project) === current)) return current
+        return getId(nextProjects[0])
+      })
+    } catch (error) {
+      setLocalProjects([])
+      setSelectedLocalProjectId('')
+      setErrorMessage(getErrorMessage(error))
+    }
+  }, [])
+
   useEffect(() => {
     loadTeams()
-  }, [loadTeams])
+    loadLocalProjects()
+  }, [loadLocalProjects, loadTeams])
 
   useEffect(() => {
     setSelectedProjectId('')
@@ -214,6 +264,129 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   useEffect(() => {
     loadProjectContext(selectedTeamId, selectedProjectId)
   }, [loadProjectContext, selectedProjectId, selectedTeamId])
+
+  useEffect(() => {
+    const name = getValue(selectedProject, ['name', 'project_name', 'projectName'], '')
+    setLocalCopyName(name ? `${name}-本地副本` : '')
+    setBundleMessage('')
+    setLocalProjectConflict(undefined)
+    setConflictCopyName('')
+  }, [selectedProjectId])
+
+  const updateBundleProgress = useCallback((progress: ProjectBundleProgress) => {
+    const labels = { export: '导出本地项目', upload: '上传项目归档', download: '下载项目归档', import: '导入本地副本' }
+    setBundleMessage(`${labels[progress.stage]}：${progress.completed}/${progress.total}`)
+  }, [])
+
+  const publishLocalProject = useCallback(async () => {
+    if (!selectedTeamId || !selectedProjectId || !selectedLocalProject || !canWrite) return
+    setActionLoading('publish-project-bundle')
+    setErrorMessage('')
+    setBundleMessage('')
+    try {
+      const result = await publishTeamProjectBundle(
+        {
+          teamId: selectedTeamId,
+          projectId: selectedProjectId,
+          localProject: {
+            id: getValue(selectedLocalProject, ['Id', 'id']),
+            name: getValue(selectedLocalProject, ['ProjectName', 'name']),
+          },
+          onProgress: updateBundleProgress,
+        },
+        createDefaultTeamProjectBundleDependencies(),
+      )
+      setBundleMessage(`项目归档已发布，共 ${result.manifest.chunk_count} 个分块`)
+      await loadTeamContext(selectedTeamId)
+      await loadProjectContext(selectedTeamId, selectedProjectId)
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setActionLoading('')
+    }
+  }, [
+    canWrite,
+    loadProjectContext,
+    loadTeamContext,
+    selectedLocalProject,
+    selectedProjectId,
+    selectedTeamId,
+    updateBundleProgress,
+  ])
+
+  const executeProjectDownload = useCallback(
+    async (name: string, overwriteProject?: ApiEntity) => {
+      if (!selectedTeamId || !selectedProjectId || !name) return
+      setActionLoading('download-project-bundle')
+      setErrorMessage('')
+      setBundleMessage('')
+      try {
+        const remoteVersion = getValue(syncInfo, ['version', 'Version'], undefined)
+        const result = await restoreTeamProjectBundle(
+          {
+            teamId: selectedTeamId,
+            projectId: selectedProjectId,
+            localProjectName: name,
+            overwriteLocalProject: overwriteProject
+              ? {
+                  id: getValue(overwriteProject, ['Id', 'id']),
+                  name: getLocalProjectName(overwriteProject),
+                  type: getValue(overwriteProject, ['Type', 'type']),
+                }
+              : undefined,
+            onlineProjectVersion:
+              remoteVersion !== undefined && Number.isSafeInteger(Number(remoteVersion))
+                ? Number(remoteVersion)
+                : undefined,
+            onProgress: updateBundleProgress,
+          },
+          createDefaultTeamProjectBundleDependencies(),
+        )
+        setBundleMessage(
+          result.localProject.backupPath
+            ? `本地项目已覆盖，原项目备份保留在：${result.localProject.backupPath}`
+            : `本地副本已创建：${result.localProject.name}`,
+        )
+        await loadLocalProjects()
+        return true
+      } catch (error) {
+        setErrorMessage(getErrorMessage(error))
+        return false
+      } finally {
+        setActionLoading('')
+      }
+    },
+    [loadLocalProjects, selectedProjectId, selectedTeamId, syncInfo, updateBundleProgress],
+  )
+
+  const downloadLocalProject = useCallback(async () => {
+    const name = localCopyName.trim()
+    if (!name) return
+    const sameNameProject = localProjects.find((project) => getLocalProjectName(project) === name)
+    if (sameNameProject) {
+      setLocalProjectConflict(sameNameProject)
+      setConflictCopyName(createAvailableLocalProjectCopyName(name, localProjects))
+      return
+    }
+    await executeProjectDownload(name)
+  }, [executeProjectDownload, localCopyName, localProjects])
+
+  const downloadConflictAsCopy = useCallback(async () => {
+    const name = conflictCopyName.trim()
+    if (!name || localProjects.some((project) => getLocalProjectName(project) === name)) return
+    if (await executeProjectDownload(name)) {
+      setLocalProjectConflict(undefined)
+      setConflictCopyName('')
+    }
+  }, [conflictCopyName, executeProjectDownload, localProjects])
+
+  const overwriteConflictProject = useCallback(async () => {
+    if (!localProjectConflict) return
+    if (await executeProjectDownload(getLocalProjectName(localProjectConflict), localProjectConflict)) {
+      setLocalProjectConflict(undefined)
+      setConflictCopyName('')
+    }
+  }, [executeProjectDownload, localProjectConflict])
 
   const createProject = useCallback(async () => {
     const name = projectName.trim()
@@ -266,7 +439,12 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     if (!selectedTeamId || !selectedProjectId || !canWrite || !name) return
     setActionLoading('test-data')
     try {
-      await callApi(createTestData as ApiFunction, selectedTeamId, selectedProjectId, { name, content: {} })
+      await callApi(createTestData as ApiFunction, selectedTeamId, selectedProjectId, {
+        name,
+        type: 'manual',
+        deduplication_key: `manual-data:${Date.now()}`,
+        content: '{}',
+      })
       setTestDataName('')
       const response = await callApi(listTestData as ApiFunction, selectedTeamId, selectedProjectId)
       setTestData(getList(response, ['test_data', 'testData']))
@@ -284,8 +462,10 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     try {
       await callApi(createTestResult as ApiFunction, selectedTeamId, selectedProjectId, {
         name,
+        type: 'manual',
+        deduplication_key: `manual-result:${Date.now()}`,
         status: 'pending',
-        summary: '',
+        content: JSON.stringify({ summary: '' }),
       })
       setTestResultName('')
       const response = await callApi(listTestResults as ApiFunction, selectedTeamId, selectedProjectId)
@@ -420,6 +600,51 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                     <YakitTag color={canWrite ? 'green' : 'blue'}>{canWrite ? '写入权限' : '只读权限'}</YakitTag>
                   </div>
 
+                  <section className={`${styles['panel']} ${styles['bundle-panel']}`}>
+                    <div className={styles['panel-title']}>
+                      <h2>本地项目归档</h2>
+                      <span>{bundleMessage || '在线项目保存权威共享版本，本地项目保存工作副本'}</span>
+                    </div>
+                    <div className={styles['bundle-grid']}>
+                      <div className={styles['create-row']}>
+                        <YakitSelect
+                          value={selectedLocalProjectId || undefined}
+                          placeholder="选择本地项目"
+                          onChange={(value) => setSelectedLocalProjectId(`${value}`)}
+                          disabled={!canWrite || localProjects.length === 0}
+                        >
+                          {localProjects.map((project) => (
+                            <YakitSelect.Option key={getId(project)} value={getId(project)}>
+                              {getValue(project, ['ProjectName', 'name'], '未命名本地项目')}
+                            </YakitSelect.Option>
+                          ))}
+                        </YakitSelect>
+                        <YakitButton
+                          onClick={publishLocalProject}
+                          disabled={!canWrite || !selectedLocalProject}
+                          loading={actionLoading === 'publish-project-bundle'}
+                        >
+                          发布本地项目
+                        </YakitButton>
+                      </div>
+                      <div className={styles['create-row']}>
+                        <YakitInput
+                          value={localCopyName}
+                          placeholder="本地副本名称"
+                          onChange={(event) => setLocalCopyName(event.target.value)}
+                        />
+                        <YakitButton
+                          type="outline1"
+                          onClick={downloadLocalProject}
+                          disabled={!localCopyName.trim()}
+                          loading={actionLoading === 'download-project-bundle'}
+                        >
+                          下载为本地副本
+                        </YakitButton>
+                      </div>
+                    </div>
+                  </section>
+
                   <section className={`${styles['panel']} ${styles['sync-panel']}`}>
                     <div className={styles['panel-title']}>
                       <h2>快照与同步</h2>
@@ -545,6 +770,57 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
           </div>
         )}
       </YakitSpin>
+      <YakitModal
+        visible={Boolean(localProjectConflict)}
+        title="本地存在同名项目"
+        width={520}
+        closable={false}
+        keyboard={false}
+        maskClosable={false}
+        footer={[
+          <YakitButton
+            key="cancel"
+            type="outline1"
+            disabled={actionLoading === 'download-project-bundle'}
+            onClick={() => {
+              setLocalProjectConflict(undefined)
+              setConflictCopyName('')
+            }}
+          >
+            取消
+          </YakitButton>,
+          <YakitButton
+            key="overwrite"
+            type="outline1"
+            loading={actionLoading === 'download-project-bundle'}
+            onClick={overwriteConflictProject}
+          >
+            覆盖本地副本
+          </YakitButton>,
+          <YakitButton
+            key="copy"
+            type="primary"
+            loading={actionLoading === 'download-project-bundle'}
+            disabled={
+              !conflictCopyName.trim() ||
+              localProjects.some((project) => getLocalProjectName(project) === conflictCopyName.trim())
+            }
+            onClick={downloadConflictAsCopy}
+          >
+            创建副本
+          </YakitButton>,
+        ]}
+      >
+        <div className={styles['project-conflict-form']}>
+          <span>同名项目：{getLocalProjectName(localProjectConflict)}</span>
+          <YakitInput
+            aria-label="本地项目副本名称"
+            value={conflictCopyName}
+            onChange={(event) => setConflictCopyName(event.target.value)}
+          />
+          <small>覆盖操作会先导出原项目备份；创建副本为默认选项。</small>
+        </div>
+      </YakitModal>
     </div>
   )
 })

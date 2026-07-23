@@ -1,6 +1,9 @@
 const { ipcMain } = require('electron')
+const { createProjectArchiveStore } = require('../projectArchive')
 
 module.exports = (win, getClient) => {
+  const projectArchiveStore = createProjectArchiveStore()
+
   // asyncSetCurrentProject wrapper
   const asyncSetCurrentProject = (params) => {
     return new Promise((resolve, reject) => {
@@ -190,4 +193,11 @@ module.exports = (win, getClient) => {
     let stream = getClient().ImportProject(params)
     handlerHelper.registerHandler(win, stream, streamImportProjectMap, token)
   })
+
+  ipcMain.handle('InspectProjectArchive', (e, filePath) => projectArchiveStore.inspectArchive(filePath))
+  ipcMain.handle('ReadProjectArchiveChunk', (e, params) => projectArchiveStore.readArchiveChunk(params))
+  ipcMain.handle('CreateProjectArchive', (e, params) => projectArchiveStore.createArchive(params))
+  ipcMain.handle('WriteProjectArchiveChunk', (e, params) => projectArchiveStore.writeArchiveChunk(params))
+  ipcMain.handle('FinalizeProjectArchive', (e, filePath) => projectArchiveStore.finalizeArchive(filePath))
+  ipcMain.handle('RemoveProjectArchive', (e, filePath) => projectArchiveStore.removeArchive(filePath))
 }

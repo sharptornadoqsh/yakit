@@ -1515,6 +1515,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         open={projectShareModal.open}
         mode={projectShareModal.mode}
         onClose={() => setProjectShareModal((current) => ({ ...current, open: false }))}
+        onImported={() => update(1)}
       />
 
       <TransferProject

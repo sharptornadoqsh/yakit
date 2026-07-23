@@ -59,6 +59,19 @@ export function NetWorkApi<T, D>(params: requestConfig<T>): Promise<D> {
   })
 }
 
+const createNetworkApiError = (status: number, message: string | undefined, data: any) => {
+  const serverError = data?.error
+  const errorMessage = `${serverError?.message || message || `Request failed with status code ${status}`}`
+  const responseData: Record<string, any> = data && typeof data === 'object' && !Array.isArray(data) ? { ...data } : {}
+  responseData.code = serverError?.code || status
+  responseData.message = errorMessage
+  return Object.assign(new Error(errorMessage), {
+    status,
+    code: serverError?.code || status,
+    response: { status, data: responseData },
+  })
+}
+
 export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, resolve, reject) => {
   const { code, message, data } = res
   // console.log("返回", res)
@@ -67,10 +80,11 @@ export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, res
     reject(tOriginal('servicesFetch.requestTimeout'))
     return
   }
+  if (code >= 200 && code < 300) {
+    resolve(data)
+    return
+  }
   switch (code) {
-    case 200:
-      resolve(data)
-      break
     case 209:
       reject(data.reason)
       break
@@ -79,7 +93,7 @@ export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, res
       reject(message)
       break
     default:
-      reject(message)
+      reject((data as any)?.error ? createNetworkApiError(code, message, data) : message)
       break
   }
 }

@@ -189,6 +189,8 @@ export interface TestDataRecord {
   metadata: string
   file_size: number
   content_hash: string
+  deduplication_key: string
+  content?: string
   created_by: number
   source_client_id: string
   status: string
@@ -200,13 +202,12 @@ export interface TestDataRecord {
 
 export interface CreateTestDataInput {
   name: string
-  data_type: string
-  metadata?: string
-  file_size?: number
-  content_hash?: string
+  type: string
+  metadata?: Record<string, unknown>
+  deduplication_key?: string
   source_client_id?: string
   status?: string
-  content?: string
+  content: string
 }
 
 export interface UpdateTestDataInput extends Partial<CreateTestDataInput> {
@@ -224,6 +225,8 @@ export interface TestResultRecord {
   metadata: string
   file_size: number
   content_hash: string
+  deduplication_key: string
+  content?: string
   created_by: number
   source_client_id: string
   status: string
@@ -236,14 +239,13 @@ export interface TestResultRecord {
 export interface CreateTestResultInput {
   test_data_id?: number
   name: string
-  result_type: string
+  type: string
   severity?: string
-  metadata?: string
-  file_size?: number
-  content_hash?: string
+  metadata?: Record<string, unknown>
+  deduplication_key?: string
   source_client_id?: string
   status?: string
-  content?: string
+  content: string
 }
 
 export interface UpdateTestResultInput extends Partial<CreateTestResultInput> {
@@ -335,6 +337,7 @@ export interface TeamPlugin {
 
 export interface PluginImportEntry {
   category_id?: number
+  source_name?: string
   script_name: string
   type: string
   content: string
@@ -344,6 +347,7 @@ export interface PluginImportEntry {
   file_hash?: string
   change_note?: string
   visibility?: PluginVisibility
+  group_ids?: number[]
   overwrite?: boolean
   revision?: number
 }
@@ -360,12 +364,18 @@ export interface PluginImportResult {
   batch_id: string
   items: Array<{
     name: string
+    source_name: string
+    plugin_name: string
     status: string
+    message: string
     reason?: string
     skipped?: boolean
     overwritten?: boolean
     plugin_id?: number
-    version?: number
+    remote_plugin_id: number
+    version: number
+    content_hash: string
+    conflict_type: string
   }>
   failures: Array<{ index: number; script_name: string; reason: string }>
 }
@@ -417,6 +427,7 @@ export interface ProjectSharePreview {
   used_count: number
   test_data_count: number
   test_result_count: number
+  project_bundle_available: boolean
 }
 
 export interface ImportProjectShareInput {
@@ -676,11 +687,11 @@ export const importTeamPlugins = (teamId: V2Identifier, data: ImportTeamPluginsI
   writeV2<ImportTeamPluginsInput, V2Response<PluginImportResult>>('post', `v2/teams/${teamId}/plugins/import`, data)
 
 export const downloadTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier) =>
-  NetWorkApi<Record<string, never>, Blob>({
+  NetWorkApi<Record<string, never>, ArrayBuffer>({
     method: 'get',
     url: `v2/teams/${teamId}/plugins/${pluginId}/download`,
     params: {},
-    responseType: 'blob',
+    responseType: 'arraybuffer',
   })
 
 export const setPluginVisibility = (
