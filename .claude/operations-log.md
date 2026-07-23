@@ -1,5 +1,40 @@
 # 操作记录
 
+## 团队插件映射返回类型编码前检查
+
+时间：2026-07-23 13:37:45 +08:00
+
+- 已查阅 `.claude/context-summary-team-plugin-mapping-return.md`，当前分支为 `qsh`，工作树初始状态为空。
+- 已使用代码图与精确文本检索定位 `saveTeamPluginMapping`、`TeamPluginInstallDependencies.saveMapping`、`installTeamPluginDownload` 及相关测试。
+- 将复用现有 `setRemoteValue` 与安装依赖接口，不修改通用缓存返回类型。
+- 将遵循异步副作用函数返回 `Promise<void>`、两个空格、单引号、无分号与尾随逗号的既有约定。
+- 已对照测试模板持久化、团队项目映射持久化和相邻分类分组保存适配器，确认修改方式与项目一致。
+- 验证限定为相关 Vitest、格式和差异检查；依照用户要求不执行 Yakit 编译或构建。
+
+## 团队插件映射返回类型实施与验证记录
+
+时间：2026-07-23 13:39:51 +08:00
+
+### 实施记录
+
+- `saveTeamPluginMapping` 改为显式的异步 `Promise<void>` 函数，并等待 `setRemoteValue` 完成。
+- 缓存键、序列化内容、安装调用次序与异常传播保持不变。
+- 组件契约测试增加返回类型和等待语义断言，用允许执行的测试覆盖本次构建错误条件。
+
+### 本地验证记录
+
+- 三份相关 Vitest 文件共十一项用例成功。
+- 四份目标文件的 Prettier 检查成功。
+- `git diff --check` 成功。
+- 按用户要求未执行 Yakit 编译、生产构建或安装包构建。
+
+### 编码后声明
+
+- 复用了 `setRemoteValue`、`TeamPluginInstallDependencies` 和既有组件契约测试。
+- 命名、异步返回契约、格式与测试目录遵循项目现有约定。
+- 对照测试模板存储、团队项目映射存储和分类分组保存适配器，采用一致的异步副作用函数写法。
+- 已检查通用缓存工具与安装依赖接口，没有建立重复的存储接口。
+
 ## 一、任务初始化
 
 - 执行 `git fetch origin --prune`、`git switch qsh`、`git pull --ff-only origin qsh`、`git status --short`、`git branch --show-current` 与 `git remote -v`。

@@ -22,5 +22,7 @@ describe('团队插件页面模块', () => {
     expect(source).toContain('上传本地插件')
     expect(source).toContain('批量安装')
     expect(source).toContain('本地同名插件')
+    expect(source).toContain('const saveTeamPluginMapping = async (mapping: TeamPluginLocalMapping): Promise<void> =>')
+    expect(source).toContain('await setRemoteValue(key, JSON.stringify(mapping))')
   })
 })

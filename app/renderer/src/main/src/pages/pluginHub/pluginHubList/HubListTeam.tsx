@@ -101,10 +101,10 @@ const getOnlineBaseUrl = async () => {
   }
 }
 
-const saveTeamPluginMapping = (mapping: TeamPluginLocalMapping) => {
+const saveTeamPluginMapping = async (mapping: TeamPluginLocalMapping): Promise<void> => {
   const serverKey = encodeURIComponent(mapping.onlineBaseUrl || 'current')
   const key = `team-plugin-mapping:${serverKey}:${mapping.teamId || 0}:${mapping.teamPluginId}`
-  return setRemoteValue(key, JSON.stringify(mapping))
+  await setRemoteValue(key, JSON.stringify(mapping))
 }
 
 export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
