@@ -1,6 +1,6 @@
 import { PluginFilterParams, PluginListPageMeta, PluginSearchParams } from './baseTemplateType'
 import { YakitPluginListOnlineResponse } from './online/PluginsOnlineType'
-import { NetWorkApi, requestConfig } from '@/services/fetch'
+import { isTokenExpirationError, NetWorkApi, requestConfig } from '@/services/fetch'
 import { API } from '@/services/swagger/resposeType'
 import { info, yakitNotify } from '@/utils/notification'
 import { isCommunityEdition } from '@/utils/envfile'
@@ -173,13 +173,13 @@ export const apiFetchOnlineList: APIFunc<PluginsQueryProps, YakitPluginListOnlin
           resolve(res)
         })
         .catch((err) => {
-          if (err !== 'token过期') {
+          if (!isTokenExpirationError(err)) {
             if (!hiddenError) yakitNotify('error', '获取插件商店列表失败:' + err)
           }
           reject(err)
         })
     } catch (error) {
-      if (error !== 'token过期') {
+      if (!isTokenExpirationError(error)) {
         if (!hiddenError) yakitNotify('error', '获取插件商店列表失败:' + error)
       }
       reject(error)
@@ -310,13 +310,13 @@ export const apiFetchGroupStatisticsOnline: APIOptionalFunc<API.PluginsSearchReq
           resolve(res)
         })
         .catch((err) => {
-          if (err !== 'token过期') {
+          if (!isTokenExpirationError(err)) {
             if (!hiddenError) yakitNotify('error', '获取插件商店统计数据失败:' + err)
           }
           reject(err)
         })
     } catch (error) {
-      if (error !== 'token过期') {
+      if (!isTokenExpirationError(error)) {
         if (!hiddenError) yakitNotify('error', '获取插件商店统计数据失败:' + error)
       }
       reject(error)
@@ -340,11 +340,15 @@ export const apiFetchGroupStatisticsMine: APIOptionalFunc<API.PluginsSearchReque
           resolve(res)
         })
         .catch((err) => {
-          if (!hiddenError) yakitNotify('error', '获取我的插件统计数据失败:' + err)
+          if (!isTokenExpirationError(err) && !hiddenError) {
+            yakitNotify('error', '获取我的插件统计数据失败:' + err)
+          }
           reject(err)
         })
     } catch (error) {
-      if (!hiddenError) yakitNotify('error', '获取我的插件统计数据失败:' + error)
+      if (!isTokenExpirationError(error) && !hiddenError) {
+        yakitNotify('error', '获取我的插件统计数据失败:' + error)
+      }
       reject(error)
     }
   })

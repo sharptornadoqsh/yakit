@@ -9,6 +9,11 @@ const tOriginal = i18n.getFixedT(null, 'utils')
 
 let tokenExpirationHandled = false
 
+export const isTokenExpirationError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error || '')
+  return message.includes('token过期')
+}
+
 export interface AxiosResponseInfoProps {
   message?: string
   reason?: string

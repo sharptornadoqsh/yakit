@@ -70,12 +70,13 @@ const companyUser = {
 
 let handleAxios: typeof import('../fetch').handleAxios
 let tokenOverdue: typeof import('../fetch').tokenOverdue
+let isTokenExpirationError: typeof import('../fetch').isTokenExpirationError
 
 describe('token expiration session', () => {
   beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
-    ;({ handleAxios, tokenOverdue } = await import('../fetch'))
+    ;({ handleAxios, tokenOverdue, isTokenExpirationError } = await import('../fetch'))
   })
 
   it('retains a community session without showing an expiration notice', () => {
@@ -108,6 +109,12 @@ describe('token expiration session', () => {
     expect(mocks.logoutDynamicControl).toHaveBeenCalledTimes(1)
     expect(mocks.globalUserLogout).toHaveBeenCalledTimes(1)
     expect(mocks.notifyError).toHaveBeenCalledTimes(1)
+  })
+
+  it('识别字符串与错误对象中的令牌过期消息', () => {
+    expect(isTokenExpirationError('token过期')).toBe(true)
+    expect(isTokenExpirationError(new Error('token过期'))).toBe(true)
+    expect(isTokenExpirationError('网络连接失败')).toBe(false)
   })
 
   it('接受第二版接口的全部成功状态码', () => {
