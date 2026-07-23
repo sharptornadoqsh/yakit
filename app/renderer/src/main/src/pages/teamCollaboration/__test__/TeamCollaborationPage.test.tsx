@@ -6,6 +6,7 @@ import { restoreTeamProjectBundle } from '../teamProjectBundle'
 import {
   createTestData,
   createTestResult,
+  getMe,
   getProjectSync,
   listAuditLogs,
   listProjectMembers,
@@ -70,6 +71,7 @@ vi.mock('@/components/yakitUI/YakitTag/YakitTag', () => ({
 }))
 
 vi.mock('@/services/teamCollaboration', () => ({
+  getMe: vi.fn(),
   listTeams: vi.fn(),
   listTeamMembers: vi.fn(),
   listTeamProjects: vi.fn(),
@@ -97,16 +99,46 @@ describe('团队协作页面', () => {
       value: undefined,
     })
     vi.mocked(listTeams).mockResolvedValue({
-      data: [{ id: 1, name: '蓝队', role: 'viewer', permissions: ['project:read'] }],
+      data: [{ id: 1, name: '蓝队' }],
+    } as never)
+    vi.mocked(getMe).mockResolvedValue({
+      data: {
+        user: { id: 7, name: '小周' },
+        memberships: [
+          {
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            team: { id: 1, name: '蓝队' },
+            roles: [{ code: 'tester', name: '测试人员' }],
+            permissions: [
+              'project.read',
+              'project_member.read',
+              'member.read',
+              'test_data.read',
+              'test_result.read',
+              'audit.read',
+            ],
+            projects: [],
+          },
+        ],
+      },
     } as never)
     vi.mocked(listTeamMembers).mockResolvedValue({
-      data: [{ id: 11, user_name: '小周', role_name: '观察员', status: 'active' }],
+      data: [
+        {
+          id: 11,
+          team_id: 1,
+          user_id: 7,
+          status: 'active',
+          user: { id: 7, name: '小周' },
+          roles: [{ code: 'tester', name: '测试人员' }],
+        },
+      ],
     } as never)
     vi.mocked(listTeamProjects).mockResolvedValue({
       data: [{ id: 21, name: '供应链评估', version: 4, updated_at: '2026-07-22T08:00:00Z' }],
     } as never)
     vi.mocked(listProjectMembers).mockResolvedValue({
-      data: [{ id: 31, user_name: '小周', access_level: 'read' }],
+      data: [{ id: 31, team_id: 1, project_id: 21, user_id: 7, access_level: 'read' }],
     } as never)
     vi.mocked(listTestData).mockResolvedValue({ data: [{ id: 41, name: '登录样本', version: 2 }] } as never)
     vi.mocked(listTestResults).mockResolvedValue({
@@ -132,6 +164,8 @@ describe('团队协作页面', () => {
     expect(await screen.findByText('检测到 409 版本冲突')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '创建团队项目' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '更新快照' })).toBeDisabled()
+    expect(screen.getAllByText('小周').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('测试人员')).toBeInTheDocument()
     expect(screen.getByText('登录样本')).toBeInTheDocument()
     expect(screen.getByText('基线结果')).toBeInTheDocument()
     expect(screen.getByText('snapshot.update')).toBeInTheDocument()
@@ -143,8 +177,19 @@ describe('团队协作页面', () => {
   })
 
   test('按服务端请求契约创建共享测试数据和结果', async () => {
-    vi.mocked(listTeams).mockResolvedValue({
-      data: [{ id: 1, name: '蓝队', role: 'editor', permissions: ['project:write'] }],
+    vi.mocked(getMe).mockResolvedValue({
+      data: {
+        user: { id: 7, name: '小周' },
+        memberships: [
+          {
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            team: { id: 1, name: '蓝队' },
+            roles: [{ code: 'maintainer', name: '维护人员' }],
+            permissions: ['project.manage', 'test_data.write', 'test_result.write'],
+            projects: [],
+          },
+        ],
+      },
     } as never)
     vi.mocked(getProjectSync)
       .mockReset()
@@ -180,6 +225,98 @@ describe('团队协作页面', () => {
         content: JSON.stringify({ summary: '' }),
       }),
     )
+  })
+
+  test('按服务端细粒度权限分别控制写入入口', async () => {
+    vi.mocked(getMe).mockResolvedValue({
+      data: {
+        user: { id: 7, name: '小周' },
+        memberships: [
+          {
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            team: { id: 1, name: '蓝队' },
+            roles: [{ code: 'data_writer', name: '数据维护人员' }],
+            permissions: ['project.read', 'test_data.read', 'test_data.write', 'test_result.read'],
+            projects: [],
+          },
+        ],
+      },
+    } as never)
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+    expect(await screen.findByText('供应链评估')).toBeInTheDocument()
+
+    expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled()
+    expect(screen.getByRole('button', { name: '创建团队项目' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '更新快照' })).toBeDisabled()
+    expect(screen.getByPlaceholderText('测试数据名称')).not.toBeDisabled()
+    expect(screen.getByPlaceholderText('测试结果名称')).toBeDisabled()
+  })
+
+  test('管理员角色获得团队写入入口', async () => {
+    vi.mocked(getMe).mockResolvedValue({
+      data: {
+        user: { id: 7, name: '小周' },
+        memberships: [
+          {
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            team: { id: 1, name: '蓝队' },
+            roles: [{ code: 'administrator', name: '管理员' }],
+            permissions: [],
+            projects: [],
+          },
+        ],
+      },
+    } as never)
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+    expect(await screen.findByText('供应链评估')).toBeInTheDocument()
+
+    expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled()
+    expect(screen.getByPlaceholderText('测试数据名称')).not.toBeDisabled()
+    expect(screen.getByPlaceholderText('测试结果名称')).not.toBeDisabled()
+    expect(screen.getByText('写入权限')).toBeInTheDocument()
+  })
+
+  test('没有审计权限时不请求审计接口', async () => {
+    vi.mocked(getMe).mockResolvedValue({
+      data: {
+        user: { id: 7, name: '小周' },
+        memberships: [
+          {
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            team: { id: 1, name: '蓝队' },
+            roles: [{ code: 'tester', name: '测试人员' }],
+            permissions: [
+              'project.read',
+              'project_member.read',
+              'member.read',
+              'test_data.read',
+              'test_data.write',
+              'test_result.read',
+              'test_result.write',
+            ],
+            projects: [],
+          },
+        ],
+      },
+    } as never)
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+    expect(await screen.findByText('供应链评估')).toBeInTheDocument()
+    await waitFor(() => expect(listTestResults).toHaveBeenCalledTimes(1))
+
+    expect(listAuditLogs).not.toHaveBeenCalled()
+    expect(screen.queryByText('snapshot.update')).not.toBeInTheDocument()
   })
 
   test('同名项目默认创建副本，也可在生成备份后覆盖本地项目', async () => {

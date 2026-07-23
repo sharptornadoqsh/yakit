@@ -10,6 +10,7 @@ import {
   createTeamProject,
   createTestData,
   createTestResult,
+  getMe,
   getProjectSync,
   listAuditLogs,
   listProjectMembers,
@@ -59,25 +60,71 @@ const formatTime = (value: any): string => {
   return Number.isNaN(time.getTime()) ? `${value}` : time.toLocaleString('zh-CN', { hour12: false })
 }
 
-const hasWritePermission = (team?: ApiEntity): boolean => {
-  if (!team) return false
-  if (getValue(team, ['can_write', 'canWrite'], false) === true) return true
-  const role = `${getValue(team, ['role', 'role_name', 'roleName', 'current_user_role'])}`.toLowerCase()
-  if (['owner', 'admin', 'manager', 'editor', 'write'].includes(role)) return true
-  const permissions = getValue(team, ['permissions', 'permission_codes', 'permissionCodes'], [])
-  return (
-    Array.isArray(permissions) &&
-    permissions.some((permission) =>
-      ['project:create', 'project:write', 'project:update', 'team:write', '*'].includes(`${permission}`),
-    )
-  )
+const getMembershipTeamId = (membership: ApiEntity): string => {
+  const teamId = getId(getValue(membership, ['team'], undefined))
+  if (teamId) return teamId
+  return `${getValue(membership, ['team_id', 'teamId'], getValue(membership?.member, ['team_id', 'teamId']))}`
 }
 
-const roleText = (record?: ApiEntity): string =>
-  `${getValue(record, ['role_name', 'roleName', 'role', 'current_user_role'], '成员')}`
+const mergeTeamMemberships = (teams: ApiEntity[], memberships: ApiEntity[]): ApiEntity[] => {
+  const membershipByTeamId = new Map<string, ApiEntity>()
+  memberships.forEach((membership) => {
+    const teamId = getMembershipTeamId(membership)
+    if (teamId) membershipByTeamId.set(teamId, membership)
+  })
+  return teams.map((team) => {
+    const membership = membershipByTeamId.get(getId(team))
+    if (!membership) return team
+    return {
+      ...team,
+      current_member: getValue(membership, ['member'], undefined),
+      current_user_roles: getValue(membership, ['roles'], []),
+      permissions: getValue(membership, ['permissions'], []),
+    }
+  })
+}
 
-const userText = (record?: ApiEntity): string =>
-  `${getValue(record, ['user_name', 'userName', 'username', 'name', 'nickname'], '未命名成员')}`
+const getTeamRoleCodes = (team: ApiEntity): string[] => {
+  const roles = getValue(team, ['current_user_roles', 'roles'], [])
+  const roleCodes = Array.isArray(roles)
+    ? roles.map((role) => (typeof role === 'string' ? role : getValue(role, ['code', 'name'], '')))
+    : []
+  roleCodes.push(getValue(team, ['role', 'role_name', 'roleName', 'current_user_role'], ''))
+  return roleCodes.map((role) => `${role}`.trim().toLowerCase()).filter(Boolean)
+}
+
+const hasTeamPermission = (team: ApiEntity | undefined, requiredCodes: string[]): boolean => {
+  if (!team) return false
+  if (getValue(team, ['can_write', 'canWrite'], false) === true) return true
+  if (getTeamRoleCodes(team).some((role) => ['owner', 'admin', 'administrator', 'superadmin'].includes(role))) {
+    return true
+  }
+  const permissions = getValue(team, ['permissions', 'permission_codes', 'permissionCodes'], [])
+  if (!Array.isArray(permissions)) return false
+  const permissionCodes = permissions.map((permission) => `${permission}`)
+  return permissionCodes.includes('*') || requiredCodes.some((permission) => permissionCodes.includes(permission))
+}
+
+const roleText = (record?: ApiEntity): string => {
+  const directRole = `${getValue(record, ['role_name', 'roleName', 'role', 'current_user_role'], '')}`.trim()
+  if (directRole) return directRole
+  const roles = getValue(record, ['roles'], [])
+  if (!Array.isArray(roles)) return '成员'
+  const names = roles.map((role) => `${getValue(role, ['name', 'code'], '')}`.trim()).filter(Boolean)
+  return names.join('、') || '成员'
+}
+
+const userText = (record?: ApiEntity): string => {
+  const directName = `${getValue(record, ['user_name', 'userName', 'username', 'name', 'nickname'], '')}`.trim()
+  if (directName) return directName
+  const user = getValue(record, ['user'], undefined)
+  return `${getValue(user, ['name', 'nick_name', 'email', 'uid'], '未命名成员')}`
+}
+
+const getUserId = (record?: ApiEntity): string => {
+  const user = getValue(record, ['user'], undefined)
+  return `${getValue(record, ['user_id', 'userId'], getValue(user, ['id', 'ID']))}`
+}
 
 const callApi = (fn: ApiFunction, ...args: any[]) => fn(...args)
 
@@ -130,14 +177,33 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     () => localProjects.find((project) => getId(project) === selectedLocalProjectId),
     [localProjects, selectedLocalProjectId],
   )
-  const canWrite = useMemo(() => hasWritePermission(selectedTeam), [selectedTeam])
+  const teamMemberByUserId = useMemo(() => {
+    const index = new Map<string, ApiEntity>()
+    teamMembers.forEach((member) => {
+      const userId = getUserId(member)
+      if (userId) index.set(userId, member)
+    })
+    return index
+  }, [teamMembers])
+  const canManageProject = useMemo(() => hasTeamPermission(selectedTeam, ['project.manage']), [selectedTeam])
+  const canWriteTestData = useMemo(() => hasTeamPermission(selectedTeam, ['test_data.write']), [selectedTeam])
+  const canWriteTestResult = useMemo(() => hasTeamPermission(selectedTeam, ['test_result.write']), [selectedTeam])
+  const canReadAudit = useMemo(() => hasTeamPermission(selectedTeam, ['audit.read']), [selectedTeam])
+  const canPublishProject = canManageProject && canWriteTestData
+  const canWrite = canManageProject || canWriteTestData || canWriteTestResult
 
   const loadTeams = useCallback(async () => {
     setLoading(true)
     setErrorMessage('')
     try {
-      const response = await callApi(listTeams as ApiFunction)
-      const nextTeams = getList(response, ['teams'])
+      const [teamResponse, currentUserResponse] = await Promise.all([
+        callApi(listTeams as ApiFunction),
+        callApi(getMe as ApiFunction),
+      ])
+      const nextTeams = mergeTeamMemberships(
+        getList(teamResponse, ['teams']),
+        getList(currentUserResponse, ['memberships']),
+      )
       setTeams(nextTeams)
       setSelectedTeamId((current) => {
         if (nextTeams.some((team) => getId(team) === current)) return current
@@ -204,11 +270,14 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       if (!teamId || !projectId) return
       setDetailLoading(true)
       setErrorMessage('')
+      const auditRequest = canReadAudit
+        ? callApi(listAuditLogs as ApiFunction, teamId, { project_id: projectId })
+        : Promise.resolve([])
       const [memberResult, dataResult, resultResult, auditResult] = await Promise.allSettled([
         callApi(listProjectMembers as ApiFunction, teamId, projectId),
         callApi(listTestData as ApiFunction, teamId, projectId),
         callApi(listTestResults as ApiFunction, teamId, projectId),
-        callApi(listAuditLogs as ApiFunction, teamId, { project_id: projectId }),
+        auditRequest,
       ])
       setProjectMembers(memberResult.status === 'fulfilled' ? getList(memberResult.value, ['members']) : [])
       setTestData(dataResult.status === 'fulfilled' ? getList(dataResult.value, ['test_data', 'testData']) : [])
@@ -223,7 +292,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       setDetailLoading(false)
       await loadSync(teamId, projectId)
     },
-    [loadSync],
+    [canReadAudit, loadSync],
   )
 
   const loadLocalProjects = useCallback(async () => {
@@ -279,7 +348,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   }, [])
 
   const publishLocalProject = useCallback(async () => {
-    if (!selectedTeamId || !selectedProjectId || !selectedLocalProject || !canWrite) return
+    if (!selectedTeamId || !selectedProjectId || !selectedLocalProject || !canPublishProject) return
     setActionLoading('publish-project-bundle')
     setErrorMessage('')
     setBundleMessage('')
@@ -305,7 +374,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       setActionLoading('')
     }
   }, [
-    canWrite,
+    canPublishProject,
     loadProjectContext,
     loadTeamContext,
     selectedLocalProject,
@@ -390,7 +459,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
 
   const createProject = useCallback(async () => {
     const name = projectName.trim()
-    if (!selectedTeamId || !canWrite || !name) return
+    if (!selectedTeamId || !canManageProject || !name) return
     setActionLoading('create-project')
     setErrorMessage('')
     try {
@@ -402,10 +471,10 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     } finally {
       setActionLoading('')
     }
-  }, [canWrite, loadTeamContext, projectName, selectedTeamId])
+  }, [canManageProject, loadTeamContext, projectName, selectedTeamId])
 
   const updateSnapshot = useCallback(async () => {
-    if (!selectedTeamId || !selectedProjectId || !canWrite) return
+    if (!selectedTeamId || !selectedProjectId || !canManageProject) return
     let snapshot: ApiEntity
     try {
       snapshot = JSON.parse(snapshotText)
@@ -432,11 +501,11 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     } finally {
       setActionLoading('')
     }
-  }, [canWrite, loadSync, selectedProject, selectedProjectId, selectedTeamId, snapshotText, syncInfo])
+  }, [canManageProject, loadSync, selectedProject, selectedProjectId, selectedTeamId, snapshotText, syncInfo])
 
   const addTestData = useCallback(async () => {
     const name = testDataName.trim()
-    if (!selectedTeamId || !selectedProjectId || !canWrite || !name) return
+    if (!selectedTeamId || !selectedProjectId || !canWriteTestData || !name) return
     setActionLoading('test-data')
     try {
       await callApi(createTestData as ApiFunction, selectedTeamId, selectedProjectId, {
@@ -453,11 +522,11 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     } finally {
       setActionLoading('')
     }
-  }, [canWrite, selectedProjectId, selectedTeamId, testDataName])
+  }, [canWriteTestData, selectedProjectId, selectedTeamId, testDataName])
 
   const addTestResult = useCallback(async () => {
     const name = testResultName.trim()
-    if (!selectedTeamId || !selectedProjectId || !canWrite || !name) return
+    if (!selectedTeamId || !selectedProjectId || !canWriteTestResult || !name) return
     setActionLoading('test-result')
     try {
       await callApi(createTestResult as ApiFunction, selectedTeamId, selectedProjectId, {
@@ -475,7 +544,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     } finally {
       setActionLoading('')
     }
-  }, [canWrite, selectedProjectId, selectedTeamId, testResultName])
+  }, [canWriteTestResult, selectedProjectId, selectedTeamId, testResultName])
 
   return (
     <div className={styles['page']} data-testid="team-collaboration-page">
@@ -543,11 +612,11 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                     value={projectName}
                     onChange={(event) => setProjectName(event.target.value)}
                     placeholder="输入项目名称"
-                    disabled={!canWrite}
+                    disabled={!canManageProject}
                   />
                   <YakitButton
                     onClick={createProject}
-                    disabled={!canWrite || !projectName.trim()}
+                    disabled={!canManageProject || !projectName.trim()}
                     loading={actionLoading === 'create-project'}
                   >
                     创建团队项目
@@ -611,7 +680,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                           value={selectedLocalProjectId || undefined}
                           placeholder="选择本地项目"
                           onChange={(value) => setSelectedLocalProjectId(`${value}`)}
-                          disabled={!canWrite || localProjects.length === 0}
+                          disabled={!canPublishProject || localProjects.length === 0}
                         >
                           {localProjects.map((project) => (
                             <YakitSelect.Option key={getId(project)} value={getId(project)}>
@@ -621,7 +690,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                         </YakitSelect>
                         <YakitButton
                           onClick={publishLocalProject}
-                          disabled={!canWrite || !selectedLocalProject}
+                          disabled={!canPublishProject || !selectedLocalProject}
                           loading={actionLoading === 'publish-project-bundle'}
                         >
                           发布本地项目
@@ -672,7 +741,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                       rows={5}
                       value={snapshotText}
                       onChange={(event) => setSnapshotText(event.target.value)}
-                      disabled={!canWrite}
+                      disabled={!canManageProject}
                       aria-label="项目快照"
                     />
                     <div className={styles['actions']}>
@@ -683,7 +752,11 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                       >
                         同步项目
                       </YakitButton>
-                      <YakitButton onClick={updateSnapshot} disabled={!canWrite} loading={actionLoading === 'snapshot'}>
+                      <YakitButton
+                        onClick={updateSnapshot}
+                        disabled={!canManageProject}
+                        loading={actionLoading === 'snapshot'}
+                      >
                         更新快照
                       </YakitButton>
                     </div>
@@ -693,7 +766,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                     <EntityPanel title="项目成员权限" items={projectMembers} empty="暂无项目成员">
                       {(member) => (
                         <div className={styles['entity-row']} key={getId(member)}>
-                          <span>{userText(member)}</span>
+                          <span>{userText(teamMemberByUserId.get(getUserId(member)) || member)}</span>
                           <YakitTag>{getValue(member, ['access_level', 'accessLevel', 'permission'], 'read')}</YakitTag>
                         </div>
                       )}
@@ -708,7 +781,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                           value={testDataName}
                           placeholder="测试数据名称"
                           buttonText="新增数据"
-                          disabled={!canWrite}
+                          disabled={!canWriteTestData}
                           loading={actionLoading === 'test-data'}
                           onChange={setTestDataName}
                           onCreate={addTestData}
@@ -732,7 +805,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                           value={testResultName}
                           placeholder="测试结果名称"
                           buttonText="新增结果"
-                          disabled={!canWrite}
+                          disabled={!canWriteTestResult}
                           loading={actionLoading === 'test-result'}
                           onChange={setTestResultName}
                           onCreate={addTestResult}
