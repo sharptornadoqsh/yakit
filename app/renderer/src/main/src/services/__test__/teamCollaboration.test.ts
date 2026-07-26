@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  type ProjectSync,
+  type V2Response,
   bindPluginGroup,
+  createPluginCategory,
+  createPluginGroup,
   createProjectShare,
+  createTeamPlugin,
   createTeamProject,
   createTestData,
   createTestResult,
+  deletePluginCategory,
+  deletePluginGroup,
+  deleteTeamPlugin,
   downloadTeamPlugin,
   getMe,
   getProjectSync,
+  getTeamPlugin,
   importProjectShare,
   importTeamPlugins,
   listAuditLogs,
@@ -25,8 +34,12 @@ import {
   previewProjectShare,
   revokeProjectShare,
   setPluginVisibility,
+  updatePluginCategory,
+  updatePluginGroup,
+  updateTeamPlugin,
   updateProjectShare,
   updateProjectSnapshot,
+  unbindPluginGroup,
 } from '../teamCollaboration'
 
 const mocks = vi.hoisted(() => ({
@@ -135,6 +148,42 @@ describe('team collaboration service', () => {
     })
   })
 
+  it('保留项目同步响应中的删除记录', async () => {
+    const syncResponse: V2Response<ProjectSync> = {
+      ok: true,
+      data: {
+        server_time: '2026-07-26T12:00:00Z',
+        project_members: [],
+        test_data: [],
+        test_results: [],
+        tombstones: {
+          project_members: [{ id: 11, deleted_at: '2026-07-26T11:57:00Z' }],
+          test_data: [{ id: 12, deleted_at: '2026-07-26T11:58:00Z' }],
+          test_results: [{ id: 13, deleted_at: '2026-07-26T11:59:00Z' }],
+        },
+      },
+    }
+    mocks.NetWorkApi.mockResolvedValueOnce(syncResponse)
+
+    await expect(getProjectSync(3, 7, '2026-07-26T11:00:00Z')).resolves.toEqual(syncResponse)
+  })
+
+  it('兼容不含删除记录字段的旧项目同步响应', async () => {
+    const legacyResponse: V2Response<ProjectSync> = {
+      ok: true,
+      data: {
+        server_time: '2026-07-26T12:01:00Z',
+        project_members: [],
+        test_data: [],
+        test_results: [],
+      },
+    }
+    mocks.NetWorkApi.mockResolvedValueOnce(legacyResponse)
+
+    const legacySync = await getProjectSync(3, 7)
+    expect(legacySync.data.tombstones).toBeUndefined()
+  })
+
   it('uses data for v2 write requests', async () => {
     const project = { project_key: 'alpha', name: 'Alpha' }
     await createTeamProject(3, project)
@@ -186,9 +235,112 @@ describe('team collaboration service', () => {
       data: pluginImport,
     })
 
+    const plugin = {
+      script_name: 'scanner',
+      type: 'yak',
+      content: 'println(1)',
+      description: '团队扫描插件',
+      tags: ['scanner'],
+      enabled: true,
+      visibility: 'team' as const,
+      category_id: 4,
+      group_ids: [9],
+    }
+    await createTeamPlugin(3, plugin)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/teams/3/plugins',
+      data: plugin,
+    })
+
+    const updatedPlugin = {
+      ...plugin,
+      script_name: 'scanner-v2',
+      content: 'println(2)',
+      change_note: '更新检测逻辑',
+      revision: 4,
+    }
+    await updateTeamPlugin(3, 5, updatedPlugin)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'patch',
+      url: 'v2/teams/3/plugins/5',
+      data: updatedPlugin,
+    })
+
+    await deleteTeamPlugin(3, 5)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'delete',
+      url: 'v2/teams/3/plugins/5',
+      data: undefined,
+    })
+    await deleteTeamPlugin(3, 5, { cascade: true })
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'delete',
+      url: 'v2/teams/3/plugins/5?cascade=true',
+      data: undefined,
+    })
+
+    const category = { name: 'Web', description: 'Web 插件', sort_order: 1, status: 'active' }
+    await createPluginCategory(3, category)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/teams/3/plugin-categories',
+      data: category,
+    })
+    await updatePluginCategory(3, 4, { ...category, name: 'Web 安全' })
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'patch',
+      url: 'v2/teams/3/plugin-categories/4',
+      data: { ...category, name: 'Web 安全' },
+    })
+    await deletePluginCategory(3, 4)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'delete',
+      url: 'v2/teams/3/plugin-categories/4',
+      data: undefined,
+    })
+    await deletePluginCategory(3, 4, { cascade: true })
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'delete',
+      url: 'v2/teams/3/plugin-categories/4?cascade=true',
+      data: undefined,
+    })
+
+    const group = { name: '基线', description: '基线插件', sort_order: 2, status: 'active' }
+    await createPluginGroup(3, group)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/teams/3/plugin-groups',
+      data: group,
+    })
+    await updatePluginGroup(3, 9, { ...group, name: '发布基线' })
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'patch',
+      url: 'v2/teams/3/plugin-groups/9',
+      data: { ...group, name: '发布基线' },
+    })
+    await deletePluginGroup(3, 9)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'delete',
+      url: 'v2/teams/3/plugin-groups/9',
+      data: undefined,
+    })
+    await deletePluginGroup(3, 9, { cascade: true })
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'delete',
+      url: 'v2/teams/3/plugin-groups/9?cascade=true',
+      data: undefined,
+    })
+
     await bindPluginGroup(3, 5, 9)
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
       method: 'put',
+      url: 'v2/teams/3/plugins/5/groups/9',
+      data: undefined,
+    })
+    await unbindPluginGroup(3, 5, 9)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'delete',
       url: 'v2/teams/3/plugins/5/groups/9',
       data: undefined,
     })
@@ -244,6 +396,15 @@ describe('team collaboration service', () => {
       url: 'v2/teams/3/plugins/5/download',
       params: {},
       responseType: 'arraybuffer',
+    })
+  })
+
+  it('reads one team plugin from its resource endpoint', async () => {
+    await getTeamPlugin(3, 5)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'get',
+      url: 'v2/teams/3/plugins/5',
+      params: {},
     })
   })
 })

@@ -58,7 +58,7 @@ describe('睿眼菜单模型', () => {
     expect(groups['brute-force']).toEqual(['爆破任务', '字典管理'])
     expect(groups['packet-tools']).toEqual(['报文重放', 'WebSocket 调试', '报文差异', '编解码'])
     expect(groups['plugin-center']).toEqual(['插件仓库', '批量导入', '插件开发'])
-    expect(groups['team-collaboration']).toEqual(['服务连接', '用户管理', '角色权限'])
+    expect(groups['team-collaboration']).toEqual(['服务连接', '团队项目', '用户管理', '角色权限'])
     expect(groups['project-security']).toEqual(['项目管理', '安全概览', '风险与漏洞', '扫描结果', '客户端测试总览'])
     expect(groups['system-settings']).toEqual([
       '引擎',
@@ -117,6 +117,12 @@ describe('睿眼菜单模型', () => {
     expect(teamItems).toHaveLength(2)
     expect(teamItems.map((item) => item.route)).toEqual([YakitRoute.AccountAdminPage, YakitRoute.RoleAdminPage])
     teamItems.forEach((item) => expect(isRenyanMenuItemNavigable(item)).toBe(true))
+  })
+
+  it('团队项目入口映射到真实协作页面', () => {
+    const item = flattenRenyanMenu(buildRenyanMenu()).find((candidate) => candidate.key === 'team-projects')
+    expect(item?.route).toBe(YakitRoute.TeamCollaboration)
+    expect(item && isRenyanMenuItemNavigable(item)).toBe(true)
   })
 
   it('能力过滤不会保留空的一级菜单', () => {

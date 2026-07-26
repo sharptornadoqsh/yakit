@@ -280,6 +280,7 @@ export const RENYAN_MENU_MODEL: readonly RenyanMenuItem[] = [
       title: '团队协作',
       children: [
         { key: 'service-connection', title: '服务连接', action: 'serviceConnection' },
+        { key: 'team-projects', title: '团队项目', route: YakitRoute.TeamCollaboration },
         {
           key: 'account-administration',
           title: '用户管理',

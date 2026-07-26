@@ -216,6 +216,43 @@ describe('团队协作页面', () => {
     expect(await screen.findByText(/最近同步/)).toBeInTheDocument()
   })
 
+  test('同步项目后移除服务端删除记录对应的成员、测试数据和测试结果', async () => {
+    vi.mocked(listProjectMembers).mockResolvedValue({
+      data: [{ id: 31, team_id: 1, project_id: 21, user_id: 99, user_name: '待移除项目成员' }],
+    } as never)
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValueOnce({
+        server_time: '2026-07-26T11:00:00Z',
+        project: { version: 4, snapshot: {} },
+        tombstones: { project_members: [], test_data: [], test_results: [] },
+      } as never)
+      .mockResolvedValueOnce({
+        server_time: '2026-07-26T12:00:00Z',
+        project: { version: 4, snapshot: {} },
+        tombstones: {
+          project_members: [{ id: 31, deleted_at: '2026-07-26T11:57:00Z' }],
+          test_data: [{ id: 41, deleted_at: '2026-07-26T11:58:00Z' }],
+          test_results: [{ id: 51, deleted_at: '2026-07-26T11:59:00Z' }],
+        },
+      } as never)
+
+    render(<TeamCollaborationPage />)
+
+    expect(await screen.findByText('待移除项目成员')).toBeInTheDocument()
+    expect(screen.getByText('登录样本')).toBeInTheDocument()
+    expect(screen.getByText('基线结果')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '同步项目' }))
+
+    await waitFor(() => expect(getProjectSync).toHaveBeenCalledTimes(2))
+    await waitFor(() => {
+      expect(screen.queryByText('待移除项目成员')).not.toBeInTheDocument()
+      expect(screen.queryByText('登录样本')).not.toBeInTheDocument()
+      expect(screen.queryByText('基线结果')).not.toBeInTheDocument()
+    })
+  })
+
   test('团队上下文乱序返回时仅展示当前团队项目', async () => {
     vi.mocked(listTeams).mockResolvedValue({
       data: [

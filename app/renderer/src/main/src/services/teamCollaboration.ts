@@ -252,12 +252,24 @@ export interface UpdateTestResultInput extends Partial<CreateTestResultInput> {
   version: number
 }
 
+export interface ProjectSyncTombstone {
+  id: number
+  deleted_at: string
+}
+
+export interface ProjectSyncTombstones {
+  project_members: ProjectSyncTombstone[]
+  test_data: ProjectSyncTombstone[]
+  test_results: ProjectSyncTombstone[]
+}
+
 export interface ProjectSync {
   server_time: string
   project?: CollaborationProject
   project_members: ProjectMember[]
   test_data: TestDataRecord[]
   test_results: TestResultRecord[]
+  tombstones?: ProjectSyncTombstones
 }
 
 export interface AuditLog {
@@ -312,6 +324,10 @@ export interface SavePluginGroupInput {
   status?: string
 }
 
+export interface CascadeDeleteOptions {
+  cascade?: boolean
+}
+
 export interface TeamPlugin {
   id: number
   team_id: number
@@ -335,7 +351,7 @@ export interface TeamPlugin {
   updated_at?: V2Timestamp
 }
 
-export interface PluginImportEntry {
+export interface CreateTeamPluginInput {
   category_id?: number
   source_name?: string
   script_name: string
@@ -348,6 +364,13 @@ export interface PluginImportEntry {
   change_note?: string
   visibility?: PluginVisibility
   group_ids?: number[]
+}
+
+export interface UpdateTeamPluginInput extends Partial<CreateTeamPluginInput> {
+  revision: number
+}
+
+export interface PluginImportEntry extends CreateTeamPluginInput {
   overwrite?: boolean
   revision?: number
 }
@@ -637,6 +660,21 @@ export const listAuditLogs = (teamId: V2Identifier, params: V2ListQuery = {}) =>
 export const listTeamPlugins = (teamId: V2Identifier, params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<TeamPlugin[]>>(`v2/teams/${teamId}/plugins`, params)
 
+export const getTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier) =>
+  getV2<Record<string, never>, V2Response<TeamPlugin>>(`v2/teams/${teamId}/plugins/${pluginId}`, {})
+
+export const createTeamPlugin = (teamId: V2Identifier, data: CreateTeamPluginInput) =>
+  writeV2<CreateTeamPluginInput, V2Response<TeamPlugin>>('post', `v2/teams/${teamId}/plugins`, data)
+
+export const updateTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier, data: UpdateTeamPluginInput) =>
+  writeV2<UpdateTeamPluginInput, V2Response<TeamPlugin>>('patch', `v2/teams/${teamId}/plugins/${pluginId}`, data)
+
+export const deleteTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier, options: CascadeDeleteOptions = {}) =>
+  writeV2<undefined, V2Response<{ deleted: boolean }>>(
+    'delete',
+    `v2/teams/${teamId}/plugins/${pluginId}${options.cascade ? '?cascade=true' : ''}`,
+  )
+
 export const listPluginCategories = (teamId: V2Identifier, params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<PluginCategory[]>>(`v2/teams/${teamId}/plugin-categories`, params)
 
@@ -653,8 +691,15 @@ export const updatePluginCategory = (teamId: V2Identifier, categoryId: V2Identif
     data,
   )
 
-export const deletePluginCategory = (teamId: V2Identifier, categoryId: V2Identifier) =>
-  writeV2<undefined, V2Response<{ deleted: boolean }>>('delete', `v2/teams/${teamId}/plugin-categories/${categoryId}`)
+export const deletePluginCategory = (
+  teamId: V2Identifier,
+  categoryId: V2Identifier,
+  options: CascadeDeleteOptions = {},
+) =>
+  writeV2<undefined, V2Response<{ deleted: boolean }>>(
+    'delete',
+    `v2/teams/${teamId}/plugin-categories/${categoryId}${options.cascade ? '?cascade=true' : ''}`,
+  )
 
 export const listPluginGroups = (teamId: V2Identifier, params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<PluginGroup[]>>(`v2/teams/${teamId}/plugin-groups`, params)
@@ -668,8 +713,11 @@ export const createPluginGroup = (teamId: V2Identifier, data: SavePluginGroupInp
 export const updatePluginGroup = (teamId: V2Identifier, groupId: V2Identifier, data: SavePluginGroupInput) =>
   writeV2<SavePluginGroupInput, V2Response<PluginGroup>>('patch', `v2/teams/${teamId}/plugin-groups/${groupId}`, data)
 
-export const deletePluginGroup = (teamId: V2Identifier, groupId: V2Identifier) =>
-  writeV2<undefined, V2Response<{ deleted: boolean }>>('delete', `v2/teams/${teamId}/plugin-groups/${groupId}`)
+export const deletePluginGroup = (teamId: V2Identifier, groupId: V2Identifier, options: CascadeDeleteOptions = {}) =>
+  writeV2<undefined, V2Response<{ deleted: boolean }>>(
+    'delete',
+    `v2/teams/${teamId}/plugin-groups/${groupId}${options.cascade ? '?cascade=true' : ''}`,
+  )
 
 export const bindPluginGroup = (teamId: V2Identifier, pluginId: V2Identifier, groupId: V2Identifier) =>
   writeV2<undefined, V2Response<{ plugin_id: number; group_id: number }>>(

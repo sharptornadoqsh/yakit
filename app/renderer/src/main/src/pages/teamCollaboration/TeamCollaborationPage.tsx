@@ -88,6 +88,27 @@ const getList = (response: any, keys: string[] = []): ApiEntity[] => {
   return []
 }
 
+const mergeSyncedRecords = (
+  current: ApiEntity[],
+  changed: ApiEntity[] = [],
+  tombstones: ApiEntity[] = [],
+): ApiEntity[] => {
+  const records = new Map<string, ApiEntity>()
+  current.forEach((record) => {
+    const id = getId(record)
+    if (id) records.set(id, record)
+  })
+  changed.forEach((record) => {
+    const id = getId(record)
+    if (id) records.set(id, record)
+  })
+  tombstones.forEach((record) => {
+    const id = getId(record)
+    if (id) records.delete(id)
+  })
+  return Array.from(records.values())
+}
+
 const getErrorStatus = (error: any): number =>
   Number(error?.response?.status || error?.status || error?.response?.data?.code || error?.code || 0)
 
@@ -387,6 +408,22 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       if (!isCurrentRequest()) return
       const nextSync = (response?.data || response) as ApiEntity
       setSyncInfo(nextSync)
+      const tombstones = nextSync.tombstones as ApiEntity | undefined
+      const syncedProjectMembers = Array.isArray(nextSync.project_members) ? nextSync.project_members : undefined
+      const syncedTestData = Array.isArray(nextSync.test_data) ? nextSync.test_data : undefined
+      const syncedTestResults = Array.isArray(nextSync.test_results) ? nextSync.test_results : undefined
+      const deletedProjectMembers = Array.isArray(tombstones?.project_members) ? tombstones.project_members : []
+      const deletedTestData = Array.isArray(tombstones?.test_data) ? tombstones.test_data : []
+      const deletedTestResults = Array.isArray(tombstones?.test_results) ? tombstones.test_results : []
+      if (syncedProjectMembers || deletedProjectMembers.length) {
+        setProjectMembers((current) => mergeSyncedRecords(current, syncedProjectMembers, deletedProjectMembers))
+      }
+      if (syncedTestData || deletedTestData.length) {
+        setTestData((current) => mergeSyncedRecords(current, syncedTestData, deletedTestData))
+      }
+      if (syncedTestResults || deletedTestResults.length) {
+        setTestResults((current) => mergeSyncedRecords(current, syncedTestResults, deletedTestResults))
+      }
       const nextSnapshot = Object.prototype.hasOwnProperty.call(nextSync, 'snapshot')
         ? nextSync.snapshot
         : nextSync.project?.snapshot

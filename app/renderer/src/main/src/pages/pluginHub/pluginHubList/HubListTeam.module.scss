@@ -10,13 +10,24 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: 180px minmax(220px, 1fr) repeat(3, 150px) repeat(4, auto);
+  grid-template-columns: 180px minmax(220px, 1fr) repeat(3, 150px) repeat(6, max-content);
   gap: 8px;
   align-items: center;
+
+  > * {
+    min-width: 0;
+  }
 }
 
 .teamSelect {
   width: 100%;
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .pluginInfo {
@@ -84,6 +95,80 @@
   }
 }
 
+.editorForm,
+.filterForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 20px 0;
+
+  label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.filterManager {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px 0;
+
+  section {
+    min-width: 0;
+  }
+}
+
+.managerHeader,
+.managerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.managerHeader {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--Colors-Use-Neutral-Border);
+}
+
+.managerList {
+  display: flex;
+  max-height: 360px;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  overflow: auto;
+}
+
+.managerRow {
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--Colors-Use-Neutral-Border);
+  border-radius: 4px;
+
+  > div:first-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  span {
+    overflow: hidden;
+    color: var(--Colors-Use-Neutral-Text-3-Secondary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .conflictForm {
   display: flex;
   flex-direction: column;
@@ -91,16 +176,39 @@
   padding: 20px 0;
 }
 
+@media (max-width: 1600px) {
+  .toolbar {
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+  }
+}
+
 @media (max-width: 1400px) {
   .toolbar {
     grid-template-columns: repeat(3, minmax(160px, 1fr));
   }
 
-  .uploadForm {
+  .uploadForm,
+  .editorForm,
+  .filterForm,
+  .filterManager {
     grid-template-columns: 1fr;
 
     label:first-child {
       grid-column: auto;
     }
+  }
+
+  .fullWidth {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .toolbar,
+  .uploadForm,
+  .editorForm,
+  .filterForm,
+  .filterManager {
+    grid-template-columns: 1fr;
   }
 }
