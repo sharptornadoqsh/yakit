@@ -55,6 +55,16 @@ const createDeferred = <T,>() => {
   return { promise, reject, resolve }
 }
 
+interface MockSelectOption {
+  label: React.ReactNode
+  value: string | number
+}
+
+type MockTableRecord = Record<string, any> & {
+  id: number
+  script_name: string
+}
+
 vi.mock('@/services/teamCollaboration', () => ({
   createPluginCategory: mocks.createPluginCategory,
   createPluginGroup: mocks.createPluginGroup,
@@ -118,7 +128,15 @@ vi.mock('@/components/yakitUI/YakitModal/YakitModal', () => ({
 }))
 
 vi.mock('antd', () => ({
-  Select: ({ allowClear: _allowClear, mode, onChange, options = [], placeholder, value, ...props }) => (
+  Select: ({
+    allowClear: _allowClear,
+    mode,
+    onChange,
+    options = [] as MockSelectOption[],
+    placeholder,
+    value,
+    ...props
+  }) => (
     <select
       {...props}
       multiple={mode === 'multiple'}
@@ -140,7 +158,7 @@ vi.mock('antd', () => ({
       ))}
     </select>
   ),
-  Table: ({ columns, dataSource = [], pagination, rowSelection }) => (
+  Table: ({ columns, dataSource = [] as MockTableRecord[], pagination, rowSelection }) => (
     <>
       <span data-testid="plugin-total">{pagination?.total}</span>
       <table>

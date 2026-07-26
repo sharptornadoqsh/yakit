@@ -1799,3 +1799,22 @@
 - 产品修改限定于团队项目导出适配层及其测试，没有改变 Yak 引擎协议或数据库模型。
 - 验收脚本仍通过本地归档路径和内存正文完成两端传递，只证明真实引擎、本机数据库、映射结构和重启持久性。
 - online 实时接口证据与 Electron 界面人工验收由根目录文档分别记录，不由本报告提高证据等级。
+## 2026-07-27 01:35:43 +08:00 编码前检查 - Actions 下拉框 never 类型
+
+- 已查阅 `.claude/context-summary-yakit-actions-select-never.md`。
+- 已确认当前分支为 `qsh`，工作树无修改。
+- 已使用 CodeGraph 和 Desktop Commander 定位 `HubListTeamComponent.test.tsx`。
+- 将复用 React 类型、Vitest 模拟结构和现有内联属性类型模式。
+- 已检查全部 `*.test.tsx` 中的空数组默认值，目标文件仅有 `options` 与 `dataSource` 两处。
+- 修改限定为显式数组元素类型，不改变产品源码或测试行为。
+- 不执行 Yakit 构建、TypeScript 类型检查或打包。
+
+## 2026-07-27 01:38:53 +08:00 实现与验证 - Actions 下拉框 never 类型
+
+- 新增 `MockSelectOption`，将 Select 模拟的默认 `options` 声明为明确元素数组。
+- 新增 `MockTableRecord`，将 Table 模拟的默认 `dataSource` 声明为明确记录数组，避免后续同类失败。
+- `HubListTeamComponent.test.tsx` 二十七项测试全部通过。
+- 目标源码与任务文档通过 Prettier 校验，`git diff --check` 无输出。
+- CodeGraph 索引已同步。
+- 独立只读复审结论为通过，未发现其他同类 `never[]` 属性访问风险。
+- 未执行 Yakit 构建、TypeScript 类型检查或打包。
