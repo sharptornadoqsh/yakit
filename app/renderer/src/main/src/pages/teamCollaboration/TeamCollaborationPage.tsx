@@ -408,7 +408,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       if (!isCurrentRequest()) return
       const nextSync = (response?.data || response) as ApiEntity
       setSyncInfo(nextSync)
-      const tombstones = nextSync.tombstones as ApiEntity | undefined
+      const tombstones: ApiEntity = nextSync.tombstones ?? {}
       const syncedProjectMembers = Array.isArray(nextSync.project_members) ? nextSync.project_members : undefined
       const syncedTestData = Array.isArray(nextSync.test_data) ? nextSync.test_data : undefined
       const syncedTestResults = Array.isArray(nextSync.test_results) ? nextSync.test_results : undefined
