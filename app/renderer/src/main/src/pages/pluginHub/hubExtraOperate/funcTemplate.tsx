@@ -20,6 +20,7 @@ import { OutlineQuestionmarkcircleIcon } from '@/assets/icon/outline'
 import { pluginTypeToName } from '@/pages/plugins/builtInData'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { AuthorIcon, AuthorImg, TagsListShow } from '@/pages/plugins/funcTemplate'
+import { resolveRuiYanPluginAuthor } from '@/config/renyanUiPolicy'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
 import { SolidChevrondownIcon, SolidChevronupIcon } from '@/assets/icon/solid'
 import { formatDate } from '@/utils/timeUtil'
@@ -434,9 +435,9 @@ export const HubDetailHeader: React.FC<HubDetailHeaderProps> = memo((props) => {
               <AuthorImg src={img || UnLogin} />
               <div
                 className={classNames(styles['name-wrapper'], styles['text-style'], 'yakit-content-single-ellipsis')}
-                title={user || 'anonymous'}
+                title={resolveRuiYanPluginAuthor(user)}
               >
-                {user || 'anonymous'}
+                {resolveRuiYanPluginAuthor(user)}
               </div>
               <AuthorIcon />
             </div>

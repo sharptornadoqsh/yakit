@@ -53,6 +53,7 @@ import { ManualHijackTypeProps, MITMManualRefProps } from '../MITMManual/MITMMan
 import { grpcMITMV2RecoverManualHijack } from '../MITMManual/utils'
 import { TableTotalAndSelectNumber } from '@/components/TableTotalAndSelectNumber/TableTotalAndSelectNumber'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
+import { getRuiYanMitmDefaultExcludeColumns } from '@/config/renyanUiPolicy'
 import { YakitMenu } from '@/components/yakitUI/YakitMenu/YakitMenu'
 import { ChevronDownIcon } from '@/assets/newIcon'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
@@ -999,6 +1000,7 @@ const MITMHijackedContent: React.FC<MITMHijackedContentProps> = React.memo((prop
             pageType="MITM"
             detailMode="aside"
             noTableTitle={true}
+            defaultExcludeColumnsKey={getRuiYanMitmDefaultExcludeColumns()}
             downstreamProxyStr={downstreamProxyStr}
             params={{ SourceType: sourceType }}
             onSetTableTotal={setTableTotal}

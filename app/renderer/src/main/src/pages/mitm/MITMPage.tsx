@@ -68,6 +68,7 @@ import {
 } from './MITMHacker/utils'
 import { KVPair } from '@/models/kv'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 import { useProxy } from '@/hook/useProxy'
 import { registerShortcutKeyHandle, unregisterShortcutKeyHandle } from '@/utils/globalShortcutKey/utils'
 import { ShortcutKeyPage } from '@/utils/globalShortcutKey/events/pageMaps'
@@ -637,6 +638,7 @@ export const MITMServer: React.FC<MITMServerProps> = React.memo((props) => {
   const [openTabsFlag, setOpenTabsFlag] = useState<boolean>(true)
 
   const { t } = useI18nNamespaces(['mitm', 'yakitUi'])
+  const showRulePluginPanel = RUIYAN_UI_POLICY.mitm.showRulePluginPanel
 
   /**
    * @description 插件勾选
@@ -1053,11 +1055,18 @@ export const MITMServer: React.FC<MITMServerProps> = React.memo((props) => {
   })
 
   return (
-    <div className={classNames(style['mitm-workspace-grid'], isFullScreenFirstNode && style['mitm-plugin-expanded'])}>
-      <aside className={style['mitm-server-start-pre-first']} aria-label="规则与插件">
-        {onRenderFirstNode()}
-      </aside>
-      {!isFullScreenFirstNode ? (
+    <div
+      className={classNames(
+        style['mitm-workspace-grid'],
+        (!showRulePluginPanel || isFullScreenFirstNode) && style['mitm-plugin-expanded'],
+      )}
+    >
+      {showRulePluginPanel ? (
+        <aside className={style['mitm-server-start-pre-first']} aria-label="规则与插件">
+          {onRenderFirstNode()}
+        </aside>
+      ) : null}
+      {!showRulePluginPanel || !isFullScreenFirstNode ? (
         <section className={style['mitm-server-start-pre-second']} aria-label="代理流量工作区">
           {onRenderSecondNode()}
         </section>

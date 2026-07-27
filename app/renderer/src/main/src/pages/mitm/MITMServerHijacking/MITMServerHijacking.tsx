@@ -38,6 +38,7 @@ import {
 } from '../MITMHacker/utils'
 import { convertMITMFilterUI } from '../MITMServerStartForm/utils'
 import { getMitmHijackFilter } from '../MITMServerStartForm/MITMFiltersModal'
+import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 import { YakitSelect } from '@/components/yakitUI/YakitSelect/YakitSelect'
 import { YakitBaseSelectRef } from '@/components/yakitUI/YakitSelect/YakitSelectType'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
@@ -471,37 +472,44 @@ export const MITMServerHijacking: React.FC<MITMServerHijackingProp> = (props) =>
               </label>
             </div>
             <Divider type="vertical" style={{ margin: '0 4px', top: 1 }} />
-            <YakitPopover
-              placement="bottom"
-              title={
-                <div className={style['proxy_configuration_top']} onClick={() => setDownStreamAgentModalVisible(true)}>
-                  {t('ProxyConfig.downstream_agent')}
-                </div>
-              }
-              content={
-                <div className={style['proxy_configuration_bottom']}>
-                  <span>{t('HttpQueryAdvancedConfig.disable_system_proxy')}</span>
-                  <YakitSwitch
-                    size="large"
-                    checked={disableSystemProxy}
-                    onChange={(checked) => {
-                      updateDisableSystemProxy(checked)
-                    }}
-                  />
-                </div>
-              }
-            >
-              <div className={style['link-item']}>{t('AgentConfigModal.proxy_configuration')}</div>
-            </YakitPopover>
-            <Divider type="vertical" style={{ margin: '0 4px', top: 1 }} />
-            {!isNarrow && (
+            {RUIYAN_UI_POLICY.mitm.showDownstreamProxy ? (
+              <>
+                <YakitPopover
+                  placement="bottom"
+                  title={
+                    <div
+                      className={style['proxy_configuration_top']}
+                      onClick={() => setDownStreamAgentModalVisible(true)}
+                    >
+                      {t('ProxyConfig.downstream_agent')}
+                    </div>
+                  }
+                  content={
+                    <div className={style['proxy_configuration_bottom']}>
+                      <span>{t('HttpQueryAdvancedConfig.disable_system_proxy')}</span>
+                      <YakitSwitch
+                        size="large"
+                        checked={disableSystemProxy}
+                        onChange={(checked) => {
+                          updateDisableSystemProxy(checked)
+                        }}
+                      />
+                    </div>
+                  }
+                >
+                  <div className={style['link-item']}>{t('AgentConfigModal.proxy_configuration')}</div>
+                </YakitPopover>
+                <Divider type="vertical" style={{ margin: '0 4px', top: 1 }} />
+              </>
+            ) : null}
+            {!isNarrow && RUIYAN_UI_POLICY.mitm.showContentRules ? (
               <>
                 <div className={style['link-item']} onClick={() => setVisible(true)}>
                   规则配置
                 </div>
                 <Divider type="vertical" style={{ margin: '0 4px', top: 1 }} />
               </>
-            )}
+            ) : null}
             <div className={style['link-item']} onClick={() => setFiltersVisible(true)}>
               过滤器
             </div>
@@ -529,9 +537,11 @@ export const MITMServerHijacking: React.FC<MITMServerHijackingProp> = (props) =>
           {/*>*/}
           {/*    系统代理*/}
           {/*</YakitButton>*/}
-          <div className={style['mitm-server-chrome']}>
-            <ChromeLauncherButton isStartMITM={true} host={host} port={port} disableCACertPage={disableCACertPage} />
-          </div>
+          {RUIYAN_UI_POLICY.mitm.showNoConfigStart ? (
+            <div className={style['mitm-server-chrome']}>
+              <ChromeLauncherButton isStartMITM={true} host={host} port={port} disableCACertPage={disableCACertPage} />
+            </div>
+          ) : null}
           {isNarrow && (
             <YakitPopover
               overlayClassName={classNames(style['more-popover'])}
@@ -543,7 +553,9 @@ export const MITMServerHijacking: React.FC<MITMServerHijackingProp> = (props) =>
                 <YakitMenu
                   selectedKeys={[]}
                   data={[
-                    { key: 'rule-config', label: t('MITMServerHijacking.rule_configuration') },
+                    ...(RUIYAN_UI_POLICY.mitm.showContentRules
+                      ? [{ key: 'rule-config', label: t('MITMServerHijacking.rule_configuration') }]
+                      : []),
                     {
                       key: 'cert-download',
                       label: t('MITMFormAdvancedConfiguration.certificateDownload'),

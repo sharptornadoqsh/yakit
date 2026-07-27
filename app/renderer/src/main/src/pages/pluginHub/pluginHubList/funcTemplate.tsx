@@ -8,6 +8,7 @@ import { YakitCheckbox } from '@/components/yakitUI/YakitCheckbox/YakitCheckbox'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { PluginFilterParams, PluginListTabs, PluginSearchParams } from '@/pages/plugins/baseTemplateType'
 import { AuthorIcon, AuthorImg, CodeScoreModule, FuncFilterPopover, FuncSearch } from '@/pages/plugins/funcTemplate'
+import { resolveRuiYanPluginAuthor } from '@/config/renyanUiPolicy'
 import { TagShowOpt } from '@/pages/plugins/funcTemplateType'
 import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { YakitPopover } from '@/components/yakitUI/YakitPopover/YakitPopover'
@@ -719,7 +720,7 @@ export const HubGridOpt: React.FC<HubGridOptProps> = memo((props) => {
               <div className={styles['user-body']}>
                 {authorImgNode}
                 <div className={classNames(styles['user-style'], 'yakit-content-single-ellipsis')}>
-                  {user || 'anonymous'}
+                  {resolveRuiYanPluginAuthor(user)}
                 </div>
                 <AuthorIcon />
               </div>

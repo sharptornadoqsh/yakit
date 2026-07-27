@@ -79,6 +79,7 @@ import { HybridScanControlAfterRequest } from '@/models/HybridScan'
 import { getReleaseEditionName, getRemoteHttpSettingGV } from '@/utils/envfile'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { RuiYanSegmented } from '@/components/renyanUI'
+import { RUIYAN_UI_POLICY, resolveRuiYanVulnerabilitySelectionType } from '@/config/renyanUiPolicy'
 
 const HybridScanTaskListDrawer = React.lazy(
   () => import('@/pages/plugins/pluginBatchExecutor/HybridScanTaskListDrawer'),
@@ -116,11 +117,12 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
   const [pageInfo, setPageInfo] = useState<PocPageInfoProps>(initPageInfo())
   const [keyWordResponseToSelect, setKeyWordResponseToSelect] = useState<GroupCount[]>([])
   const [responseToSelect, setResponseToSelect] = useState<GroupCount[]>([])
+  const showGroupSelection = RUIYAN_UI_POLICY.vulnerabilityDetection.showGroupSelection
 
   // 隐藏插件列表
   const [hidden, setHidden] = useState<boolean>(false)
   const [type, setType] = useState<'keyword' | 'group'>(
-    pageInfo.selectGroup && pageInfo.selectGroup?.length > 0 ? 'group' : 'keyword',
+    resolveRuiYanVulnerabilitySelectionType(Boolean(pageInfo.selectGroup?.length)),
   )
 
   const [executeStatus, setExecuteStatus] = useState<ExpandAndRetractExcessiveState>('default')
@@ -162,7 +164,7 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
         .map((ele) => ele.Value)
       groupObj.selectGroupListByKeyWord = initSelectGroup
     }
-    if (responseToSelect.length > 0) {
+    if (showGroupSelection && responseToSelect.length > 0) {
       // 设置组默认选中
       const initSelectGroup = responseToSelect
         .filter((item) => initSelectGroupAll.includes(item.Value))
@@ -172,7 +174,7 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
     // 未被删除的组
     const haveGroup = groupObj.selectGroup.concat(groupObj.selectGroupListByKeyWord)
     // 被删除的组
-    const removeGroup = initSelectGroupAll.filter((item) => !haveGroup.includes(item))
+    const removeGroup = showGroupSelection ? initSelectGroupAll.filter((item) => !haveGroup.includes(item)) : []
     setPageInfo((v) => ({ ...v, ...groupObj }))
     setDeletedGroup(removeGroup)
     /**ANCHOR[id=deleted-init-group-all] - 清空初始查询回来的组 */
@@ -188,9 +190,9 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
   const selectGroupListAll = useCreation(() => {
     const groups = [
       ...new Set([
-        ...(pageInfo.selectGroup || []),
+        ...(showGroupSelection ? pageInfo.selectGroup || [] : []),
         ...(pageInfo.selectGroupListByKeyWord || []),
-        ...(deletedGroup || []),
+        ...(showGroupSelection ? deletedGroup || [] : []),
       ]),
     ]
     return groups
@@ -211,17 +213,22 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
     } catch (error) {}
   })
 
-  const onActiveKey = useMemoizedFn((key) => {
-    setType(key)
+  const onActiveKey = useMemoizedFn((key: string) => {
+    setType(resolveRuiYanVulnerabilitySelectionType(key === 'group'))
   })
 
   useEffect(() => {
-    if (pageInfo.selectGroup?.length) {
+    if (showGroupSelection && pageInfo.selectGroup?.length) {
       const t = pageInfo.selectGroup && pageInfo.selectGroup?.length > 0 ? 'group' : 'keyword'
       setHidden(false)
       onActiveKey(t)
     }
   }, [])
+
+  const effectivePageInfo = useCreation<PocPageInfoProps>(
+    () => (showGroupSelection ? pageInfo : { ...pageInfo, selectGroup: [] }),
+    [pageInfo, showGroupSelection],
+  )
 
   const activeWorkflowStep = useCreation(() => {
     if (executeStatus === 'finished') return 4
@@ -265,26 +272,28 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
               onChange={onActiveKey}
               items={[
                 { label: t('YakPoC.byKeyword'), value: 'keyword' },
-                { label: t('YakPoC.byGroup'), value: 'group' },
+                ...(showGroupSelection ? [{ label: t('YakPoC.byGroup'), value: 'group' }] : []),
               ]}
             />
           </div>
           <PluginGroupByKeyWord
             pageId={pageId}
             inViewport={inViewport}
-            hidden={type === 'group'}
+            hidden={showGroupSelection && type === 'group'}
             defGroupKeywords={pageInfo.defGroupKeywords || ''}
             selectGroupListByKeyWord={pageInfo.selectGroupListByKeyWord || []}
             setSelectGroupListByKeyWord={onSetSelectGroupListByKeyWord}
             setResponseToSelect={setKeyWordResponseToSelect}
           />
-          <PluginGroupGrid
-            inViewport={inViewport}
-            hidden={type === 'keyword'}
-            selectGroupList={pageInfo.selectGroup || []}
-            setSelectGroupList={onSetSelectGroupList}
-            setResponseToSelect={setResponseToSelect}
-          />
+          {showGroupSelection ? (
+            <PluginGroupGrid
+              inViewport={inViewport}
+              hidden={type === 'keyword'}
+              selectGroupList={pageInfo.selectGroup || []}
+              setSelectGroupList={onSetSelectGroupList}
+              setResponseToSelect={setResponseToSelect}
+            />
+          ) : null}
         </div>
         <YakPoCExecuteContent
           hidden={hidden}
@@ -294,7 +303,7 @@ export const YakPoC: React.FC<YakPoCProps> = React.memo((props) => {
           setExecuteStatus={setExecuteStatus}
           onClearAll={onClearAll}
           pageId={pageId}
-          pageInfo={pageInfo}
+          pageInfo={effectivePageInfo}
           onInitInputValueAfter={onInitInputValueAfter}
           type={type}
         />

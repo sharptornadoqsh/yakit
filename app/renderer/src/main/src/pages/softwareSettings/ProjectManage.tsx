@@ -51,6 +51,7 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { Trans } from 'react-i18next'
 import { getProjectDisplayText } from './projectBranding'
 import { ProjectShareModal } from './projectShare/ProjectShareModal'
+import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 
 const { ipcRenderer } = window.require('electron')
 const { YakitPanel } = YakitCollapse
@@ -482,6 +483,9 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         },
       },
     ]
+    if (!RUIYAN_UI_POLICY.projectWorkspace.showStoragePath) {
+      header = header.filter((item) => item.key !== 'DatabasePath')
+    }
     let arr = judgeProjectConfig(eeSystemConfig)
     arr.forEach((item) => {
       if (item.key === 'ExternalProjectCode' || item.key === 'ExternalModule') {
@@ -1098,10 +1102,14 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
           label: t('YakitButton.edit'),
           disabled: project?.ProjectName === '[default]',
         },
-        {
-          key: 'copyPath',
-          label: t('ProjectManage.copyPath'),
-        },
+        ...(RUIYAN_UI_POLICY.projectWorkspace.showStoragePath
+          ? [
+              {
+                key: 'copyPath',
+                label: t('ProjectManage.copyPath'),
+              },
+            ]
+          : []),
         { type: 'divider' },
         {
           key: 'delete',
@@ -1584,18 +1592,22 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                 <dt>{t('ProjectManage.description')}</dt>
                 <dd>{getProjectDisplayText(selectedProject.ProjectName, selectedProject.Description) || '-'}</dd>
               </div>
-              <div>
-                <dt>{t('ProjectManage.storagePath')}</dt>
-                <dd className={styles['project-detail-path']}>
-                  <span>{getProjectDisplayText(selectedProject.ProjectName, selectedProject.DatabasePath) || '-'}</span>
-                  {selectedProject.DatabasePath ? (
-                    <CopyComponents
-                      copyText={getProjectDisplayText(selectedProject.ProjectName, selectedProject.DatabasePath)}
-                      onAfterCopy={() => {}}
-                    />
-                  ) : null}
-                </dd>
-              </div>
+              {RUIYAN_UI_POLICY.projectWorkspace.showStoragePath ? (
+                <div>
+                  <dt>{t('ProjectManage.storagePath')}</dt>
+                  <dd className={styles['project-detail-path']}>
+                    <span>
+                      {getProjectDisplayText(selectedProject.ProjectName, selectedProject.DatabasePath) || '-'}
+                    </span>
+                    {selectedProject.DatabasePath ? (
+                      <CopyComponents
+                        copyText={getProjectDisplayText(selectedProject.ProjectName, selectedProject.DatabasePath)}
+                        onAfterCopy={() => {}}
+                      />
+                    ) : null}
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt>{t('ProjectManage.size')}</dt>
                 <dd>{selectedProject.FileSize || '-'}</dd>
@@ -1643,9 +1655,11 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
               >
                 {t('ProjectManage.plaintextExport')}
               </RuiYanButton>
-              <RuiYanButton variant="secondary" onClick={() => operateFunc('copyPath', selectedProject)}>
-                {t('ProjectManage.copyPath')}
-              </RuiYanButton>
+              {RUIYAN_UI_POLICY.projectWorkspace.showStoragePath ? (
+                <RuiYanButton variant="secondary" onClick={() => operateFunc('copyPath', selectedProject)}>
+                  {t('ProjectManage.copyPath')}
+                </RuiYanButton>
+              ) : null}
             </div>
           </div>
         ) : null}

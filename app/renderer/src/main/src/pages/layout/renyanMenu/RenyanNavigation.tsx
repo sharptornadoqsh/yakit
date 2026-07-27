@@ -89,6 +89,17 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
 
   useEffect(() => {
+    if (currentRoute === YakitRoute.PoC && currentPath.length === 0) {
+      const fallbackGroup = menu.find((item) => item.key === 'vulnerability-detection')
+      const fallbackTarget = fallbackGroup && flattenRenyanMenu([fallbackGroup]).find(isRenyanMenuItemNavigable)
+      if (fallbackGroup && fallbackTarget) {
+        setActiveGroupKey(fallbackGroup.key)
+        setActiveSecondaryKey(fallbackTarget.key)
+        activateMenuItem(fallbackTarget, onMenuSelect)
+        return
+      }
+    }
+
     if (currentRoute === YakitRoute.Beta_ConfigNetwork) {
       let section: string | null = null
       try {

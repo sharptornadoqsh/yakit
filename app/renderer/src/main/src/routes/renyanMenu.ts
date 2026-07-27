@@ -1,4 +1,5 @@
 import { YakitRoute } from '@/enums/yakitRoute'
+import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 
 export type RenyanDeliveryStatus = 'available' | 'planned'
 
@@ -20,6 +21,7 @@ export type RenyanFeatureFlag =
   | 'domesticCrypto'
   | 'pluginPipeline'
   | 'managedClientOverview'
+  | 'specialVulnerabilityDetection'
 
 export type RenyanShellAction = 'changeProject' | 'serviceConnection' | 'engineUpdate' | 'diagnostics' | 'about'
 
@@ -80,6 +82,7 @@ export const DEFAULT_RENYAN_FEATURE_FLAGS: Record<RenyanFeatureFlag, boolean> = 
   domesticCrypto: false,
   pluginPipeline: false,
   managedClientOverview: false,
+  specialVulnerabilityDetection: RUIYAN_UI_POLICY.vulnerabilityDetection.showSpecialDetection,
 }
 
 export const DEFAULT_RENYAN_CAPABILITIES: readonly RenyanCapability[] = [
@@ -182,6 +185,7 @@ export const RENYAN_MENU_MODEL: readonly RenyanMenuItem[] = [
           key: 'targeted-vulnerability',
           title: '专项检测',
           route: YakitRoute.PoC,
+          featureFlag: 'specialVulnerabilityDetection',
           children: [
             { key: 'target-plugin-select', title: '插件选择', route: YakitRoute.PoC },
             { key: 'target-execution-log', title: '执行日志', route: YakitRoute.PoC },

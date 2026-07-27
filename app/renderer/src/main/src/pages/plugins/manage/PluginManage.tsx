@@ -34,6 +34,7 @@ import {
   useUpdateEffect,
 } from 'ahooks'
 import { API } from '@/services/swagger/resposeType'
+import { resolveRuiYanPluginAuthor } from '@/config/renyanUiPolicy'
 import cloneDeep from 'lodash/cloneDeep'
 import { RuiYanButton, RuiYanConfirmDialog, RuiYanModal, showRuiYanModal } from '@/components/renyanUI'
 import { Form, Progress, Tooltip } from 'antd'
@@ -1637,7 +1638,7 @@ const ModifyAuthorModal: React.FC<ModifyAuthorModalProps> = memo((props) => {
               <YakitSelect.Option key={item.name} value={item.id} record={item}>
                 <div className={styles['modify-author-item-wrapper']}>
                   <AuthorImg size="small" src={item.head_img || ''} />
-                  {item.name}
+                  {resolveRuiYanPluginAuthor(item.name)}
                 </div>
               </YakitSelect.Option>
             ))}

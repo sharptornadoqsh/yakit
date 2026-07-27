@@ -80,6 +80,7 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { PublicHTTPHistoryIcon } from '@/routes/publicIcon'
 import { debugToPrintLogs } from '@/utils/logCollection'
 import { JSONParseLog } from '@/utils/tool'
+import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 import {
   defFilterConfig,
   FilterConfig,
@@ -520,6 +521,7 @@ export const HTTPFlowTable = React.memo<HTTPFlowTableProp>((props) => {
   }, [])
 
   const updateAdvancedSearch = useMemo(() => {
+    if (pageType === 'MITM' && !RUIYAN_UI_POLICY.mitm.showAdvancedFilter) return false
     return ['History', 'MITM'].includes(pageType || '') || showAdvancedSearch
   }, [pageType, showAdvancedSearch])
   const [filterConfig, setFilterConfig] = useState<FilterConfig>(cloneDeep(defFilterConfig))
@@ -2673,15 +2675,17 @@ export const HTTPFlowTable = React.memo<HTTPFlowTableProp>((props) => {
           disableDeselect={true}
         />
       </div>
-      <HTTPFlowTableFormConfiguration
-        visible={drawerFormVisible}
-        setVisible={setDrawerFormVisible}
-        filterConfig={filterConfig}
-        saveOk={(config) => {
-          setFilterConfig(config)
-          setRemoteValue(RemoteHistoryGV.HTTPFlowTableFormConfiguration, JSON.stringify(config))
-        }}
-      ></HTTPFlowTableFormConfiguration>
+      {updateAdvancedSearch ? (
+        <HTTPFlowTableFormConfiguration
+          visible={drawerFormVisible}
+          setVisible={setDrawerFormVisible}
+          filterConfig={filterConfig}
+          saveOk={(config) => {
+            setFilterConfig(config)
+            setRemoteValue(RemoteHistoryGV.HTTPFlowTableFormConfiguration, JSON.stringify(config))
+          }}
+        ></HTTPFlowTableFormConfiguration>
+      ) : null}
       <EditTagsModal
         visible={editTagsVisible}
         editTagsInfo={editTagsRef.current}

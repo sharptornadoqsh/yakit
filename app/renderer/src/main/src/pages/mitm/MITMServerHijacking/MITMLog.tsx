@@ -35,6 +35,7 @@ import {
 } from '@/components/HTTPFlowTable/HTTPFlowTableFormConfiguration/HTTPFlowTableFormConfiguration'
 import { RemoteHistoryGV } from '@/enums/history'
 import { cloneDeep } from 'lodash'
+import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 
 const { ipcRenderer } = window.require('electron')
 interface MITMLogHeardExtraProps {
@@ -57,6 +58,7 @@ export const MITMLogHeardExtra: React.FC<MITMLogHeardExtraProps> = React.memo((p
     hasNewData,
   } = props
   const { t, i18n } = useI18nNamespaces(['yakitUi', 'history', 'yakitRoute'])
+  const { showAdvancedFilter, showProcessFilter } = RUIYAN_UI_POLICY.mitm
   const mitmContent = useContext(MITMContext)
   const mitmVersion = useCreation(() => {
     return mitmContent.mitmStore.version
@@ -147,11 +149,12 @@ export const MITMLogHeardExtra: React.FC<MITMLogHeardExtraProps> = React.memo((p
     } catch (error) {}
   })
   useEffect(() => {
+    if (!showProcessFilter) return
     emiter.on('onMITMLogProcessQuery', onMITMLogProcessQuery)
     return () => {
       emiter.off('onMITMLogProcessQuery', onMITMLogProcessQuery)
     }
-  }, [])
+  }, [showProcessFilter])
   useEffect(() => {
     if (processVisible) {
       setProcessLoading(true)
@@ -219,11 +222,12 @@ export const MITMLogHeardExtra: React.FC<MITMLogHeardExtraProps> = React.memo((p
   }, [filterConfig])
 
   useEffect(() => {
+    if (!showAdvancedFilter) return
     emiter.on('onGetAdvancedSearchDataEvent', onGetAdvancedSearchData)
     return () => {
       emiter.off('onGetAdvancedSearchDataEvent', onGetAdvancedSearchData)
     }
-  }, [])
+  }, [showAdvancedFilter])
   const onGetAdvancedSearchData = useMemoizedFn((str: string) => {
     try {
       const value = JSONParseLog(str, { page: 'MITMLog', fun: 'onGetAdvancedSearchData' })
@@ -262,92 +266,98 @@ export const MITMLogHeardExtra: React.FC<MITMLogHeardExtraProps> = React.memo((p
         <TableTotalAndSelectNumber total={tableTotal} selectNum={tableSelectNum} />
       </div>
       <div className={styles['mitm-log-heard-right']}>
-        <div className={styles['advancedSearch']}>
-          <YakitButton
-            type="text"
-            onClick={() => {
-              setDrawerFormVisible(true)
-            }}
-            style={{ padding: 0 }}
-          >
-            高级筛选
-          </YakitButton>
-          {isFilter && (
-            <YakitTag color={'success'} style={{ margin: 0 }}>
-              已配置
-              <OutlineCheckIcon className={styles['check-icon']} />
-            </YakitTag>
-          )}
-          <HTTPFlowTableFormConfiguration
-            visible={drawerFormVisible}
-            setVisible={setDrawerFormVisible}
-            filterConfig={filterConfig}
-            saveOk={(config) => {
-              setFilterConfig(config)
-              setRemoteValue(RemoteHistoryGV.HTTPFlowTableFormConfiguration, JSON.stringify(config))
-              emiter.emit('onGetOtherPageAdvancedSearchDataEvent', JSON.stringify(config))
-            }}
-          ></HTTPFlowTableFormConfiguration>
-        </div>
-        <YakitPopover
-          placement="bottom"
-          trigger="click"
-          content={
-            <div className={styles['process-cont-wrapper']}>
-              <div>
-                <YakitInput
-                  allowClear
-                  prefix={<OutlineSearchIcon className={styles['search-icon']} />}
-                  onChange={(e) => setSearchProcessVal(e.target.value)}
-                ></YakitInput>
-              </div>
-              <div className={styles['process-list-wrapper']}>
-                {processLoading ? (
-                  <YakitSpin style={{ display: 'block' }}></YakitSpin>
-                ) : (
-                  <>
-                    {renderProcessList.length ? (
-                      <>
-                        {renderProcessList.map((item) => (
-                          <div
-                            className={classNames(styles['process-list-item'], {
-                              [styles['process-list-item-active']]: curProcess.includes(item.process),
-                            })}
-                            key={item.process}
-                            onClick={() => onProcessItemClick(item)}
-                          >
-                            <div className={styles['process-item-left-wrapper']}>
-                              {item.icon ? (
-                                <div className={styles['process-icon']}>{item.icon}</div>
-                              ) : (
-                                <OutlineTerminalIcon className={styles['process-icon']} />
-                              )}
-                              <div className={styles['process-item-label']} title={item.process}>
-                                {item.process}
+        {showAdvancedFilter ? (
+          <div className={styles['advancedSearch']}>
+            <YakitButton
+              type="text"
+              onClick={() => {
+                setDrawerFormVisible(true)
+              }}
+              style={{ padding: 0 }}
+            >
+              高级筛选
+            </YakitButton>
+            {isFilter && (
+              <YakitTag color={'success'} style={{ margin: 0 }}>
+                已配置
+                <OutlineCheckIcon className={styles['check-icon']} />
+              </YakitTag>
+            )}
+            <HTTPFlowTableFormConfiguration
+              visible={drawerFormVisible}
+              setVisible={setDrawerFormVisible}
+              filterConfig={filterConfig}
+              saveOk={(config) => {
+                setFilterConfig(config)
+                setRemoteValue(RemoteHistoryGV.HTTPFlowTableFormConfiguration, JSON.stringify(config))
+                emiter.emit('onGetOtherPageAdvancedSearchDataEvent', JSON.stringify(config))
+              }}
+            ></HTTPFlowTableFormConfiguration>
+          </div>
+        ) : null}
+        {showProcessFilter ? (
+          <YakitPopover
+            placement="bottom"
+            trigger="click"
+            content={
+              <div className={styles['process-cont-wrapper']}>
+                <div>
+                  <YakitInput
+                    allowClear
+                    prefix={<OutlineSearchIcon className={styles['search-icon']} />}
+                    onChange={(e) => setSearchProcessVal(e.target.value)}
+                  ></YakitInput>
+                </div>
+                <div className={styles['process-list-wrapper']}>
+                  {processLoading ? (
+                    <YakitSpin style={{ display: 'block' }}></YakitSpin>
+                  ) : (
+                    <>
+                      {renderProcessList.length ? (
+                        <>
+                          {renderProcessList.map((item) => (
+                            <div
+                              className={classNames(styles['process-list-item'], {
+                                [styles['process-list-item-active']]: curProcess.includes(item.process),
+                              })}
+                              key={item.process}
+                              onClick={() => onProcessItemClick(item)}
+                            >
+                              <div className={styles['process-item-left-wrapper']}>
+                                {item.icon ? (
+                                  <div className={styles['process-icon']}>{item.icon}</div>
+                                ) : (
+                                  <OutlineTerminalIcon className={styles['process-icon']} />
+                                )}
+                                <div className={styles['process-item-label']} title={item.process}>
+                                  {item.process}
+                                </div>
+                                {curProcess.includes(item.process) && (
+                                  <SolidCheckIcon className={styles['check-icon']} />
+                                )}
                               </div>
-                              {curProcess.includes(item.process) && <SolidCheckIcon className={styles['check-icon']} />}
                             </div>
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div style={{ textAlign: 'center' }}>暂无数据</div>
-                    )}
-                  </>
-                )}
+                          ))}
+                        </>
+                      ) : (
+                        <div style={{ textAlign: 'center' }}>暂无数据</div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          }
-          overlayClassName={styles['http-mitm-table-process-popover']}
-          onVisibleChange={setProcessVisible}
-          visible={processVisible}
-        >
-          {curProcess.length >= 1 ? (
-            <YakitButton type="primary">进程筛选（{curProcess.length}）</YakitButton>
-          ) : (
-            <YakitButton type="outline1">进程筛选</YakitButton>
-          )}
-        </YakitPopover>
+            }
+            overlayClassName={styles['http-mitm-table-process-popover']}
+            onVisibleChange={setProcessVisible}
+            visible={processVisible}
+          >
+            {curProcess.length >= 1 ? (
+              <YakitButton type="primary">进程筛选（{curProcess.length}）</YakitButton>
+            ) : (
+              <YakitButton type="outline1">进程筛选</YakitButton>
+            )}
+          </YakitPopover>
+        ) : null}
         <HistorySearch
           searchVal={searchVal}
           setSearchVal={setSearchVal}

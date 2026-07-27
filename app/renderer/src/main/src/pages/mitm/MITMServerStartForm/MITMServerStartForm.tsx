@@ -37,6 +37,7 @@ import { checkProxyVersion, isValidUrlWithProtocol } from '@/utils/proxyConfigUt
 import { useProxy } from '@/hook/useProxy'
 import { debugToPrintLogs } from '@/utils/logCollection'
 import emiter from '@/utils/eventBus/eventBus'
+import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 const MITMFormAdvancedConfiguration = React.lazy(() => import('./MITMFormAdvancedConfiguration'))
 const ChromeLauncherButton = React.lazy(() => import('../MITMChromeLauncher'))
 
@@ -146,6 +147,8 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
 
   const [form] = Form.useForm()
   const stateSecretHijacking = useWatch<string>('stateSecretHijacking', form)
+  const watchedHost = useWatch('host', form)
+  const watchedPort = useWatch('port', form)
 
   const mitmContent = useContext(MITMContext)
 
@@ -225,6 +228,10 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
     props.setEnableInitialPlugin(checked)
   })
   const onStartMITM = useMemoizedFn((values) => {
+    const currentValues = {
+      ...form.getFieldsValue(true),
+      ...values,
+    }
     // 开启替换规则
     if (openRepRuleFlag) {
       Modal.confirm({
@@ -247,7 +254,7 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
           </div>
         ),
         onOk: () => {
-          execStartMITM(values)
+          execStartMITM(currentValues)
         },
         onCancel: () => {
           props.setVisible(true)
@@ -258,7 +265,7 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
       })
       return
     }
-    execStartMITM(values)
+    execStartMITM(currentValues)
   })
   const execStartMITM = useMemoizedFn((values) => {
     // 获取高级配置的默认值
@@ -328,7 +335,7 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
             enableInitialPlugin: info.enableInitialPlugin,
           })
         }
-        execStartMITM(form.getFieldsValue())
+        execStartMITM(form.getFieldsValue(true))
       }
     } catch (error) {}
   })
@@ -419,57 +426,59 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
               max={65535}
             />
           </Item>
-          <Item
-            label={t('MITMServerForm.downstreamProxyLabel')}
-            name="downstreamProxy"
-            extra={
-              <span className={styles['form-rule-help']}>
-                {t('MITMServerForm.downstreamProxyHelp')}
-                <span className={styles['form-rule-help-setting']} onClick={onClickDownstreamProxy}>
-                  {t('AgentConfigModal.proxy_configuration')}
+          {RUIYAN_UI_POLICY.mitm.showDownstreamProxy ? (
+            <Item
+              label={t('MITMServerForm.downstreamProxyLabel')}
+              name="downstreamProxy"
+              extra={
+                <span className={styles['form-rule-help']}>
+                  {t('MITMServerForm.downstreamProxyHelp')}
+                  <span className={styles['form-rule-help-setting']} onClick={onClickDownstreamProxy}>
+                    {t('AgentConfigModal.proxy_configuration')}
+                  </span>
+                  <Divider type="vertical" />
+                  <ProxyTest onEchoNode={(downstreamProxy) => form.setFieldsValue({ downstreamProxy })} />
                 </span>
-                <Divider type="vertical" />
-                <ProxyTest onEchoNode={(downstreamProxy) => form.setFieldsValue({ downstreamProxy })} />
-              </span>
-            }
-            getValueFromEvent={(value) => {
-              // 只保留最后一个选中的值
-              if (Array.isArray(value) && value.length > 1) {
-                return [value[value.length - 1]]
               }
-              return value
-            }}
-            validateTrigger={['onChange', 'onBlur']}
-            rules={[
-              {
-                validator: (_, value) => {
-                  if (!value || !Array.isArray(value) || value.length === 0) {
-                    return Promise.resolve()
-                  }
-                  // 获取当前options中的所有值
-                  const existingOptions = proxyRouteOptions.map(({ value }) => value)
-                  // 只校验新输入的值(不在options中的值)
-                  const newValues = value.filter((v) => !existingOptions.includes(v))
-                  // 校验代理地址格式: 协议://地址:端口
-                  for (const v of newValues) {
-                    if (!isValidUrlWithProtocol(v)) {
-                      return Promise.reject(t('ProxyConfig.valid_proxy_address_tip'))
+              getValueFromEvent={(value) => {
+                // 只保留最后一个选中的值
+                if (Array.isArray(value) && value.length > 1) {
+                  return [value[value.length - 1]]
+                }
+                return value
+              }}
+              validateTrigger={['onChange', 'onBlur']}
+              rules={[
+                {
+                  validator: (_, value) => {
+                    if (!value || !Array.isArray(value) || value.length === 0) {
+                      return Promise.resolve()
                     }
-                  }
-                  return Promise.resolve()
+                    // 获取当前options中的所有值
+                    const existingOptions = proxyRouteOptions.map(({ value }) => value)
+                    // 只校验新输入的值(不在options中的值)
+                    const newValues = value.filter((v) => !existingOptions.includes(v))
+                    // 校验代理地址格式: 协议://地址:端口
+                    for (const v of newValues) {
+                      if (!isValidUrlWithProtocol(v)) {
+                        return Promise.reject(t('ProxyConfig.valid_proxy_address_tip'))
+                      }
+                    }
+                    return Promise.resolve()
+                  },
                 },
-              },
-            ]}
-          >
-            <YakitSelect
-              ref={downstreamProxyRef}
-              allowClear
-              options={proxyRouteOptions}
-              mode="tags"
-              maxTagCount={4}
-              placeholder={t('MITMServerForm.proxyPlaceholder')}
-            />
-          </Item>
+              ]}
+            >
+              <YakitSelect
+                ref={downstreamProxyRef}
+                allowClear
+                options={proxyRouteOptions}
+                mode="tags"
+                maxTagCount={4}
+                placeholder={t('MITMServerForm.proxyPlaceholder')}
+              />
+            </Item>
+          ) : null}
           <Item
             label={t('MITMServerForm.http2Support')}
             name="enableHttp2"
@@ -518,48 +527,52 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
           >
             <YakitSwitch size="large" />
           </Item>
-          <Item
-            label={t('MITMServerForm.contentRule')}
-            help={
-              <span className={styles['form-rule-help']}>
-                {t('MITMServerForm.contentRuleHelp')}
-                <span
-                  className={styles['form-rule-help-setting']}
-                  onClick={() => {
-                    setIsUseDefRules(true)
-                    ruleButtonRef.current.onSetImportVisible(true)
-                  }}
-                >
-                  {t('MITMServerForm.defaultConfig')}&nbsp;
-                  <RefreshIcon />
+          {RUIYAN_UI_POLICY.mitm.showContentRules ? (
+            <Item
+              label={t('MITMServerForm.contentRule')}
+              help={
+                <span className={styles['form-rule-help']}>
+                  {t('MITMServerForm.contentRuleHelp')}
+                  <span
+                    className={styles['form-rule-help-setting']}
+                    onClick={() => {
+                      setIsUseDefRules(true)
+                      ruleButtonRef.current.onSetImportVisible(true)
+                    }}
+                  >
+                    {t('MITMServerForm.defaultConfig')}&nbsp;
+                    <RefreshIcon />
+                  </span>
                 </span>
-              </span>
-            }
-          >
-            <div className={styles['form-rule-wrapper']}>
-              <div className={styles['form-rule-body']}>
-                <div className={styles['form-rule']} onClick={() => props.setVisible(true)}>
-                  <div className={styles['form-rule-text']}>
-                    {t('MITMServerForm.existingRules', { count: rules.length })}
-                  </div>
-                  <div className={styles['form-rule-icon']}>
-                    <CogIcon />
+              }
+            >
+              <div className={styles['form-rule-wrapper']}>
+                <div className={styles['form-rule-body']}>
+                  <div className={styles['form-rule']} onClick={() => props.setVisible(true)}>
+                    <div className={styles['form-rule-text']}>
+                      {t('MITMServerForm.existingRules', { count: rules.length })}
+                    </div>
+                    <div className={styles['form-rule-icon']}>
+                      <CogIcon />
+                    </div>
                   </div>
                 </div>
+                <div>
+                  <RuleExportAndImportButton
+                    ref={ruleButtonRef}
+                    isUseDefRules={isUseDefRules}
+                    setIsUseDefRules={setIsUseDefRules}
+                    onOkImport={() => getRules()}
+                  />
+                </div>
               </div>
-              <div>
-                <RuleExportAndImportButton
-                  ref={ruleButtonRef}
-                  isUseDefRules={isUseDefRules}
-                  setIsUseDefRules={setIsUseDefRules}
-                  onOkImport={() => getRules()}
-                />
-              </div>
-            </div>
-          </Item>
-          <Item label={t('MITMServerForm.enablePlugin')} name="enableInitialPlugin" valuePropName="checked">
-            <YakitSwitch size="large" onChange={(checked) => onSwitchPlugin(checked)} />
-          </Item>
+            </Item>
+          ) : null}
+          {RUIYAN_UI_POLICY.mitm.showRulePluginPanel ? (
+            <Item label={t('MITMServerForm.enablePlugin')} name="enableInitialPlugin" valuePropName="checked">
+              <YakitSwitch size="large" onChange={(checked) => onSwitchPlugin(checked)} />
+            </Item>
+          ) : null}
           <Item label={' '} colon={false}>
             <div className={styles['mitm-submit-btns']}>
               <YakitButton type="primary" size="large" htmlType="submit">
@@ -570,21 +583,23 @@ export const MITMServerStartForm: React.FC<MITMServerStartFormProp> = React.memo
                   {t('MITMServerForm.startHijackV2')}
                 </YakitButton>
               )}
-              <ChromeLauncherButton
-                host={useWatch('host', form)}
-                port={useWatch('port', form)}
-                disableCACertPage={advancedFormRef.current?.getValue().disableCACertPage}
-                onFished={(host, port) => {
-                  const values = {
-                    ...form.getFieldsValue(),
-                    host,
-                    port,
-                  }
-                  execStartMITM(values)
-                }}
-                repRuleFlag={openRepRuleFlag}
-                onSetVisible={props.setVisible}
-              />
+              {RUIYAN_UI_POLICY.mitm.showNoConfigStart ? (
+                <ChromeLauncherButton
+                  host={watchedHost}
+                  port={watchedPort}
+                  disableCACertPage={advancedFormRef.current?.getValue().disableCACertPage}
+                  onFished={(host, port) => {
+                    const values = {
+                      ...form.getFieldsValue(true),
+                      host,
+                      port,
+                    }
+                    execStartMITM(values)
+                  }}
+                  repRuleFlag={openRepRuleFlag}
+                  onSetVisible={props.setVisible}
+                />
+              ) : null}
               <YakitButton type="text" size="large" onClick={() => setAdvancedFormVisible(true)}>
                 {t('MITMServerForm.advancedConfig')}
               </YakitButton>

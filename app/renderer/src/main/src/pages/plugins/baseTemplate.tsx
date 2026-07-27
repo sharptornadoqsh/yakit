@@ -12,6 +12,7 @@ import {
   PluginsContainerProps,
   PluginsLayoutProps,
 } from './baseTemplateType'
+import { resolveRuiYanPluginAuthor } from '@/config/renyanUiPolicy'
 import { SolidChevrondownIcon, SolidChevronupIcon } from '@/assets/icon/solid'
 import { FilterPanel } from '@/components/businessUI/FilterPanel/FilterPanel'
 import {
@@ -317,9 +318,9 @@ export const PluginDetailHeader: React.FC<PluginDetailHeaderProps> = memo((props
               <AuthorImg src={img || UnLogin} />
               <div
                 className={classNames(styles['name-wrapper'], styles['text-style'], 'yakit-content-single-ellipsis')}
-                title={user || 'anonymous'}
+                title={resolveRuiYanPluginAuthor(user)}
               >
-                {user || 'anonymous'}
+                {resolveRuiYanPluginAuthor(user)}
               </div>
               <AuthorIcon />
             </div>

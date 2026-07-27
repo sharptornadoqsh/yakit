@@ -24,6 +24,7 @@ import {
   TagsListShowProps,
   TypeSelectProps,
 } from './funcTemplateType'
+import { resolveRuiYanPluginAuthor } from '@/config/renyanUiPolicy'
 import {
   useControllableValue,
   useDebounceFn,
@@ -1187,7 +1188,7 @@ export const GridLayoutOpt: React.FC<GridLayoutOptProps> = memo((props) => {
               <div className={styles['user-body']}>
                 {authorImgNode}
                 <div className={classNames(styles['user-style'], 'yakit-content-single-ellipsis')}>
-                  {user || t('FuncTemplate.anonymous')}
+                  {resolveRuiYanPluginAuthor(user)}
                 </div>
                 <AuthorIcon />
               </div>

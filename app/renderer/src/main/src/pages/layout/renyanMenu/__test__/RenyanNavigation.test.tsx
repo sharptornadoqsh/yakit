@@ -100,10 +100,19 @@ describe('睿眼顶部导航', () => {
     fireEvent.click(screen.getByRole('button', { name: '漏洞检测' }))
 
     expect(screen.getByRole('button', { name: '通用检测' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '专项检测' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: '专项检测' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '检测配置' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '插件选择' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '执行日志' })).not.toBeInTheDocument()
+  })
+
+  it('历史专项检测路由回到通用检测', async () => {
+    testState.currentRoute = YakitRoute.PoC
+    const onMenuSelect = vi.fn()
+
+    render(<RenyanNavigation defaultExpand={true} onMenuSelect={onMenuSelect} setRouteToLabel={vi.fn()} />)
+
+    await waitFor(() => expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.BatchExecutorPage }))
   })
 
   it('系统设置写入目标分区并打开真实网络诊断页面', () => {

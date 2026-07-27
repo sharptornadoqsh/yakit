@@ -13,6 +13,7 @@ import { useStore } from '@/store'
 import { pluginSupplementJSONConvertToData } from '@/pages/pluginEditor/utils/convert'
 import { ImagePreviewList } from '../utilsUI/UtilsTemplate'
 import { TextareaForImage } from '@/pages/pluginEditor/pluginImageTextarea/PluginImageTextareaType'
+import { resolveRuiYanPluginLogUserName } from '@/config/renyanUiPolicy'
 
 import classNames from 'classnames'
 import styles from './PluginLog.module.scss'
@@ -193,10 +194,14 @@ export const PluginLogOpt: React.FC<PluginLogOptProps> = memo((props) => {
       return (
         <>
           <AuthorImg src={handleUser.handleHeadImg || UnLogin} wrapperClassName={styles['img-style']} />
-          <div className={styles['author-name']}>{handleUser.handleUserName}</div>
+          <div className={styles['author-name']}>
+            {resolveRuiYanPluginLogUserName(handleUser.handleUserName, handleUser.isAuthor)}
+          </div>
           {mergeRoleTag}
           <div className={styles['log-content']}>{content}</div>
-          <div className={classNames(styles['author-name'], styles['reply-name'])}>{info.userName}</div>
+          <div className={classNames(styles['author-name'], styles['reply-name'])}>
+            {resolveRuiYanPluginLogUserName(info.userName, info.isAuthors)}
+          </div>
           {roleTag}
           <div className={styles['log-content']}>的修改</div>
         </>
@@ -209,10 +214,12 @@ export const PluginLogOpt: React.FC<PluginLogOptProps> = memo((props) => {
       return (
         <>
           <AuthorImg src={info.headImg || UnLogin} wrapperClassName={styles['img-style']} />
-          <div className={styles['author-name']}>{info.userName}</div>
+          <div className={styles['author-name']}>{resolveRuiYanPluginLogUserName(info.userName, info.isAuthors)}</div>
           {roleTag}
           <div className={styles['log-content']}>{content}</div>
-          <div className={classNames(styles['author-name'], styles['reply-name'])}>{parentComment.userName}</div>
+          <div className={classNames(styles['author-name'], styles['reply-name'])}>
+            {resolveRuiYanPluginLogUserName(parentComment.userName, parentComment.isAuthors)}
+          </div>
           {replyRoleTag}
         </>
       )
@@ -221,7 +228,7 @@ export const PluginLogOpt: React.FC<PluginLogOptProps> = memo((props) => {
     return (
       <>
         <AuthorImg src={info.headImg || UnLogin} wrapperClassName={styles['img-style']} />
-        <div className={styles['author-name']}>{info.userName}</div>
+        <div className={styles['author-name']}>{resolveRuiYanPluginLogUserName(info.userName, info.isAuthors)}</div>
         {roleTag}
         <div className={styles['log-content']}>{content}</div>
       </>

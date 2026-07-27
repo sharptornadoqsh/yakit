@@ -22,6 +22,7 @@ import ReactResizeDetector from 'react-resize-detector'
 import './HackerPlugin.scss'
 import { showModal } from '../../utils/showModal'
 import { xtermClear } from '../../utils/xtermUtils'
+import { resolveRuiYanPluginAuthor } from '@/config/renyanUiPolicy'
 
 const { ipcRenderer } = window.require('electron')
 const { Text } = Typography
@@ -169,7 +170,7 @@ export const HackerPlugin: React.FC<HackerPluginProps> = React.memo((props) => {
         </Checkbox>
         <div style={{ flex: 1, textAlign: 'right' }}>
           {info.Author && (
-            <Tooltip title={info.Author}>
+            <Tooltip title={resolveRuiYanPluginAuthor(info.Author)}>
               <Button size={'small'} type={'link'} icon={<UserOutlined />} />
             </Tooltip>
           )}

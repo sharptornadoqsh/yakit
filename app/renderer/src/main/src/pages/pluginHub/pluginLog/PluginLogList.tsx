@@ -16,6 +16,7 @@ import { pluginSupplementJSONConvertToData } from '@/pages/pluginEditor/utils/co
 import { ImagePreviewList } from '../utilsUI/UtilsTemplate'
 import { formatTimestamp } from '@/utils/timeUtil'
 import { RuiYanConfirmDialog, RuiYanModal } from '@/components/renyanUI'
+import { resolveRuiYanPluginLogUserName } from '@/config/renyanUiPolicy'
 
 // import classNames from "classnames"
 import styles from './PluginLog.module.scss'
@@ -415,7 +416,12 @@ export const PluginLogList: React.FC<PluginLogListProps> = memo((props) => {
           <div className={styles['preview-reply']}>
             <div className={styles['header-wrapper']}>
               <AuthorImg src={replyInfo.current.parentComment?.headImg || UnLogin} />
-              <div className={styles['author-name']}>{replyInfo.current.parentComment?.userName}</div>
+              <div className={styles['author-name']}>
+                {resolveRuiYanPluginLogUserName(
+                  replyInfo.current.parentComment?.userName,
+                  Boolean(replyInfo.current.parentComment?.isAuthors),
+                )}
+              </div>
               {replyRoleTag()}
               <div className={styles['log-time']}>{` · ${formatTimestamp(
                 replyInfo.current.parentComment?.updated_at || 0,
