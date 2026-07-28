@@ -36,6 +36,7 @@ export const PluginLocalListDetails: React.FC<PluginLocalListDetailsProps> = Rea
       fixFilterList,
       defaultFilters,
       pluginGroupExcludeType = [],
+      displayMode = 'default',
     } = props
 
     const [search, setSearch] = useControllableValue<PluginSearchParams>(props, {
@@ -256,6 +257,7 @@ export const PluginLocalListDetails: React.FC<PluginLocalListDetailsProps> = Rea
                 pluginType={info.Type}
                 onPluginClick={onPluginClick}
                 extra={optExtra}
+                displayMode={displayMode}
               />
             )
           },

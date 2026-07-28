@@ -944,11 +944,13 @@ export const PluginDetailsListItem: <T>(props: PluginDetailsListItemProps<T>) =>
     onPluginClick,
     enableCheck = true,
     enableClick = true,
+    displayMode = 'default',
   } = props
   const onCheck = useMemoizedFn((e: CheckboxChangeEvent) => {
     if (enableCheck) optCheck(plugin, e.target.checked)
   })
   const authorImgNode = useMemo(() => {
+    if (displayMode === 'name-only') return null
     if (isCorePlugin) {
       if (!pluginTypeToName[pluginType]) {
         debugToPrintLogs({
@@ -966,7 +968,7 @@ export const PluginDetailsListItem: <T>(props: PluginDetailsListItemProps<T>) =>
       )
     }
     return <AuthorImg src={headImg || UnLogin} builtInIcon={official ? 'official' : undefined} />
-  }, [isCorePlugin, headImg, pluginType, official])
+  }, [displayMode, isCorePlugin, headImg, pluginType, official])
   const onClick = useMemoizedFn((e) => {
     if (enableClick) onPluginClick(plugin, order)
   })
@@ -1006,19 +1008,21 @@ export const PluginDetailsListItem: <T>(props: PluginDetailsListItemProps<T>) =>
             {pluginName}
           </div>
         </div>
-        <div className={'plugin-details-item-show'}>
-          {extraNode()}
-          <Tooltip title={help || 'No Description about it.'} placement="topRight" overlayClassName="plugins-tooltip">
-            <OutlineQuestionmarkcircleIcon className={'plugin-details-item-show-icon-style'} />
-          </Tooltip>
-          <YakitPopover
-            placement="topRight"
-            overlayClassName={'terminal-popover'}
-            content={<YakEditor type={pluginType} value={content} readOnly={true} />}
-          >
-            <OutlineTerminalIcon className={'plugin-details-item-show-icon-style'} />
-          </YakitPopover>
-        </div>
+        {displayMode !== 'name-only' && (
+          <div className={'plugin-details-item-show'}>
+            {extraNode()}
+            <Tooltip title={help || 'No Description about it.'} placement="topRight" overlayClassName="plugins-tooltip">
+              <OutlineQuestionmarkcircleIcon className={'plugin-details-item-show-icon-style'} />
+            </Tooltip>
+            <YakitPopover
+              placement="topRight"
+              overlayClassName={'terminal-popover'}
+              content={<YakEditor type={pluginType} value={content} readOnly={true} />}
+            >
+              <OutlineTerminalIcon className={'plugin-details-item-show-icon-style'} />
+            </YakitPopover>
+          </div>
+        )}
       </div>
     </div>
   )

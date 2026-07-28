@@ -81,6 +81,7 @@ export const NewPortScan: React.FC<NewPortScanProps> = React.memo((props) => {
   return (
     <PluginLocalListDetails
       hidden={hidden}
+      displayMode="name-only"
       selectList={selectList}
       setSelectList={setSelectList}
       search={search}

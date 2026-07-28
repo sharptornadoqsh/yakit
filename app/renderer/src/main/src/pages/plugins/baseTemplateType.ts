@@ -204,6 +204,8 @@ export interface PluginListPageMeta {
 /** ---------- 插件列表相关 end ---------- */
 
 /**插件详情中列表的item */
+export type PluginDetailsListItemDisplayMode = 'default' | 'name-only'
+
 export interface PluginDetailsListItemProps<T> {
   /** 插件在列表里的索引 */
   order: number
@@ -226,6 +228,8 @@ export interface PluginDetailsListItemProps<T> {
   enableCheck?: boolean
   /**是否可以点击 */
   enableClick?: boolean
+  /**插件身份信息展示模式 */
+  displayMode?: PluginDetailsListItemDisplayMode
 }
 
 export interface PluginContributesListItemProps {

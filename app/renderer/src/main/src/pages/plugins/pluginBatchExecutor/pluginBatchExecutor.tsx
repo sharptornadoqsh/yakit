@@ -239,6 +239,7 @@ export const PluginBatchExecutor: React.FC<PluginBatchExecutorProps> = React.mem
       </div>
       <PluginLocalListDetails
         hidden={false}
+        displayMode="name-only"
         selectList={selectList}
         setSelectList={setSelectList}
         search={search}

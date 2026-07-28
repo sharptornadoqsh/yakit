@@ -44,7 +44,7 @@ import {
   OutlineOpenIcon,
 } from '@/assets/icon/outline'
 import { RollingLoadList } from '@/components/RollingLoadList/RollingLoadList'
-import { FolderColorIcon, SolidCloudpluginIcon, SolidPrivatepluginIcon } from '@/assets/icon/colors'
+import { FolderColorIcon } from '@/assets/icon/colors'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { CloudDownloadIcon } from '@/assets/newIcon'
 import { YakitGetOnlinePlugin } from '@/pages/mitm/MITMServerHijacking/MITMPluginLocalList'
@@ -61,11 +61,10 @@ import {
   hybridScanParamsConvertToInputValue,
 } from '@/pages/plugins/utils'
 import emiter from '@/utils/eventBus/eventBus'
-import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
 import { apiFetchQueryYakScriptGroupLocalByPoc } from './utils'
 import { PluginListPageMeta } from '@/pages/plugins/baseTemplateType'
 import { initialLocalState, pluginLocalReducer } from '@/pages/plugins/pluginReducer'
-import { getRemoteValue, setRemoteValue } from '@/utils/kv'
+import { setRemoteValue } from '@/utils/kv'
 import { RemoteGV } from '@/yakitGV'
 import { PluginDetailsListItem } from '@/pages/plugins/baseTemplate'
 import moment from 'moment'
@@ -76,7 +75,7 @@ import { compareAsc } from '@/pages/yakitStore/viewers/base'
 import { batchPluginType } from '@/defaultConstants/PluginBatchExecutor'
 import { defaultPocPageInfo } from '@/defaultConstants/YakPoC'
 import { HybridScanControlAfterRequest } from '@/models/HybridScan'
-import { getReleaseEditionName, getRemoteHttpSettingGV } from '@/utils/envfile'
+import { getReleaseEditionName } from '@/utils/envfile'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { RuiYanSegmented } from '@/components/renyanUI'
 import { RUIYAN_UI_POLICY, resolveRuiYanVulnerabilitySelectionType } from '@/config/renyanUiPolicy'
@@ -320,23 +319,6 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
   const [loading, setLoading] = useState<boolean>(false)
   const [hasMore, setHasMore] = useState<boolean>(true)
 
-  const privateDomainRef = useRef<string>('') // 私有域地址
-
-  // 获取筛选栏展示状态
-  useEffect(() => {
-    getPrivateDomainAndRefList()
-  }, [])
-
-  /**获取最新的私有域,并刷新列表 */
-  const getPrivateDomainAndRefList = useMemoizedFn(() => {
-    getRemoteValue(getRemoteHttpSettingGV()).then((setting) => {
-      if (setting) {
-        const values = JSON.parse(setting)
-        privateDomainRef.current = values.BaseUrl
-      }
-    })
-  })
-
   useEffect(() => {
     fetchList(true)
   }, [selectGroupList])
@@ -389,16 +371,12 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
         if (!res.Data) res.Data = []
         const length = +res.Pagination.Page === 1 ? res.Data.length : res.Data.length + response.Data.length
         setHasMore(length < +res.Total)
-        const newData = res.Data.map((ele) => ({
-          ...ele,
-          isLocalPlugin: privateDomainRef.current !== ele.OnlineBaseUrl,
-        }))
         dispatch({
           type: 'add',
           payload: {
             response: {
               ...res,
-              Data: newData,
+              Data: res.Data,
             },
           },
         })
@@ -416,15 +394,6 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
   // 滚动更多加载
   const onUpdateList = useMemoizedFn(() => {
     fetchList()
-  })
-  /** 单项副标题组件 */
-  const optExtra = useMemoizedFn((data: YakScript) => {
-    if (privateDomainRef.current !== data.OnlineBaseUrl) return <></>
-    if (data.OnlineIsPrivate) {
-      return <SolidPrivatepluginIcon className="icon-svg-16" />
-    } else {
-      return <SolidCloudpluginIcon className="icon-svg-16" />
-    }
   })
   return (
     <div
@@ -455,9 +424,9 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
                 isCorePlugin={!!info.IsCorePlugin}
                 pluginType={info.Type}
                 onPluginClick={() => {}}
-                extra={optExtra}
                 enableClick={false}
                 enableCheck={false}
+                displayMode="name-only"
               />
             )
           }}
@@ -957,8 +926,6 @@ const YakPoCExecuteContent: React.FC<YakPoCExecuteContentProps> = React.memo((pr
     trigger: 'setExecuteStatus',
   })
   const [total, setTotal] = useState<number>(0)
-  const [showType, setShowType] = useState<'plugin' | 'log'>('plugin')
-  const [pluginExecuteLog, setPluginExecuteLog] = useState<StreamResult.PluginExecuteLog[]>([])
 
   /**暂停 */
   const [pauseLoading, setPauseLoading] = useState<boolean>(false)
@@ -1015,28 +982,12 @@ const YakPoCExecuteContent: React.FC<YakPoCExecuteContentProps> = React.memo((pr
     }
   }, [selectGroupList])
 
-  const isShowPluginAndLog = useCreation(() => {
+  const isShowSelectedPlugins = useCreation(() => {
     return selectGroupList.length > 0 || isExecuting
   }, [selectGroupList, isExecuting])
 
-  const pluginLogDisabled = useCreation(() => {
-    return !isExecuting
-  }, [isExecuting])
-
   const onSetExecuteStatus = useMemoizedFn((val) => {
     setExecuteStatus(val)
-    switch (val) {
-      case 'process':
-      case 'paused':
-        setShowType('log')
-        break
-      case 'error':
-      case 'finished':
-        setShowType('plugin')
-        break
-      default:
-        break
-    }
   })
   const onPause = useMemoizedFn((e) => {
     pluginBatchExecuteContentRef.current?.onPause()
@@ -1054,55 +1005,29 @@ const YakPoCExecuteContent: React.FC<YakPoCExecuteContentProps> = React.memo((pr
   }, [pageInfo.https, pageInfo.httpFlowIds, pageInfo.request])
   return (
     <>
-      {isShowPluginAndLog && (
+      {isShowSelectedPlugins && (
         <div className={styles['midden-wrapper']} style={{ width: i18n.language.startsWith('zh') ? 300 : 350 }}>
           <div className={styles['midden-stage-heading']}>
-            <span className={styles['stage-number']}>{showType === 'log' ? '04' : '02'}</span>
-            <span>{showType === 'log' ? '执行进度' : '已选插件'}</span>
+            <span className={styles['stage-number']}>02</span>
+            <span>已选插件</span>
           </div>
           <div className={styles['midden-heard']}>
-            <YakitRadioButtons
-              size="small"
-              value={showType}
-              onChange={(e) => {
-                setShowType(e.target.value)
-              }}
-              buttonStyle="solid"
-              options={[
-                {
-                  value: 'plugin',
-                  label: t('YakPoCExecuteContent.selectedPlugin'),
-                },
-                {
-                  value: 'log',
-                  label: t('YakPoCExecuteContent.pluginLog'),
-                  disabled: pluginLogDisabled,
-                },
-              ]}
-            />
-            {showType === 'plugin' && (
-              <div className={styles['heard-right']}>
-                <span className={styles['heard-tip']}>
-                  Total
-                  <span className={styles['heard-number']}>{total}</span>
-                </span>
-                <YakitButton type="text" danger onClick={onClearAll}>
-                  {t('YakitButton.clear')}
-                </YakitButton>
-              </div>
-            )}
+            <div className={styles['heard-right']}>
+              <span className={styles['heard-tip']}>
+                Total
+                <span className={styles['heard-number']}>{total}</span>
+              </span>
+              <YakitButton type="text" danger onClick={onClearAll}>
+                {t('YakitButton.clear')}
+              </YakitButton>
+            </div>
           </div>
           <PluginListByGroup
-            hidden={showType !== 'plugin'}
+            hidden={false}
             type={type}
             selectGroupList={selectGroupList}
             total={total}
             setTotal={setTotal}
-          />
-          <PluginExecuteLog
-            hidden={showType !== 'log'}
-            pluginExecuteLog={pluginExecuteLog}
-            isExecuting={executeStatus === 'process'}
           />
         </div>
       )}
@@ -1170,7 +1095,6 @@ const YakPoCExecuteContent: React.FC<YakPoCExecuteContentProps> = React.memo((pr
               pluginInfo={pluginInfo}
               executeStatus={executeStatus}
               setExecuteStatus={onSetExecuteStatus}
-              setPluginExecuteLog={setPluginExecuteLog}
               setHidden={setHidden}
               dataScanParams={dataScanParams}
               pageId={pageId}

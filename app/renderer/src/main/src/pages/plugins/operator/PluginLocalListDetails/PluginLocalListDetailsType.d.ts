@@ -1,5 +1,10 @@
 import { ReactNode } from 'react'
-import { PluginDetailsProps, PluginFilterParams, PluginSearchParams } from '../../baseTemplateType'
+import {
+  PluginDetailsListItemDisplayMode,
+  PluginDetailsProps,
+  PluginFilterParams,
+  PluginSearchParams,
+} from '../../baseTemplateType'
 import { YakScript } from '@/pages/invoker/schema'
 import { API } from '@/services/swagger/resposeType'
 
@@ -35,6 +40,8 @@ export interface PluginLocalListDetailsProps {
   setAllCheck?: (b: boolean) => void
   /**插件组排除插件类型 */
   pluginGroupExcludeType?: string[]
+  /**插件身份信息展示模式 */
+  displayMode?: PluginDetailsListItemDisplayMode
 }
 
 export interface PluginLocalListDetailsRefProps {}
