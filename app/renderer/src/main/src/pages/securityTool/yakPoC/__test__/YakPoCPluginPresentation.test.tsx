@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { YakPoC } from '../YakPoC'
 
 vi.hoisted(() => {
@@ -18,10 +18,18 @@ vi.hoisted(() => {
   })
 })
 
-const { queryPluginList, queryKeywordGroups } = vi.hoisted(() => ({
-  queryPluginList: vi.fn(),
-  queryKeywordGroups: vi.fn(),
-}))
+const { queryPluginList, queryKeywordGroups, pluginEventBus } = vi.hoisted(() => {
+  const handlers = new Map<string, (...args: unknown[]) => void>()
+  return {
+    queryPluginList: vi.fn(),
+    queryKeywordGroups: vi.fn(),
+    pluginEventBus: {
+      emit: vi.fn((event: string, ...args: unknown[]) => handlers.get(event)?.(...args)),
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => handlers.set(event, handler)),
+      off: vi.fn((event: string) => handlers.delete(event)),
+    },
+  }
+})
 
 const plugin = {
   ScriptName: '专项检测插件',
@@ -237,7 +245,28 @@ vi.mock('@/components/yakitUI/YakitSpin/YakitSpin', () => ({
 }))
 
 vi.mock('@/pages/mitm/MITMServerHijacking/MITMPluginLocalList', () => ({
-  YakitGetOnlinePlugin: () => null,
+  YakitGetOnlinePlugin: ({
+    visible,
+    setVisible,
+    onFinish,
+  }: {
+    visible: boolean
+    setVisible: (visible: boolean) => void
+    onFinish?: () => void | Promise<void>
+  }) =>
+    visible ? (
+      <button
+        type="button"
+        onClick={() => {
+          void Promise.resolve(onFinish?.()).then(() => {
+            setVisible(false)
+            pluginEventBus.emit('onRefreshLocalPluginList', true)
+          })
+        }}
+      >
+        完成下载
+      </button>
+    ) : null,
 }))
 
 vi.mock('@/components/renyanUI', () => ({
@@ -284,7 +313,7 @@ vi.mock('@/utils/envfile', async () => {
 })
 
 vi.mock('@/utils/eventBus/eventBus', () => ({
-  default: { emit: vi.fn() },
+  default: pluginEventBus,
 }))
 
 vi.mock('@/utils/clipboard', () => ({
@@ -301,6 +330,9 @@ vi.mock('@/i18n/useI18nNamespaces', () => {
     'YakPoCExecuteContent.pluginExecute': '插件执行',
     'YakPoCExecuteContent.taskList': '任务列表',
     'YakitButton.clear': '清空',
+    'YakitButton.oneClickDownload': '一键下载',
+    'YakitEmpty.noData': '暂无数据',
+    'PluginGroupByKeyWord.noDataDesc': '可下载默认关键词与插件',
   }
   return {
     useI18nNamespaces: () => ({
@@ -311,6 +343,14 @@ vi.mock('@/i18n/useI18nNamespaces', () => {
 })
 
 describe('YakPoC 插件展示', () => {
+  beforeEach(() => {
+    queryKeywordGroups.mockReset()
+    queryPluginList.mockReset()
+    pluginEventBus.emit.mockClear()
+    pluginEventBus.on.mockClear()
+    pluginEventBus.off.mockClear()
+  })
+
   it('已选插件面板只显示插件名称且不提供插件日志页签', async () => {
     queryKeywordGroups.mockResolvedValue([{ Value: 'Java', Total: 1 }])
     queryPluginList.mockResolvedValue({
@@ -331,6 +371,33 @@ describe('YakPoC 插件展示', () => {
 
     await waitFor(() => {
       expect(queryPluginList).toHaveBeenCalled()
+    })
+  })
+
+  it('首次下载完成后在当前页面重新读取并显示关键词分类', async () => {
+    queryKeywordGroups
+      .mockResolvedValue([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ Value: 'Java', Total: 1 }])
+    queryPluginList.mockResolvedValue({
+      Pagination: { Page: 1, Limit: 20, OrderBy: '', Order: '' },
+      Total: 0,
+      Data: [],
+    })
+
+    render(<YakPoC pageId="poc-page" />)
+
+    await waitFor(() => {
+      expect(queryKeywordGroups).toHaveBeenCalledTimes(1)
+    })
+    fireEvent.click(screen.getByRole('button', { name: '一键下载' }))
+    fireEvent.click(screen.getByRole('button', { name: '完成下载' }))
+
+    expect(await screen.findByText('Java', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(queryKeywordGroups).toHaveBeenCalledTimes(3)
+    await waitFor(() => {
+      expect(queryPluginList).toHaveBeenCalledTimes(2)
     })
   })
 })

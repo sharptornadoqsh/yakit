@@ -327,7 +327,7 @@ export interface YakitGetOnlinePluginProps {
   pluginType?: string[]
   visible: boolean
   setVisible: (b: boolean) => void
-  onFinish?: () => void
+  onFinish?: () => void | Promise<void>
   isRereshLocalPluginList?: boolean
   getContainer?: HTMLElement
 }
@@ -347,65 +347,116 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
   } = props
   const taskToken = useMemo(() => randomString(40), [])
   const [percent, setPercent] = useState<number>(0)
+  const [refreshing, setRefreshing] = useState<boolean>(false)
+  const mountedRef = useRef<boolean>(true)
+  const finishingRef = useRef<boolean>(false)
+
+  /** 下载后需要刷新本地插件列表 */
+  const onRefLocalPluginList = useMemoizedFn(() => {
+    if (isRereshLocalPluginList) {
+      emiter.emit('onRefreshLocalPluginList', true)
+    }
+  })
+  const onDownloadEnd = useMemoizedFn(async () => {
+    if (finishingRef.current) return
+    finishingRef.current = true
+    if (mountedRef.current) setRefreshing(true)
+
+    let refreshError: unknown
+    try {
+      await onFinish?.()
+    } catch (error) {
+      refreshError = error
+    }
+
+    if (!mountedRef.current) return
+
+    setPercent(0)
+    setRefreshing(false)
+    setVisible(false)
+    if (isCommunityEdition()) ipcRenderer.invoke('refresh-public-menu')
+    else ipcRenderer.invoke('change-main-menu')
+    onRefLocalPluginList()
+
+    if (refreshError) {
+      const errorMessage = refreshError instanceof Error ? refreshError.message : String(refreshError)
+      yakitNotify('error', `插件下载完成，但刷新本地插件数据失败：${errorMessage}`)
+    }
+  })
+  const onDownloadError = useMemoizedFn((error: unknown) => {
+    if (finishingRef.current) return
+    finishingRef.current = true
+    if (!mountedRef.current) return
+    setPercent(0)
+    setRefreshing(false)
+    setVisible(false)
+    yakitNotify('error', '下载失败:' + error)
+  })
+  const startDownload = useMemoizedFn(() => {
+    finishingRef.current = false
+    setRefreshing(false)
+    const addParams: DownloadOnlinePluginsRequest = {
+      ListType: listType === 'online' ? '' : listType,
+      PluginType: pluginType ? pluginType : [],
+    }
+    ipcRenderer
+      .invoke('DownloadOnlinePlugins', addParams, taskToken)
+      .then(() => {})
+      .catch((error) => {
+        if (!mountedRef.current) return
+        finishingRef.current = true
+        setPercent(0)
+        setRefreshing(false)
+        setVisible(false)
+        failed(`下载失败:${error}`)
+      })
+  })
+
   useEffect(() => {
     if (!taskToken) {
       return
     }
+    mountedRef.current = true
     ipcRenderer.on(`${taskToken}-data`, (_, data: DownloadOnlinePluginAllResProps) => {
+      if (!mountedRef.current || finishingRef.current) return
       const p = Math.floor(data.Progress * 100)
       setPercent(p)
     })
     ipcRenderer.on(`${taskToken}-end`, () => {
-      setTimeout(() => {
-        setPercent(0)
-        setVisible(false)
-        onFinish && onFinish()
-        if (isCommunityEdition()) ipcRenderer.invoke('refresh-public-menu')
-        else ipcRenderer.invoke('change-main-menu')
-        onRefLocalPluginList()
-      }, 200)
+      void onDownloadEnd()
     })
-    ipcRenderer.on(`${taskToken}-error`, (_, e) => {
-      onRefLocalPluginList()
-      yakitNotify('error', '下载失败:' + e)
+    ipcRenderer.on(`${taskToken}-error`, (_, error) => {
+      onDownloadError(error)
     })
     return () => {
+      mountedRef.current = false
       ipcRenderer.removeAllListeners(`${taskToken}-data`)
       ipcRenderer.removeAllListeners(`${taskToken}-error`)
       ipcRenderer.removeAllListeners(`${taskToken}-end`)
     }
-  }, [taskToken])
+  }, [taskToken, onDownloadEnd, onDownloadError])
   useEffect(() => {
     if (visible) {
-      const addParams: DownloadOnlinePluginsRequest = {
-        ListType: listType === 'online' ? '' : listType,
-        PluginType: pluginType ? pluginType : [],
-      }
-      ipcRenderer
-        .invoke('DownloadOnlinePlugins', addParams, taskToken)
-        .then(() => {})
-        .catch((e) => {
-          failed(`下载失败:${e}`)
-        })
+      startDownload()
     }
-  }, [visible])
+  }, [visible, startDownload])
   const StopAllPlugin = () => {
+    finishingRef.current = true
     ipcRenderer.invoke('cancel-DownloadOnlinePlugins', taskToken).catch((e) => {
       failed(`停止下载:${e}`)
-      onRefLocalPluginList()
     })
   }
-  /** 下载后需要刷新本地插件列表 */
-  const onRefLocalPluginList = useMemoizedFn(() => {
-    emiter.emit('onRefreshLocalPluginList', true)
-  })
   return (
     <YakitHint
       visible={visible}
-      title={`${getReleaseEditionName()} 云端插件下载中...`}
+      title={
+        refreshing ? `${getReleaseEditionName()} 插件数据刷新中...` : `${getReleaseEditionName()} 云端插件下载中...`
+      }
       heardIcon={<SolidCloudDownloadIcon style={{ color: 'var(--Colors-Use-Warning-Primary)' }} />}
       onCancel={() => {
         StopAllPlugin()
+        setPercent(0)
+        setRefreshing(false)
         setVisible(false)
       }}
       okButtonProps={{ style: { display: 'none' } }}
@@ -418,7 +469,7 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
         strokeColor="var(--Colors-Use-Main-Primary)"
         trailColor="var(--Colors-Use-Neutral-Bg-Hover)"
         percent={percent}
-        format={(percent) => `已下载 ${percent}%`}
+        format={(percent) => (refreshing ? '正在刷新插件数据' : `已下载 ${percent}%`)}
       />
     </YakitHint>
   )

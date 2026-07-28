@@ -319,10 +319,6 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
   const [loading, setLoading] = useState<boolean>(false)
   const [hasMore, setHasMore] = useState<boolean>(true)
 
-  useEffect(() => {
-    fetchList(true)
-  }, [selectGroupList])
-
   const fetchList = useDebounceFn(
     useMemoizedFn(async (reset?: boolean) => {
       if (selectGroupList.length === 0) {
@@ -391,6 +387,21 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
     }),
     { wait: 200, leading: true },
   ).run
+  const onRefreshPluginList = useMemoizedFn(() => {
+    fetchList(true)
+  })
+
+  useEffect(() => {
+    onRefreshPluginList()
+  }, [selectGroupList, onRefreshPluginList])
+
+  useEffect(() => {
+    emiter.on('onRefreshLocalPluginList', onRefreshPluginList)
+    return () => {
+      emiter.off('onRefreshLocalPluginList', onRefreshPluginList)
+    }
+  }, [onRefreshPluginList])
+
   // 滚动更多加载
   const onUpdateList = useMemoizedFn(() => {
     fetchList()
@@ -444,6 +455,9 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
   )
 })
 
+// 下载流结束后仍以实际查询结果判定就绪；间隔只限制请求频率，不代表安装已经完成。
+const SPECIAL_DETECTION_READY_RETRY_DELAYS = [0, 250, 500, 1000, 2000, 4000] as const
+
 const PluginGroupByKeyWord: React.FC<PluginGroupByKeyWordProps> = React.memo((props) => {
   const { t } = useI18nNamespaces(['yakPoC', 'yakitUi'])
   const { pageId, hidden, inViewport, setResponseToSelect, defGroupKeywords } = props
@@ -461,9 +475,19 @@ const PluginGroupByKeyWord: React.FC<PluginGroupByKeyWordProps> = React.memo((pr
   const [visibleOnline, setVisibleOnline] = useState<boolean>(false)
 
   const initialResponseRef = useRef<GroupCount[]>([])
+  const mountedRef = useRef<boolean>(true)
+  const latestRequestRef = useRef<number>(0)
   const pocPluginKeywordsRef = useRef<YakitAutoCompleteRefProps>({
     ...defYakitAutoCompleteRef,
   })
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      latestRequestRef.current += 1
+    }
+  }, [])
 
   useEffect(() => {
     if (!defGroupKeywords) return
@@ -471,31 +495,52 @@ const PluginGroupByKeyWord: React.FC<PluginGroupByKeyWordProps> = React.memo((pr
     onSearch(defGroupKeywords)
   }, [defGroupKeywords])
 
-  useEffect(() => {
-    if (inViewport) init()
-  }, [inViewport])
-
-  const init = useMemoizedFn(() => {
+  const init = useMemoizedFn(async (waitUntilReady = false) => {
+    const requestId = latestRequestRef.current + 1
+    latestRequestRef.current = requestId
     setLoading(true)
-    getQueryYakScriptGroup()
-      .then((res) => {
-        initialResponseRef.current = res
-        setResponseToSelect(res)
-        if (response.length === 0) {
-          setResponse(res)
+
+    const retryDelays = waitUntilReady ? SPECIAL_DETECTION_READY_RETRY_DELAYS : [0]
+    try {
+      for (const retryDelay of retryDelays) {
+        if (retryDelay > 0) {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay))
         }
-      })
-      .finally(() =>
-        setTimeout(() => {
-          setLoading(false)
-        }, 200),
-      )
+        if (!mountedRef.current || requestId !== latestRequestRef.current) return
+
+        const res = await getQueryYakScriptGroup()
+        if (!mountedRef.current || requestId !== latestRequestRef.current) return
+
+        if (!waitUntilReady || res.length > 0) {
+          const normalizedKeywords = keywords.trim().toUpperCase()
+          const nextResponse = normalizedKeywords
+            ? res.filter((item) => item.Value.toUpperCase().includes(normalizedKeywords))
+            : res
+
+          initialResponseRef.current = res
+          setResponseToSelect(res)
+          setResponse(nextResponse)
+          setIsRef((value) => !value)
+          return
+        }
+      }
+
+      throw new Error('下载完成后仍未读取到专项检测插件')
+    } finally {
+      if (mountedRef.current && requestId === latestRequestRef.current) {
+        setLoading(false)
+      }
+    }
   })
   const getQueryYakScriptGroup: () => Promise<GroupCount[]> = useMemoizedFn(() => {
     return new Promise((resolve, reject) => {
       apiFetchQueryYakScriptGroupLocalByPoc({ PageId: pageId }).then(resolve).catch(reject)
     })
   })
+  useEffect(() => {
+    if (inViewport) void init()
+  }, [inViewport, init])
+
   const onSelect = useMemoizedFn((val: GroupCount) => {
     const isExist = selectGroupList.includes(val.Value)
     if (isExist) {
@@ -673,12 +718,8 @@ const PluginGroupByKeyWord: React.FC<PluginGroupByKeyWordProps> = React.memo((pr
       )}
       <YakitGetOnlinePlugin
         visible={visibleOnline}
-        setVisible={(v) => {
-          setVisibleOnline(v)
-          setTimeout(() => {
-            init()
-          }, 200)
-        }}
+        setVisible={setVisibleOnline}
+        onFinish={() => init(true)}
         listType="online"
         getContainer={document.getElementById(`main-operator-page-body-${YakitRoute.PoC}`) || undefined}
       />
