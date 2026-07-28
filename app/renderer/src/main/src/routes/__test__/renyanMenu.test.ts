@@ -47,7 +47,14 @@ describe('睿眼菜单模型', () => {
     expect(groups['workbench']).toEqual(['安全概览', '最近任务', '风险趋势'])
     expect(groups['interactive-proxy']).toEqual(['代理控制台'])
     expect(groups['traffic-center']).toEqual(['历史流量'])
-    expect(groups['vulnerability-detection']).toEqual(['通用检测', '端口检测', '扫描结果', '风险结果', '安全测试报告'])
+    expect(groups['vulnerability-detection']).toEqual([
+      '通用检测',
+      '专项检测',
+      '端口检测',
+      '扫描结果',
+      '风险结果',
+      '安全测试报告',
+    ])
     expect(groups['brute-force']).toEqual(['爆破任务', '字典管理'])
     expect(groups['packet-tools']).toEqual(['报文重放', 'WebSocket 调试', '报文差异', '编解码'])
     expect(groups['plugin-center']).toEqual(['插件仓库', '批量导入', '插件开发'])
@@ -78,12 +85,15 @@ describe('睿眼菜单模型', () => {
   })
 
   it('公开已有真实页面并隐藏尚未交付能力', () => {
-    const keys = flattenRenyanMenu(buildRenyanMenu()).map((item) => item.key)
+    const items = flattenRenyanMenu(buildRenyanMenu())
+    const keys = items.map((item) => item.key)
+    const targetedVulnerability = items.find((item) => item.key === 'targeted-vulnerability')
     expect(keys).toContain('security-report')
     expect(keys).toContain('managed-client-overview')
     expect(keys).toContain('plugin-batch-import')
     expect(keys).toContain('shortcut-help')
-    expect(keys).not.toContain('targeted-vulnerability')
+    expect(targetedVulnerability?.route).toBe(YakitRoute.PoC)
+    expect(targetedVulnerability && isRenyanMenuItemNavigable(targetedVulnerability)).toBe(true)
     expect(keys).not.toContain('domestic-crypto')
     expect(keys).not.toContain('plugin-pipeline')
   })

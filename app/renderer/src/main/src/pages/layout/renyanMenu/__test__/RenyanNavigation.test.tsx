@@ -95,24 +95,32 @@ describe('睿眼顶部导航', () => {
   })
 
   it('二级导航保留直属父入口且不展示其三级节点', () => {
-    render(<RenyanNavigation defaultExpand={true} onMenuSelect={vi.fn()} setRouteToLabel={vi.fn()} />)
+    const onMenuSelect = vi.fn()
+    render(<RenyanNavigation defaultExpand={true} onMenuSelect={onMenuSelect} setRouteToLabel={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: '漏洞检测' }))
 
     expect(screen.getByRole('button', { name: '通用检测' })).toBeEnabled()
-    expect(screen.queryByRole('button', { name: '专项检测' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '专项检测' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: '检测配置' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '插件选择' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '执行日志' })).not.toBeInTheDocument()
+
+    onMenuSelect.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '专项检测' }))
+    expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.PoC })
   })
 
-  it('历史专项检测路由回到通用检测', async () => {
+  it('专项检测路由保持专项检测选中且不触发重定向', async () => {
     testState.currentRoute = YakitRoute.PoC
     const onMenuSelect = vi.fn()
 
     render(<RenyanNavigation defaultExpand={true} onMenuSelect={onMenuSelect} setRouteToLabel={vi.fn()} />)
 
-    await waitFor(() => expect(onMenuSelect).toHaveBeenCalledWith({ route: YakitRoute.BatchExecutorPage }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '专项检测' })).toHaveAttribute('aria-current', 'page'),
+    )
+    expect(onMenuSelect).not.toHaveBeenCalled()
   })
 
   it('系统设置写入目标分区并打开真实网络诊断页面', () => {

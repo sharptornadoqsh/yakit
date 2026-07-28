@@ -9,7 +9,6 @@ export const RUIYAN_UI_POLICY = {
     showRowQuickActions: false,
   },
   vulnerabilityDetection: {
-    showSpecialDetection: false,
     showGroupSelection: false,
   },
   pluginRepository: {
