@@ -473,6 +473,27 @@ interface StartLocalYaklangEngineParams {
   password?: string
 }
 
+interface SpecialDetectionActivationRequest {
+  PageId: string
+}
+
+interface SpecialDetectionActivationCount {
+  groupCount: number
+  pluginCount: number
+}
+
+interface SpecialDetectionActivationResult {
+  before: SpecialDetectionActivationCount
+  after: SpecialDetectionActivationCount
+  activationPid: number
+  activationDurationMs: number
+  enginePidsBefore: number[]
+  enginePidsAfter: number[]
+  enginePidStable: boolean | null
+  profileDatabasePath: string
+  projectDatabasePath: string
+}
+
 interface FetchCheckYaklangSourceConfig {
   timeout?: number
 }
@@ -784,6 +805,9 @@ interface YakitBridge {
     isPortAvailable: (port: number) => Promise<unknown>
     startLocalYaklangEngine: (params: StartLocalYaklangEngineParams) => Promise<unknown>
     connectYaklangEngine: (credential: YaklangEngineWatchDogCredential) => Promise<unknown>
+    activateSpecialDetectionPlugins: (
+      params: SpecialDetectionActivationRequest,
+    ) => Promise<SpecialDetectionActivationResult>
     attachCombinedOutput: (params: GrpcEmptyRequest, token: string) => Promise<unknown>
     echo: (payload: EchoPayload) => Promise<EchoResult>
     outputLogToWelcomeConsole: (message: string) => Promise<unknown>

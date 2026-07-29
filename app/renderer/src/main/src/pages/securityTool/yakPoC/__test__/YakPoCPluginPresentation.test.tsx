@@ -3,8 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { YakPoC } from '../YakPoC'
 
-vi.hoisted(() => {
+const { activateSpecialDetectionPlugins } = vi.hoisted(() => {
   const asyncMethod = vi.fn().mockResolvedValue(undefined)
+  const activateSpecialDetectionPlugins = vi.fn().mockResolvedValue(undefined)
   const channel = new Proxy(asyncMethod, {
     get: (_target, key) => (key === 'then' ? undefined : asyncMethod),
   })
@@ -14,8 +15,14 @@ vi.hoisted(() => {
   })
   Object.defineProperty(window, 'yakitBridge', {
     configurable: true,
-    value: new Proxy({}, { get: () => channel }),
+    value: new Proxy(
+      {},
+      {
+        get: (_target, key) => (key === 'engine' ? { activateSpecialDetectionPlugins } : channel),
+      },
+    ),
   })
+  return { activateSpecialDetectionPlugins }
 })
 
 const { queryPluginList, queryKeywordGroups, pluginEventBus } = vi.hoisted(() => {
@@ -30,6 +37,8 @@ const { queryPluginList, queryKeywordGroups, pluginEventBus } = vi.hoisted(() =>
     },
   }
 })
+
+const { yakitNotify } = vi.hoisted(() => ({ yakitNotify: vi.fn() }))
 
 const plugin = {
   ScriptName: '专项检测插件',
@@ -46,6 +55,11 @@ const plugin = {
 vi.mock('../YakPoC.module.scss', () => ({
   default: new Proxy({}, { get: (_, key) => String(key) }),
 }))
+
+vi.mock('@/utils/notification', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/notification')>('@/utils/notification')
+  return { ...actual, yakitNotify }
+})
 
 vi.mock('ahooks', async () => {
   const actual = await vi.importActual<typeof import('ahooks')>('ahooks')
@@ -252,13 +266,13 @@ vi.mock('@/pages/mitm/MITMServerHijacking/MITMPluginLocalList', () => ({
   }: {
     visible: boolean
     setVisible: (visible: boolean) => void
-    onFinish?: () => void | Promise<void>
+    onFinish?: (updateStatus: (message: string) => void) => void | Promise<void>
   }) =>
     visible ? (
       <button
         type="button"
         onClick={() => {
-          void Promise.resolve(onFinish?.()).then(() => {
+          void Promise.resolve(onFinish?.(vi.fn())).then(() => {
             setVisible(false)
             pluginEventBus.emit('onRefreshLocalPluginList', true)
           })
@@ -344,11 +358,14 @@ vi.mock('@/i18n/useI18nNamespaces', () => {
 
 describe('YakPoC 插件展示', () => {
   beforeEach(() => {
+    activateSpecialDetectionPlugins.mockReset()
+    activateSpecialDetectionPlugins.mockResolvedValue(undefined)
     queryKeywordGroups.mockReset()
     queryPluginList.mockReset()
     pluginEventBus.emit.mockClear()
     pluginEventBus.on.mockClear()
     pluginEventBus.off.mockClear()
+    yakitNotify.mockClear()
   })
 
   it('已选插件面板只显示插件名称且不提供插件日志页签', async () => {
@@ -378,7 +395,6 @@ describe('YakPoC 插件展示', () => {
     queryKeywordGroups
       .mockResolvedValue([])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ Value: 'Java', Total: 1 }])
     queryPluginList.mockResolvedValue({
       Pagination: { Page: 1, Limit: 20, OrderBy: '', Order: '' },
@@ -395,9 +411,14 @@ describe('YakPoC 插件展示', () => {
     fireEvent.click(screen.getByRole('button', { name: '完成下载' }))
 
     expect(await screen.findByText('Java', {}, { timeout: 3000 })).toBeInTheDocument()
-    expect(queryKeywordGroups).toHaveBeenCalledTimes(3)
+    expect(activateSpecialDetectionPlugins).toHaveBeenCalledWith({ PageId: 'poc-page' })
+    expect(queryKeywordGroups).toHaveBeenCalledTimes(2)
+    expect(activateSpecialDetectionPlugins.mock.invocationCallOrder[0]).toBeLessThan(
+      queryKeywordGroups.mock.invocationCallOrder[1],
+    )
     await waitFor(() => {
       expect(queryPluginList).toHaveBeenCalledTimes(2)
     })
+    expect(yakitNotify).toHaveBeenCalledWith('success', '专项检测插件安装完成')
   })
 })

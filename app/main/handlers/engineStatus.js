@@ -1,6 +1,7 @@
 const { ipcMain } = require('electron')
 const { getDefaultDatabaseEnvironment } = require('../defaultDatabase')
 const childProcess = require('child_process')
+const path = require('path')
 const _sudoPrompt = require('sudo-prompt')
 const { GLOBAL_YAK_SETTING } = require('../state')
 const { testRemoteClient } = require('../ipc')
@@ -8,8 +9,107 @@ const { getLocalYaklangEngine, getYakitHome } = require('../filePath')
 const net = require('net')
 const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
 const { assertTrustedAppSender, normalizePid } = require('../security')
+const { psYakList } = require('./yakLocal')
+const { runSpecialDetectionActivation } = require('../specialDetectionActivation')
 
 let dbFile = undefined
+let currentEngineMode
+let lastLocalEngineRuntime
+let specialDetectionActivationTask
+
+const DEFAULT_PROFILE_DATABASE_NAME = 'yakit-profile-plugin.db'
+const LOCAL_ENGINE_HOSTS = new Set(['127.0.0.1', 'localhost', '::1'])
+
+const parseEngineAddress = (address) => {
+  const value = String(address || '')
+  if (value.startsWith('[')) {
+    const closingBracket = value.indexOf(']')
+    return {
+      host: value.slice(1, closingBracket),
+      port: Number(value.slice(closingBracket + 2)),
+    }
+  }
+  const separator = value.lastIndexOf(':')
+  return {
+    host: separator >= 0 ? value.slice(0, separator) : value,
+    port: Number(separator >= 0 ? value.slice(separator + 1) : 0),
+  }
+}
+
+const resolveDatabasePath = (home, databaseName) =>
+  path.isAbsolute(databaseName) ? databaseName : path.join(home, databaseName)
+
+const getDatabaseArgument = (args, name) => {
+  const index = args.indexOf(name)
+  return index >= 0 ? args[index + 1] : undefined
+}
+
+const createLocalEngineRuntime = ({ version, args = [], environment }) => {
+  const home = environment.YAKIT_HOME
+  const profileDatabaseName =
+    getDatabaseArgument(args, '--profile-db') ||
+    environment.YAK_DEFAULT_PROFILE_DATABASE_NAME ||
+    DEFAULT_PROFILE_DATABASE_NAME
+  const projectDatabaseName = getDatabaseArgument(args, '--project-db') || environment.YAK_DEFAULT_PROJECT_DATABASE_NAME
+  const activationEnvironment = {
+    ...environment,
+    YAK_DEFAULT_PROFILE_DATABASE_NAME: profileDatabaseName,
+  }
+  if (projectDatabaseName) {
+    activationEnvironment.YAK_DEFAULT_PROJECT_DATABASE_NAME = projectDatabaseName
+  }
+  return {
+    version,
+    environment: activationEnvironment,
+    profileDatabasePath: resolveDatabasePath(home, profileDatabaseName),
+    projectDatabasePath: projectDatabaseName ? resolveDatabasePath(home, projectDatabaseName) : '',
+  }
+}
+
+const createFallbackLocalEngineRuntime = () => {
+  const version = process.env.RENDER_PLATFORM || process.env.REACT_APP_PLATFORM || 'yakit'
+  const home = getYakitHome()
+  const databaseEnvironment = getDefaultDatabaseEnvironment(version, version)
+  const environment = {
+    ...process.env,
+    YAKIT_HOME: home,
+    ...databaseEnvironment,
+  }
+  return createLocalEngineRuntime({ version, environment })
+}
+
+const querySpecialDetectionGroups = (client, pageId) =>
+  new Promise((resolve, reject) => {
+    client.QueryYakScriptGroup(
+      {
+        All: false,
+        IsPocBuiltIn: true,
+        IsMITMParamPlugins: 2,
+        ExcludeType: ['yak', 'codec', 'lua'],
+        PageId: pageId || 'YakPoC',
+      },
+      (error, data) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        const groups = Array.isArray(data?.Group) ? data.Group : []
+        resolve({
+          groupCount: groups.length,
+          pluginCount: groups.reduce((total, group) => total + Number(group.Total || 0), 0),
+        })
+      },
+    )
+  })
+
+const getCurrentEnginePids = async (port) => {
+  const processes = await psYakList()
+  return processes
+    .filter((item) => Number(item.port) === Number(port))
+    .map((item) => Number(item.pid))
+    .filter(Number.isSafeInteger)
+    .sort((left, right) => left - right)
+}
 
 function isPortAvailable(port) {
   return new Promise((resolve, reject) => {
@@ -161,16 +261,23 @@ module.exports = (win, callback, getClient, newClient) => {
         const resultParams = isEnpriTraceAgent ? [...extraParams, '--disable-output'] : extraParams
 
         engineLogOutputFileAndUI(win, `启动命令: ${getLocalYaklangEngine()} ${resultParams.join(' ')}`)
+        const environment = {
+          ...process.env,
+          YAKIT_HOME: getYakitHome(),
+          ...getDefaultDatabaseEnvironment(version, version),
+        }
         const subprocess = childProcess.spawn(getLocalYaklangEngine(), resultParams, {
           detached: false,
           windowsHide: true,
           stdio: ['ignore', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            YAKIT_HOME: getYakitHome(),
-            ...getDefaultDatabaseEnvironment(version, version),
-          },
+          env: environment,
         })
+        currentEngineMode = 'local'
+        lastLocalEngineRuntime = {
+          ...createLocalEngineRuntime({ version, args: resultParams, environment }),
+          enginePid: subprocess.pid,
+          port,
+        }
 
         // subprocess.unref()
         process.on('exit', () => {
@@ -224,6 +331,7 @@ module.exports = (win, callback, getClient, newClient) => {
             GLOBAL_YAK_SETTING.caPem = params.caPem || ''
             GLOBAL_YAK_SETTING.password = params.password
             GLOBAL_YAK_SETTING.sudo = false
+            currentEngineMode = 'remote'
             win.webContents.send('start-yaklang-engine-success', 'remote')
             resolve()
           } else reject(err)
@@ -261,6 +369,7 @@ module.exports = (win, callback, getClient, newClient) => {
     engineLogOutputFileAndUI(win, `原始参数为: ${JSON.stringify(params)}`)
     engineLogOutputFileAndUI(win, `开始连接引擎地址为：${addr} Host: ${hostRaw} Port: ${portFromRaw}`)
     GLOBAL_YAK_SETTING.defaultYakGRPCAddr = addr
+    currentEngineMode = params.Mode || (LOCAL_ENGINE_HOSTS.has(hostFormatted.toLowerCase()) ? 'local' : 'remote')
 
     callback(
       GLOBAL_YAK_SETTING.defaultYakGRPCAddr,
@@ -283,6 +392,110 @@ module.exports = (win, callback, getClient, newClient) => {
         }
       })
     })
+  })
+
+  ipcMain.handle('activate-special-detection-plugins', async (event, params = {}) => {
+    assertTrustedAppSender(event, 'activate-special-detection-plugins')
+    const engineAddress = parseEngineAddress(GLOBAL_YAK_SETTING.defaultYakGRPCAddr)
+    const isLocalEngine = LOCAL_ENGINE_HOSTS.has(engineAddress.host.toLowerCase())
+    const isValidLocalPort =
+      Number.isSafeInteger(engineAddress.port) && engineAddress.port > 0 && engineAddress.port <= 65_535
+    if (currentEngineMode === 'remote' || !isLocalEngine || !isValidLocalPort) {
+      const error = new Error('当前连接不是本机内置引擎，无法在本地激活专项检测插件')
+      error.code = 'SPECIAL_DETECTION_LOCAL_ENGINE_REQUIRED'
+      throw error
+    }
+    if (specialDetectionActivationTask) return await specialDetectionActivationTask
+
+    const activationTask = (async () => {
+      const runtime =
+        lastLocalEngineRuntime?.port === engineAddress.port
+          ? lastLocalEngineRuntime
+          : createFallbackLocalEngineRuntime()
+      let enginePidsBefore = []
+      let enginePidsAfter = []
+      try {
+        enginePidsBefore = await getCurrentEnginePids(engineAddress.port)
+      } catch (error) {
+        engineLogOutputFileAndUI(win, `专项检测激活前引擎进程枚举失败：${error}`)
+      }
+
+      engineLogOutputFileAndUI(win, '----- 开始激活专项检测插件 -----')
+      engineLogOutputFileAndUI(win, `专项检测配置数据库：${runtime.profileDatabasePath}`)
+      engineLogOutputFileAndUI(win, `专项检测项目数据库：${runtime.projectDatabasePath || '未指定'}`)
+      engineLogOutputFileAndUI(
+        win,
+        `当前引擎地址：${GLOBAL_YAK_SETTING.defaultYakGRPCAddr}，进程号：${enginePidsBefore.join(',') || '未知'}`,
+      )
+
+      try {
+        const before = await querySpecialDetectionGroups(getClient(), params.PageId)
+        engineLogOutputFileAndUI(
+          win,
+          `专项检测激活前分类数量：${before.groupCount}，插件引用数量：${before.pluginCount}`,
+        )
+        const activation = await runSpecialDetectionActivation({
+          command: getLocalYaklangEngine(),
+          env: runtime.environment,
+        })
+        engineLogOutputFileAndUI(
+          win,
+          `专项检测索引刷新进程已退出，进程号：${activation.pid}，耗时：${activation.durationMs} 毫秒`,
+        )
+        if (activation.outputTruncated) {
+          engineLogOutputFileAndUI(win, '专项检测索引刷新进程输出已按上限截断')
+        }
+
+        const after = await querySpecialDetectionGroups(getClient(), params.PageId)
+        try {
+          enginePidsAfter = await getCurrentEnginePids(engineAddress.port)
+        } catch (error) {
+          engineLogOutputFileAndUI(win, `专项检测激活后引擎进程枚举失败：${error}`)
+        }
+        const enginePidStable =
+          enginePidsBefore.length > 0 && enginePidsAfter.length > 0
+            ? enginePidsBefore.join(',') === enginePidsAfter.join(',')
+            : null
+        engineLogOutputFileAndUI(win, `专项检测激活后分类数量：${after.groupCount}，插件引用数量：${after.pluginCount}`)
+        engineLogOutputFileAndUI(
+          win,
+          `当前引擎进程号：${enginePidsAfter.join(',') || '未知'}，进程保持：${
+            enginePidStable === null ? '未能判定' : enginePidStable ? '是' : '否'
+          }`,
+        )
+
+        if (after.groupCount === 0) {
+          const error = new Error('运行时激活完成，但当前引擎仍未读取到专项检测插件分类')
+          error.code = 'SPECIAL_DETECTION_GROUPS_NOT_READY'
+          throw error
+        }
+        engineLogOutputFileAndUI(win, '----- 专项检测插件激活完成 -----')
+        return {
+          before,
+          after,
+          activationPid: activation.pid,
+          activationDurationMs: activation.durationMs,
+          enginePidsBefore,
+          enginePidsAfter,
+          enginePidStable,
+          profileDatabasePath: runtime.profileDatabasePath,
+          projectDatabasePath: runtime.projectDatabasePath,
+        }
+      } catch (error) {
+        engineLogOutputFileAndUI(
+          win,
+          `专项检测插件激活失败：${error?.code ? `${error.code}：` : ''}${error?.message || error}`,
+        )
+        throw error
+      }
+    })()
+
+    specialDetectionActivationTask = activationTask
+    try {
+      return await activationTask
+    } finally {
+      if (specialDetectionActivationTask === activationTask) specialDetectionActivationTask = undefined
+    }
   })
 
   /** 输出到欢迎界面的日志中 */

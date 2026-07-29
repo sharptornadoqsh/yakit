@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react'
-import { act, render, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { YakitGetOnlinePlugin } from '../MITMPluginLocalList'
 
@@ -61,15 +61,41 @@ vi.mock('@/utils/eventBus/eventBus', () => ({
 }))
 
 vi.mock('@/components/yakitUI/YakitHint/YakitHint', () => ({
-  YakitHint: ({ visible, children }: { visible: boolean; children: ReactNode }) =>
-    visible ? <div data-testid="download-hint">{children}</div> : null,
+  YakitHint: ({
+    visible,
+    title,
+    children,
+    okButtonText,
+    okButtonProps,
+    onOk,
+  }: {
+    visible: boolean
+    title?: ReactNode
+    children: ReactNode
+    okButtonText?: ReactNode
+    okButtonProps?: { style?: React.CSSProperties }
+    onOk?: () => void
+  }) =>
+    visible ? (
+      <div data-testid="download-hint">
+        <div>{title}</div>
+        {children}
+        {okButtonProps?.style?.display === 'none' ? null : (
+          <button type="button" onClick={onOk}>
+            {okButtonText}
+          </button>
+        )}
+      </div>
+    ) : null,
 }))
 
 vi.mock('antd', async () => {
   const actual = await vi.importActual<typeof import('antd')>('antd')
   return {
     ...actual,
-    Progress: ({ percent }: { percent: number }) => <div data-testid="download-progress">{percent}</div>,
+    Progress: ({ percent, format }: { percent: number; format?: (percent: number) => ReactNode }) => (
+      <div data-testid="download-progress">{format ? format(percent) : percent}</div>
+    ),
   }
 })
 
@@ -219,8 +245,35 @@ describe('YakitGetOnlinePlugin', () => {
     expect(emit).toHaveBeenCalledWith('onRefreshLocalPluginList', true)
   })
 
-  it('页面刷新失败时区分下载成功与数据刷新失败', async () => {
-    const onFinish = vi.fn().mockRejectedValue(new Error('query failed'))
+  it('下载结束后允许页面展示运行时激活阶段', async () => {
+    let resolveActivation: (() => void) | undefined
+    const activationPromise = new Promise<void>((resolve) => {
+      resolveActivation = resolve
+    })
+    const onFinish = vi.fn((updateStatus?: (message: string) => void) => {
+      updateStatus?.('正在刷新专项检测插件索引')
+      return activationPromise
+    })
+    const setVisible = vi.fn()
+
+    render(<YakitGetOnlinePlugin visible setVisible={setVisible} onFinish={onFinish} />)
+
+    await waitFor(() => {
+      expect(eventHandlers.has('download-token-end')).toBe(true)
+    })
+    triggerDownloadEnd()
+
+    expect(await waitFor(() => document.body.textContent)).toContain('正在刷新专项检测插件索引')
+    expect(setVisible).not.toHaveBeenCalled()
+
+    await act(async () => {
+      resolveActivation?.()
+      await activationPromise
+    })
+  })
+
+  it('运行环境刷新失败后仅重试激活流程且不重复下载', async () => {
+    const onFinish = vi.fn().mockRejectedValueOnce(new Error('query failed')).mockResolvedValueOnce(undefined)
     const setVisible = vi.fn()
 
     render(<YakitGetOnlinePlugin visible setVisible={setVisible} onFinish={onFinish} />)
@@ -231,9 +284,19 @@ describe('YakitGetOnlinePlugin', () => {
     triggerDownloadEnd()
 
     await waitFor(() => {
-      expect(yakitNotify).toHaveBeenCalledWith('error', expect.stringContaining('插件下载完成，但刷新本地插件数据失败'))
+      expect(yakitNotify).toHaveBeenCalledWith('error', expect.stringContaining('插件已导入，但插件运行环境刷新失败'))
     })
-    expect(setVisible).toHaveBeenCalledWith(false)
+    expect(setVisible).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '重试加载' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '重试加载' }))
+
+    await waitFor(() => {
+      expect(setVisible).toHaveBeenCalledWith(false)
+    })
+    expect(onFinish).toHaveBeenCalledTimes(2)
+    const downloadCalls = ipcRenderer.invoke.mock.calls.filter(([channel]) => channel === 'DownloadOnlinePlugins')
+    expect(downloadCalls).toHaveLength(1)
   })
 
   it('下载流失败时返回可重试页面且不发送成功刷新事件', async () => {

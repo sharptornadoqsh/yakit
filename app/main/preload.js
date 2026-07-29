@@ -267,6 +267,7 @@ process.on('loaded', function () {
       isPortAvailable: (port) => invoke('is-port-available', port),
       startLocalYaklangEngine: (params) => invoke('start-local-yaklang-engine', params),
       connectYaklangEngine: (credential) => invoke('connect-yaklang-engine', credential),
+      activateSpecialDetectionPlugins: (params) => invoke('activate-special-detection-plugins', params),
       attachCombinedOutput: (params, token) => invoke('AttachCombinedOutput', params, token),
       echo: (payload) => invoke('Echo', payload),
       outputLogToWelcomeConsole: (message) => invoke('output-log-to-welcome-console', message),

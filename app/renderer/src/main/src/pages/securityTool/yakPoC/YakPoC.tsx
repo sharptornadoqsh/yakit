@@ -79,6 +79,8 @@ import { getReleaseEditionName } from '@/utils/envfile'
 import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { RuiYanSegmented } from '@/components/renyanUI'
 import { RUIYAN_UI_POLICY, resolveRuiYanVulnerabilitySelectionType } from '@/config/renyanUiPolicy'
+import { yakitEngine } from '@/services/electronBridge'
+import { yakitNotify } from '@/utils/notification'
 
 const HybridScanTaskListDrawer = React.lazy(
   () => import('@/pages/plugins/pluginBatchExecutor/HybridScanTaskListDrawer'),
@@ -455,9 +457,6 @@ const PluginListByGroup: React.FC<PluginListByGroupProps> = React.memo((props) =
   )
 })
 
-// 下载流结束后仍以实际查询结果判定就绪；间隔只限制请求频率，不代表安装已经完成。
-const SPECIAL_DETECTION_READY_RETRY_DELAYS = [0, 250, 500, 1000, 2000, 4000] as const
-
 const PluginGroupByKeyWord: React.FC<PluginGroupByKeyWordProps> = React.memo((props) => {
   const { t } = useI18nNamespaces(['yakPoC', 'yakitUi'])
   const { pageId, hidden, inViewport, setResponseToSelect, defGroupKeywords } = props
@@ -495,37 +494,27 @@ const PluginGroupByKeyWord: React.FC<PluginGroupByKeyWordProps> = React.memo((pr
     onSearch(defGroupKeywords)
   }, [defGroupKeywords])
 
-  const init = useMemoizedFn(async (waitUntilReady = false) => {
+  const init = useMemoizedFn(async (verifyActivatedPlugins = false) => {
     const requestId = latestRequestRef.current + 1
     latestRequestRef.current = requestId
     setLoading(true)
 
-    const retryDelays = waitUntilReady ? SPECIAL_DETECTION_READY_RETRY_DELAYS : [0]
     try {
-      for (const retryDelay of retryDelays) {
-        if (retryDelay > 0) {
-          await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay))
-        }
-        if (!mountedRef.current || requestId !== latestRequestRef.current) return
-
-        const res = await getQueryYakScriptGroup()
-        if (!mountedRef.current || requestId !== latestRequestRef.current) return
-
-        if (!waitUntilReady || res.length > 0) {
-          const normalizedKeywords = keywords.trim().toUpperCase()
-          const nextResponse = normalizedKeywords
-            ? res.filter((item) => item.Value.toUpperCase().includes(normalizedKeywords))
-            : res
-
-          initialResponseRef.current = res
-          setResponseToSelect(res)
-          setResponse(nextResponse)
-          setIsRef((value) => !value)
-          return
-        }
+      const res = await getQueryYakScriptGroup()
+      if (!mountedRef.current || requestId !== latestRequestRef.current) return
+      if (verifyActivatedPlugins && res.length === 0) {
+        throw new Error('插件安装和运行环境刷新已完成，但未查询到专项检测插件，请检查插件分类和导入结果')
       }
 
-      throw new Error('下载完成后仍未读取到专项检测插件')
+      const normalizedKeywords = keywords.trim().toUpperCase()
+      const nextResponse = normalizedKeywords
+        ? res.filter((item) => item.Value.toUpperCase().includes(normalizedKeywords))
+        : res
+
+      initialResponseRef.current = res
+      setResponseToSelect(res)
+      setResponse(nextResponse)
+      setIsRef((value) => !value)
     } finally {
       if (mountedRef.current && requestId === latestRequestRef.current) {
         setLoading(false)
@@ -719,7 +708,13 @@ const PluginGroupByKeyWord: React.FC<PluginGroupByKeyWordProps> = React.memo((pr
       <YakitGetOnlinePlugin
         visible={visibleOnline}
         setVisible={setVisibleOnline}
-        onFinish={() => init(true)}
+        onFinish={async (updateStatus) => {
+          updateStatus('正在刷新专项检测插件索引')
+          await yakitEngine.activateSpecialDetectionPlugins({ PageId: pageId })
+          updateStatus('专项检测索引已刷新，正在验证插件分类')
+          await init(true)
+          yakitNotify('success', '专项检测插件安装完成')
+        }}
         listType="online"
         getContainer={document.getElementById(`main-operator-page-body-${YakitRoute.PoC}`) || undefined}
       />

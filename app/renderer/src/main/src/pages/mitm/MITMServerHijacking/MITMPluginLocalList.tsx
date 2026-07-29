@@ -327,7 +327,7 @@ export interface YakitGetOnlinePluginProps {
   pluginType?: string[]
   visible: boolean
   setVisible: (b: boolean) => void
-  onFinish?: () => void | Promise<void>
+  onFinish?: (updateStatus: (message: string) => void) => void | Promise<void>
   isRereshLocalPluginList?: boolean
   getContainer?: HTMLElement
 }
@@ -348,6 +348,8 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
   const taskToken = useMemo(() => randomString(40), [])
   const [percent, setPercent] = useState<number>(0)
   const [refreshing, setRefreshing] = useState<boolean>(false)
+  const [refreshStatus, setRefreshStatus] = useState<string>('正在刷新插件数据')
+  const [refreshError, setRefreshError] = useState<string>()
   const mountedRef = useRef<boolean>(true)
   const finishingRef = useRef<boolean>(false)
 
@@ -357,31 +359,45 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
       emiter.emit('onRefreshLocalPluginList', true)
     }
   })
-  const onDownloadEnd = useMemoizedFn(async () => {
-    if (finishingRef.current) return
-    finishingRef.current = true
-    if (mountedRef.current) setRefreshing(true)
+  const finishDownloadedPlugins = useMemoizedFn(async () => {
+    if (!mountedRef.current) return
+    setRefreshError(undefined)
+    setRefreshing(true)
+    if (mountedRef.current) {
+      setRefreshStatus('插件数据写入完成，正在准备运行时激活')
+    }
 
-    let refreshError: unknown
     try {
-      await onFinish?.()
+      await onFinish?.((message) => {
+        if (mountedRef.current) setRefreshStatus(message)
+      })
     } catch (error) {
-      refreshError = error
+      if (!mountedRef.current) return
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const message = `插件已导入，但插件运行环境刷新失败：${errorMessage}`
+      setRefreshing(false)
+      setRefreshError(message)
+      setRefreshStatus(message)
+      yakitNotify('error', message)
+      return
     }
 
     if (!mountedRef.current) return
 
     setPercent(0)
     setRefreshing(false)
+    setRefreshStatus('正在刷新插件数据')
+    setRefreshError(undefined)
     setVisible(false)
     if (isCommunityEdition()) ipcRenderer.invoke('refresh-public-menu')
     else ipcRenderer.invoke('change-main-menu')
     onRefLocalPluginList()
+  })
 
-    if (refreshError) {
-      const errorMessage = refreshError instanceof Error ? refreshError.message : String(refreshError)
-      yakitNotify('error', `插件下载完成，但刷新本地插件数据失败：${errorMessage}`)
-    }
+  const onDownloadEnd = useMemoizedFn(async () => {
+    if (finishingRef.current) return
+    finishingRef.current = true
+    await finishDownloadedPlugins()
   })
   const onDownloadError = useMemoizedFn((error: unknown) => {
     if (finishingRef.current) return
@@ -389,12 +405,16 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
     if (!mountedRef.current) return
     setPercent(0)
     setRefreshing(false)
+    setRefreshStatus('正在刷新插件数据')
+    setRefreshError(undefined)
     setVisible(false)
     yakitNotify('error', '下载失败:' + error)
   })
   const startDownload = useMemoizedFn(() => {
     finishingRef.current = false
     setRefreshing(false)
+    setRefreshStatus('正在刷新插件数据')
+    setRefreshError(undefined)
     const addParams: DownloadOnlinePluginsRequest = {
       ListType: listType === 'online' ? '' : listType,
       PluginType: pluginType ? pluginType : [],
@@ -407,6 +427,8 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
         finishingRef.current = true
         setPercent(0)
         setRefreshing(false)
+        setRefreshStatus('正在刷新插件数据')
+        setRefreshError(undefined)
         setVisible(false)
         failed(`下载失败:${error}`)
       })
@@ -450,16 +472,28 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
     <YakitHint
       visible={visible}
       title={
-        refreshing ? `${getReleaseEditionName()} 插件数据刷新中...` : `${getReleaseEditionName()} 云端插件下载中...`
+        refreshing || refreshError
+          ? `${getReleaseEditionName()} ${refreshStatus}`
+          : `${getReleaseEditionName()} 云端插件下载中...`
       }
       heardIcon={<SolidCloudDownloadIcon style={{ color: 'var(--Colors-Use-Warning-Primary)' }} />}
       onCancel={() => {
-        StopAllPlugin()
+        if (refreshing) return
+        if (!finishingRef.current) StopAllPlugin()
         setPercent(0)
         setRefreshing(false)
+        setRefreshStatus('正在刷新插件数据')
+        setRefreshError(undefined)
         setVisible(false)
       }}
-      okButtonProps={{ style: { display: 'none' } }}
+      okButtonText={refreshError ? '重试加载' : undefined}
+      okButtonProps={refreshError ? undefined : { style: { display: 'none' } }}
+      onOk={() => {
+        if (!refreshError || refreshing) return
+        void finishDownloadedPlugins()
+      }}
+      cancelButtonText={refreshError ? '关闭' : undefined}
+      cancelButtonProps={{ disabled: refreshing }}
       isDrag={true}
       mask={false}
       getContainer={getContainer}
@@ -469,7 +503,7 @@ export const YakitGetOnlinePlugin: React.FC<YakitGetOnlinePluginProps> = React.m
         strokeColor="var(--Colors-Use-Main-Primary)"
         trailColor="var(--Colors-Use-Neutral-Bg-Hover)"
         percent={percent}
-        format={(percent) => (refreshing ? '正在刷新插件数据' : `已下载 ${percent}%`)}
+        format={(percent) => (refreshing || refreshError ? refreshStatus : `已下载 ${percent}%`)}
       />
     </YakitHint>
   )
