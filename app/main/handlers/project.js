@@ -1,8 +1,31 @@
 const { ipcMain } = require('electron')
 const { createProjectArchiveStore } = require('../projectArchive')
+const { createProjectShareBundleStore } = require('../projectShareBundle')
+const { registerProjectShareIPC } = require('../projectShareIPC')
+const { createProjectShareRecoveryStore } = require('../projectShareRecoveryStore')
 
 module.exports = (win, getClient) => {
   const projectArchiveStore = createProjectArchiveStore()
+  const projectShareRecoveryStore = createProjectShareRecoveryStore()
+  const projectShareBundleStore = createProjectShareBundleStore({
+    isHandleReferenced: projectShareRecoveryStore.isHandleReferenced,
+  })
+
+  registerProjectShareIPC({
+    ipcMain,
+    win,
+    getClient,
+    bundleStore: projectShareBundleStore,
+    recoveryStore: projectShareRecoveryStore,
+    getClientId: () => require('../httpServer').getCollaborationClientID(),
+    getOnlineContext: () => {
+      const { HttpSetting, USER_INFO } = require('../state')
+      return {
+        baseUrl: HttpSetting.httpBaseURL,
+        authorization: USER_INFO.token || '',
+      }
+    },
+  })
 
   // asyncSetCurrentProject wrapper
   const asyncSetCurrentProject = (params) => {

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useStore } from '@/store'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
@@ -21,10 +22,31 @@ import {
   listTeams,
   listTestData,
   listTestResults,
+  type CollaborationTeam,
+  type CurrentCollaborationUser,
   updateProjectSnapshot,
 } from '@/services/teamCollaboration'
 import { publishTeamProjectBundle, restoreTeamProjectBundle, type ProjectBundleProgress } from './teamProjectBundle'
 import { createDefaultTeamProjectBundleDependencies } from './teamProjectBundleRuntime'
+import {
+  acceptTeamPermissionMemberVersion,
+  buildTeamPermissionSnapshots,
+  hasExactTeamPermission,
+  invalidateTeamPermissionSnapshots,
+  isCurrentTeamPermissionResponse,
+  mergeTeamMemberships,
+  subscribeTeamAuthenticationInvalidation,
+  subscribeTeamPermissionInvalidation,
+  synchronizeTeamPermissionSession,
+  type TeamPermissionRequestIdentity,
+  type TeamPermissionSnapshot,
+} from './teamPermissionContext'
+import { ParsedSharedHTTPFlow, parseSharedHTTPFlow, parseSharedRisk } from './sharedRecordAdapters'
+import {
+  SharedHTTPFlowDetail,
+  TEAM_SHARED_RECORDS_REFRESH_EVENT,
+  type TeamSharedRecordsRefreshDetail,
+} from './SharedHTTPFlowDetail'
 import styles from './TeamCollaborationPage.module.css'
 
 type ApiEntity = Record<string, any>
@@ -49,6 +71,59 @@ interface SharedRecordSaveRequest {
   requestId: number
   kind: SharedRecordKind
   context: SharedRecordContext
+}
+
+interface ParsedSharedHTTPRecord {
+  record: ApiEntity
+  parsed: ParsedSharedHTTPFlow
+}
+
+interface SharedHTTPIndexBuild {
+  requestId: number
+  completion: Promise<void>
+}
+
+const HTTP_FLOW_DEDUPLICATION_PATTERN = /^http-flow:([a-f0-9]{64})$/
+const RISK_DEDUPLICATION_PATTERN = /^risk:([a-f0-9]{64})$/
+
+const hasExactRemoteRecordIdentity = (
+  record: ApiEntity,
+  recordId: string,
+  teamId: string,
+  projectId: string,
+): boolean =>
+  Number.isSafeInteger(record.id) &&
+  record.id > 0 &&
+  record.id === Number(recordId) &&
+  record.team_id === Number(teamId) &&
+  record.project_id === Number(projectId)
+
+const getRemoteSharedHTTPFlowKey = (record: ApiEntity, recordId: string, teamId: string, projectId: string): string => {
+  if (
+    !hasExactRemoteRecordIdentity(record, recordId, teamId, projectId) ||
+    record.data_type !== 'http_flow' ||
+    record.status !== 'active'
+  ) {
+    throw new Error('共享 HTTP Flow 记录身份无效')
+  }
+  const deduplication = HTTP_FLOW_DEDUPLICATION_PATTERN.exec(record.deduplication_key)
+  if (!deduplication) throw new Error('共享 HTTP Flow 去重标识无效')
+  return deduplication[1]
+}
+
+const parseRemoteSharedHTTPRecord = async (
+  record: ApiEntity,
+  recordId: string,
+  teamId: string,
+  projectId: string,
+): Promise<ParsedSharedHTTPFlow> => {
+  const expectedFlowKey = getRemoteSharedHTTPFlowKey(record, recordId, teamId, projectId)
+  if (typeof record.content !== 'string' || !record.content) {
+    throw new Error('共享 HTTP Flow 记录身份无效')
+  }
+  const parsed = await parseSharedHTTPFlow(record.content)
+  if (expectedFlowKey !== parsed.flowKey) throw new Error('共享 HTTP Flow 去重标识不匹配')
+  return parsed
 }
 
 const isSameRecordContext = (current: SharedRecordContext, expected: SharedRecordContext): boolean =>
@@ -121,49 +196,14 @@ const formatTime = (value: any): string => {
   return Number.isNaN(time.getTime()) ? `${value}` : time.toLocaleString('zh-CN', { hour12: false })
 }
 
-const getMembershipTeamId = (membership: ApiEntity): string => {
-  const teamId = getId(getValue(membership, ['team'], undefined))
-  if (teamId) return teamId
-  return `${getValue(membership, ['team_id', 'teamId'], getValue(membership?.member, ['team_id', 'teamId']))}`
+const toPositiveTeamId = (value: string | number | null | undefined): number | null => {
+  const teamId = Number(value)
+  return Number.isSafeInteger(teamId) && teamId > 0 ? teamId : null
 }
 
-const mergeTeamMemberships = (teams: ApiEntity[], memberships: ApiEntity[]): ApiEntity[] => {
-  const membershipByTeamId = new Map<string, ApiEntity>()
-  memberships.forEach((membership) => {
-    const teamId = getMembershipTeamId(membership)
-    if (teamId) membershipByTeamId.set(teamId, membership)
-  })
-  return teams.map((team) => {
-    const membership = membershipByTeamId.get(getId(team))
-    if (!membership) return team
-    return {
-      ...team,
-      current_member: getValue(membership, ['member'], undefined),
-      current_user_roles: getValue(membership, ['roles'], []),
-      permissions: getValue(membership, ['permissions'], []),
-    }
-  })
-}
-
-const getTeamRoleCodes = (team: ApiEntity): string[] => {
-  const roles = getValue(team, ['current_user_roles', 'roles'], [])
-  const roleCodes = Array.isArray(roles)
-    ? roles.map((role) => (typeof role === 'string' ? role : getValue(role, ['code', 'name'], '')))
-    : []
-  roleCodes.push(getValue(team, ['role', 'role_name', 'roleName', 'current_user_role'], ''))
-  return roleCodes.map((role) => `${role}`.trim().toLowerCase()).filter(Boolean)
-}
-
-const hasTeamPermission = (team: ApiEntity | undefined, requiredCodes: string[]): boolean => {
-  if (!team) return false
-  if (getValue(team, ['can_write', 'canWrite'], false) === true) return true
-  if (getTeamRoleCodes(team).some((role) => ['owner', 'admin', 'administrator', 'superadmin'].includes(role))) {
-    return true
-  }
-  const permissions = getValue(team, ['permissions', 'permission_codes', 'permissionCodes'], [])
-  if (!Array.isArray(permissions)) return false
-  const permissionCodes = permissions.map((permission) => `${permission}`)
-  return permissionCodes.includes('*') || requiredCodes.some((permission) => permissionCodes.includes(permission))
+const getStableFirstTeamId = (teams: readonly CollaborationTeam[]): number | null => {
+  const teamIds = teams.map((team) => team.id).filter((teamId) => toPositiveTeamId(teamId) !== null)
+  return teamIds.length > 0 ? Math.min(...teamIds) : null
 }
 
 const roleText = (record?: ApiEntity): string => {
@@ -242,7 +282,18 @@ export const createAvailableLocalProjectCopyName = (projectName: string, localPr
 }
 
 export const TeamCollaborationPage: React.FC = React.memo(() => {
+  const userInfo = useStore((state) => state.userInfo)
+  const authenticatedUserId = Number(userInfo.user_id)
+  const authenticationSessionKey = `${
+    userInfo.isLogin ? 'authenticated' : 'logged-out'
+  }\u0000${authenticatedUserId}\u0000${userInfo.token}`
+  synchronizeTeamPermissionSession(authenticationSessionKey)
   const [teams, setTeams] = useState<ApiEntity[]>([])
+  const [permissionSnapshots, setPermissionSnapshots] = useState<ReadonlyMap<number, TeamPermissionSnapshot>>(
+    () => new Map(),
+  )
+  const [permissionSnapshotsAuthenticationSessionKey, setPermissionSnapshotsAuthenticationSessionKey] =
+    useState(authenticationSessionKey)
   const [teamMembers, setTeamMembers] = useState<ApiEntity[]>([])
   const [projects, setProjects] = useState<ApiEntity[]>([])
   const [projectMembers, setProjectMembers] = useState<ApiEntity[]>([])
@@ -266,9 +317,25 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   const [recordEditorError, setRecordEditorError] = useState('')
   const [recordDetailKind, setRecordDetailKind] = useState<SharedRecordKind>()
   const [recordDetail, setRecordDetail] = useState<ApiEntity>()
+  const [sharedHTTPDetailContent, setSharedHTTPDetailContent] = useState('')
+  const [sharedRiskDetailContent, setSharedRiskDetailContent] = useState('')
   const [recordDetailLoading, setRecordDetailLoading] = useState(false)
   const [recordDetailError, setRecordDetailError] = useState('')
   const recordDetailRequestId = useRef(0)
+  const sharedHTTPIndexRequestId = useRef(0)
+  const sharedHTTPIndexBuildRef = useRef<SharedHTTPIndexBuild>({
+    requestId: 0,
+    completion: Promise.resolve(),
+  })
+
+  useEffect(
+    () => () => {
+      recordDetailRequestId.current += 1
+    },
+    [],
+  )
+  const sharedHTTPRecordsRef = useRef<ParsedSharedHTTPRecord[]>([])
+  const [sharedHTTPRecords, setSharedHTTPRecords] = useState<ParsedSharedHTTPRecord[]>([])
   const [recordSavingKind, setRecordSavingKind] = useState<SharedRecordKind>()
   const recordSaveRequestId = useRef(0)
   const activeRecordSave = useRef<SharedRecordSaveRequest>()
@@ -285,6 +352,14 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   const [actionLoading, setActionLoading] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [syncConflict, setSyncConflict] = useState(false)
+  const selectedTeamIdRef = useRef('')
+  const permissionSnapshotsRef = useRef<ReadonlyMap<number, TeamPermissionSnapshot>>(new Map())
+  const permissionSnapshotsAuthenticationSessionKeyRef = useRef(authenticationSessionKey)
+  const permissionRequestSequence = useRef(0)
+  const currentPermissionRequest = useRef<TeamPermissionRequestIdentity>()
+  const authenticationSessionKeyRef = useRef(authenticationSessionKey)
+  const appliedAuthenticationSessionKeyRef = useRef(authenticationSessionKey)
+  authenticationSessionKeyRef.current = authenticationSessionKey
 
   const recordContext = useMemo<SharedRecordContext>(
     () => ({ teamId: selectedTeamId, projectId: selectedProjectId }),
@@ -292,8 +367,8 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   )
   const recordContextRef = useRef(recordContext)
   recordContextRef.current = recordContext
+  selectedTeamIdRef.current = selectedTeamId
 
-  const selectedTeam = useMemo(() => teams.find((team) => getId(team) === selectedTeamId), [selectedTeamId, teams])
   const selectedProject = useMemo(
     () => projects.find((project) => getId(project) === selectedProjectId),
     [projects, selectedProjectId],
@@ -310,140 +385,292 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     })
     return index
   }, [teamMembers])
-  const canManageProject = useMemo(() => hasTeamPermission(selectedTeam, ['project.manage']), [selectedTeam])
-  const canWriteTestData = useMemo(() => hasTeamPermission(selectedTeam, ['test_data.write']), [selectedTeam])
-  const canWriteTestResult = useMemo(() => hasTeamPermission(selectedTeam, ['test_result.write']), [selectedTeam])
-  const canReadAudit = useMemo(() => hasTeamPermission(selectedTeam, ['audit.read']), [selectedTeam])
+  const sharedHTTPRecordById = useMemo(
+    () => new Map(sharedHTTPRecords.map((entry) => [getId(entry.record), entry])),
+    [sharedHTTPRecords],
+  )
+  const selectedTeamPermission = useMemo(() => {
+    if (permissionSnapshotsAuthenticationSessionKey !== authenticationSessionKey) return undefined
+    const teamId = toPositiveTeamId(selectedTeamId)
+    return teamId === null ? undefined : permissionSnapshots.get(teamId)
+  }, [authenticationSessionKey, permissionSnapshots, permissionSnapshotsAuthenticationSessionKey, selectedTeamId])
+  const canReadMembers = hasExactTeamPermission(selectedTeamPermission, 'member.read')
+  const canReadProject = hasExactTeamPermission(selectedTeamPermission, 'project.read')
+  const canReadProjectMembers = hasExactTeamPermission(selectedTeamPermission, 'project_member.read')
+  const canReadTestData = hasExactTeamPermission(selectedTeamPermission, 'test_data.read')
+  const canReadTestResult = hasExactTeamPermission(selectedTeamPermission, 'test_result.read')
+  const canReadAudit = hasExactTeamPermission(selectedTeamPermission, 'audit.read')
+  const canManageProject = hasExactTeamPermission(selectedTeamPermission, 'project.manage')
+  const canWriteTestData = hasExactTeamPermission(selectedTeamPermission, 'test_data.write')
+  const canWriteTestResult = hasExactTeamPermission(selectedTeamPermission, 'test_result.write')
   const canPublishProject = canManageProject && canWriteTestData
   const canWrite = canManageProject || canWriteTestData || canWriteTestResult
 
-  const loadTeams = useCallback(async () => {
-    setLoading(true)
-    setErrorMessage('')
-    try {
-      const [teamResponse, currentUserResponse] = await Promise.all([
-        callApi(listTeams as ApiFunction),
-        callApi(getMe as ApiFunction),
-      ])
-      const nextTeams = mergeTeamMemberships(
-        getList(teamResponse, ['teams']),
-        getList(currentUserResponse, ['memberships']),
+  const commitPermissionSnapshots = useCallback(
+    (
+      next: ReadonlyMap<number, TeamPermissionSnapshot>,
+      boundAuthenticationSessionKey = authenticationSessionKeyRef.current,
+    ) => {
+      permissionSnapshotsAuthenticationSessionKeyRef.current = boundAuthenticationSessionKey
+      permissionSnapshotsRef.current = next
+      setPermissionSnapshotsAuthenticationSessionKey(boundAuthenticationSessionKey)
+      setPermissionSnapshots(next)
+    },
+    [],
+  )
+
+  const invalidatePermissionSnapshot = useCallback(
+    (teamId: number) => {
+      const next = invalidateTeamPermissionSnapshots(
+        permissionSnapshotsRef.current,
+        permissionSnapshotsAuthenticationSessionKeyRef.current,
+        authenticationSessionKeyRef.current,
+        teamId,
       )
-      setTeams(nextTeams)
-      setSelectedTeamId((current) => {
-        if (nextTeams.some((team) => getId(team) === current)) return current
-        return getId(nextTeams[0])
-      })
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error))
-      setTeams([])
-      setSelectedTeamId('')
-    } finally {
-      setLoading(false)
+      commitPermissionSnapshots(next.snapshots, next.authenticationSessionKey)
+    },
+    [commitPermissionSnapshots],
+  )
+
+  const hasActiveTeamPermission = useCallback((code: string): boolean => {
+    if (permissionSnapshotsAuthenticationSessionKeyRef.current !== authenticationSessionKeyRef.current) {
+      return false
     }
+    const teamId = toPositiveTeamId(selectedTeamIdRef.current)
+    return teamId !== null && hasExactTeamPermission(permissionSnapshotsRef.current.get(teamId), code)
   }, [])
 
-  const loadTeamContext = useCallback(async (teamId: string) => {
-    if (!teamId) {
-      teamContextRequestId.current += 1
-      setTeamMembers([])
-      setProjects([])
-      setSelectedProjectId('')
-      setDetailLoading(false)
-      return
-    }
-    if (recordContextRef.current.teamId !== teamId) return
-    const requestId = teamContextRequestId.current + 1
-    teamContextRequestId.current = requestId
-    setTeamMembers([])
-    setProjects([])
-    setDetailLoading(true)
-    setErrorMessage('')
-    const [memberResult, projectResult] = await Promise.allSettled([
-      callApi(listTeamMembers as ApiFunction, teamId),
-      callApi(listTeamProjects as ApiFunction, teamId),
-    ])
-    if (teamContextRequestId.current !== requestId || recordContextRef.current.teamId !== teamId) return
-    if (memberResult.status === 'fulfilled') {
-      setTeamMembers(getList(memberResult.value, ['members']))
-    } else {
-      setTeamMembers([])
-      setErrorMessage(getErrorMessage(memberResult.reason))
-    }
-    if (projectResult.status === 'fulfilled') {
-      const nextProjects = getList(projectResult.value, ['projects'])
-      setProjects(nextProjects)
-      setSelectedProjectId((current) => {
-        if (nextProjects.some((project) => getId(project) === current)) return current
-        return getId(nextProjects[0])
-      })
-    } else {
-      setProjects([])
-      setSelectedProjectId('')
-      setErrorMessage(getErrorMessage(projectResult.reason))
-    }
-    setDetailLoading(false)
-  }, [])
+  const loadTeams = useCallback(
+    async (requestedTeamId: number | null) => {
+      if (!userInfo.isLogin || !Number.isSafeInteger(authenticatedUserId) || authenticatedUserId <= 0) {
+        currentPermissionRequest.current = undefined
+        commitPermissionSnapshots(new Map(), authenticationSessionKey)
+        setTeams([])
+        selectedTeamIdRef.current = ''
+        setSelectedTeamId('')
+        setLoading(false)
+        return
+      }
 
-  const loadSync = useCallback(async (teamId: string, projectId: string) => {
-    if (
-      !teamId ||
-      !projectId ||
-      recordContextRef.current.teamId !== teamId ||
-      recordContextRef.current.projectId !== projectId
-    ) {
-      return
-    }
-    const requestId = syncRequestId.current + 1
-    syncRequestId.current = requestId
-    const isCurrentRequest = () =>
-      syncRequestId.current === requestId &&
-      recordContextRef.current.teamId === teamId &&
-      recordContextRef.current.projectId === projectId
-    setSyncLoading(true)
-    setSnapshotReady(false)
-    setSyncConflict(false)
-    try {
-      const response = await callApi(getProjectSync as ApiFunction, teamId, projectId)
-      if (!isCurrentRequest()) return
-      const nextSync = (response?.data || response) as ApiEntity
-      setSyncInfo(nextSync)
-      const tombstones: ApiEntity = nextSync.tombstones ?? {}
-      const syncedProjectMembers = Array.isArray(nextSync.project_members) ? nextSync.project_members : undefined
-      const syncedTestData = Array.isArray(nextSync.test_data) ? nextSync.test_data : undefined
-      const syncedTestResults = Array.isArray(nextSync.test_results) ? nextSync.test_results : undefined
-      const deletedProjectMembers = Array.isArray(tombstones?.project_members) ? tombstones.project_members : []
-      const deletedTestData = Array.isArray(tombstones?.test_data) ? tombstones.test_data : []
-      const deletedTestResults = Array.isArray(tombstones?.test_results) ? tombstones.test_results : []
-      if (syncedProjectMembers || deletedProjectMembers.length) {
-        setProjectMembers((current) => mergeSyncedRecords(current, syncedProjectMembers, deletedProjectMembers))
+      const requestIdentity: TeamPermissionRequestIdentity = {
+        userId: authenticatedUserId,
+        teamId: requestedTeamId,
+        requestSequence: permissionRequestSequence.current + 1,
       }
-      if (syncedTestData || deletedTestData.length) {
-        setTestData((current) => mergeSyncedRecords(current, syncedTestData, deletedTestData))
-      }
-      if (syncedTestResults || deletedTestResults.length) {
-        setTestResults((current) => mergeSyncedRecords(current, syncedTestResults, deletedTestResults))
-      }
-      const nextSnapshot = Object.prototype.hasOwnProperty.call(nextSync, 'snapshot')
-        ? nextSync.snapshot
-        : nextSync.project?.snapshot
-      const nextSnapshotText = formatProjectSnapshot(nextSnapshot)
-      if (nextSnapshotText !== undefined) setSnapshotText(nextSnapshotText)
-      setSnapshotReady(nextSnapshotText !== undefined)
-    } catch (error) {
-      if (!isCurrentRequest()) return
-      if (getErrorStatus(error) === 409 || getErrorMessage(error).includes('version_conflict')) {
-        setSyncConflict(true)
+      permissionRequestSequence.current = requestIdentity.requestSequence
+      currentPermissionRequest.current = requestIdentity
+      if (requestedTeamId === null) {
+        commitPermissionSnapshots(new Map(), authenticationSessionKey)
       } else {
-        setErrorMessage(getErrorMessage(error))
+        invalidatePermissionSnapshot(requestedTeamId)
       }
-    } finally {
-      if (isCurrentRequest()) setSyncLoading(false)
-    }
-  }, [])
+      setLoading(true)
+      setErrorMessage('')
+      try {
+        const [teamResponse, currentUserResponse] = await Promise.all([
+          callApi(listTeams as ApiFunction),
+          callApi(getMe as ApiFunction),
+        ])
+        if (
+          !currentPermissionRequest.current ||
+          !isCurrentTeamPermissionResponse(currentPermissionRequest.current, requestIdentity) ||
+          authenticationSessionKeyRef.current !== authenticationSessionKey
+        ) {
+          return
+        }
+
+        const currentUser = (currentUserResponse?.data || currentUserResponse) as CurrentCollaborationUser
+        if (
+          !currentUser?.user ||
+          currentUser.user.id !== authenticatedUserId ||
+          !Array.isArray(currentUser.memberships)
+        ) {
+          commitPermissionSnapshots(new Map(), authenticationSessionKey)
+          throw new Error('团队权限响应用户不匹配')
+        }
+
+        const nextTeams = mergeTeamMemberships(
+          getList(teamResponse, ['teams']) as CollaborationTeam[],
+          currentUser.memberships,
+        )
+        const responseSnapshots = buildTeamPermissionSnapshots(currentUser)
+        let activeTeamId = requestedTeamId
+        if (requestedTeamId === null) {
+          if (selectedTeamIdRef.current) return
+          activeTeamId = getStableFirstTeamId(nextTeams)
+        } else if (selectedTeamIdRef.current !== `${requestedTeamId}`) {
+          return
+        }
+
+        if (activeTeamId !== null && !nextTeams.some((team) => team.id === activeTeamId)) {
+          activeTeamId = null
+        }
+        setTeams(nextTeams)
+        selectedTeamIdRef.current = activeTeamId === null ? '' : `${activeTeamId}`
+        setSelectedTeamId(selectedTeamIdRef.current)
+        commitPermissionSnapshots(new Map(), authenticationSessionKey)
+        if (activeTeamId === null) return
+
+        const snapshot = responseSnapshots.get(activeTeamId)
+        if (!snapshot) return
+        if (
+          !acceptTeamPermissionMemberVersion(
+            authenticationSessionKey,
+            snapshot.userId,
+            snapshot.teamId,
+            snapshot.memberVersion,
+          )
+        ) {
+          return
+        }
+        commitPermissionSnapshots(new Map([[activeTeamId, snapshot]]), authenticationSessionKey)
+      } catch (error) {
+        if (
+          !currentPermissionRequest.current ||
+          !isCurrentTeamPermissionResponse(currentPermissionRequest.current, requestIdentity) ||
+          authenticationSessionKeyRef.current !== authenticationSessionKey
+        ) {
+          return
+        }
+        setErrorMessage(getErrorMessage(error))
+        commitPermissionSnapshots(new Map(), authenticationSessionKey)
+        setTeams([])
+        selectedTeamIdRef.current = ''
+        setSelectedTeamId('')
+      } finally {
+        if (
+          currentPermissionRequest.current &&
+          isCurrentTeamPermissionResponse(currentPermissionRequest.current, requestIdentity) &&
+          authenticationSessionKeyRef.current === authenticationSessionKey
+        ) {
+          setLoading(false)
+        }
+      }
+    },
+    [
+      authenticatedUserId,
+      authenticationSessionKey,
+      commitPermissionSnapshots,
+      invalidatePermissionSnapshot,
+      userInfo.isLogin,
+    ],
+  )
+
+  const loadTeamContext = useCallback(
+    async (teamId: string) => {
+      const memberReadable = canReadMembers && hasActiveTeamPermission('member.read')
+      const projectReadable = canReadProject && hasActiveTeamPermission('project.read')
+      if (!teamId || (!memberReadable && !projectReadable)) {
+        teamContextRequestId.current += 1
+        setTeamMembers([])
+        setProjects([])
+        setSelectedProjectId('')
+        setDetailLoading(false)
+        return
+      }
+      if (recordContextRef.current.teamId !== teamId) return
+      const requestId = teamContextRequestId.current + 1
+      teamContextRequestId.current = requestId
+      setTeamMembers([])
+      setProjects([])
+      setDetailLoading(true)
+      setErrorMessage('')
+      const [memberResult, projectResult] = await Promise.allSettled([
+        memberReadable ? callApi(listTeamMembers as ApiFunction, teamId) : Promise.resolve([]),
+        projectReadable ? callApi(listTeamProjects as ApiFunction, teamId) : Promise.resolve([]),
+      ])
+      if (teamContextRequestId.current !== requestId || recordContextRef.current.teamId !== teamId) return
+      if (memberResult.status === 'fulfilled') {
+        setTeamMembers(getList(memberResult.value, ['members']))
+      } else {
+        setTeamMembers([])
+        setErrorMessage(getErrorMessage(memberResult.reason))
+      }
+      if (projectResult.status === 'fulfilled') {
+        const nextProjects = getList(projectResult.value, ['projects'])
+        setProjects(nextProjects)
+        setSelectedProjectId((current) => {
+          if (nextProjects.some((project) => getId(project) === current)) return current
+          return getId(nextProjects[0])
+        })
+      } else {
+        setProjects([])
+        setSelectedProjectId('')
+        setErrorMessage(getErrorMessage(projectResult.reason))
+      }
+      setDetailLoading(false)
+    },
+    [canReadMembers, canReadProject, hasActiveTeamPermission],
+  )
+
+  const loadSync = useCallback(
+    async (teamId: string, projectId: string) => {
+      if (
+        !teamId ||
+        !projectId ||
+        !canReadProject ||
+        !hasActiveTeamPermission('project.read') ||
+        recordContextRef.current.teamId !== teamId ||
+        recordContextRef.current.projectId !== projectId
+      ) {
+        return
+      }
+      const requestId = syncRequestId.current + 1
+      syncRequestId.current = requestId
+      const isCurrentRequest = () =>
+        syncRequestId.current === requestId &&
+        recordContextRef.current.teamId === teamId &&
+        recordContextRef.current.projectId === projectId
+      setSyncLoading(true)
+      setSnapshotReady(false)
+      setSyncConflict(false)
+      try {
+        const response = await callApi(getProjectSync as ApiFunction, teamId, projectId)
+        if (!isCurrentRequest()) return
+        const nextSync = (response?.data || response) as ApiEntity
+        setSyncInfo(nextSync)
+        const tombstones: ApiEntity = nextSync.tombstones ?? {}
+        const syncedProjectMembers = Array.isArray(nextSync.project_members) ? nextSync.project_members : undefined
+        const syncedTestData = Array.isArray(nextSync.test_data) ? nextSync.test_data : undefined
+        const syncedTestResults = Array.isArray(nextSync.test_results) ? nextSync.test_results : undefined
+        const deletedProjectMembers = Array.isArray(tombstones?.project_members) ? tombstones.project_members : []
+        const deletedTestData = Array.isArray(tombstones?.test_data) ? tombstones.test_data : []
+        const deletedTestResults = Array.isArray(tombstones?.test_results) ? tombstones.test_results : []
+        if (syncedProjectMembers || deletedProjectMembers.length) {
+          setProjectMembers((current) => mergeSyncedRecords(current, syncedProjectMembers, deletedProjectMembers))
+        }
+        if (syncedTestData || deletedTestData.length) {
+          setTestData((current) => mergeSyncedRecords(current, syncedTestData, deletedTestData))
+        }
+        if (syncedTestResults || deletedTestResults.length) {
+          setTestResults((current) => mergeSyncedRecords(current, syncedTestResults, deletedTestResults))
+        }
+        const nextSnapshot = Object.prototype.hasOwnProperty.call(nextSync, 'snapshot')
+          ? nextSync.snapshot
+          : nextSync.project?.snapshot
+        const nextSnapshotText = formatProjectSnapshot(nextSnapshot)
+        if (nextSnapshotText !== undefined) setSnapshotText(nextSnapshotText)
+        setSnapshotReady(nextSnapshotText !== undefined)
+      } catch (error) {
+        if (!isCurrentRequest()) return
+        if (getErrorStatus(error) === 409 || getErrorMessage(error).includes('version_conflict')) {
+          setSyncConflict(true)
+        } else {
+          setErrorMessage(getErrorMessage(error))
+        }
+      } finally {
+        if (isCurrentRequest()) setSyncLoading(false)
+      }
+    },
+    [canReadProject, hasActiveTeamPermission],
+  )
 
   const loadProjectContext = useCallback(
     async (teamId: string, projectId: string) => {
+      const projectMembersReadable = canReadProjectMembers && hasActiveTeamPermission('project_member.read')
+      const testDataReadable = canReadTestData && hasActiveTeamPermission('test_data.read')
+      const testResultReadable = canReadTestResult && hasActiveTeamPermission('test_result.read')
+      const auditReadable = canReadAudit && hasActiveTeamPermission('audit.read')
       if (!teamId || !projectId) {
         projectContextRequestId.current += 1
         setProjectMembers([])
@@ -454,6 +681,23 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
         return
       }
       if (recordContextRef.current.teamId !== teamId || recordContextRef.current.projectId !== projectId) return
+      recordDetailRequestId.current += 1
+      setRecordDetailKind(undefined)
+      setRecordDetail(undefined)
+      setSharedHTTPDetailContent('')
+      setSharedRiskDetailContent('')
+      setRecordDetailLoading(false)
+      setRecordDetailError('')
+      if (!projectMembersReadable && !testDataReadable && !testResultReadable && !auditReadable) {
+        projectContextRequestId.current += 1
+        setProjectMembers([])
+        setTestData([])
+        setTestResults([])
+        setAuditLogs([])
+        setDetailLoading(false)
+        await loadSync(teamId, projectId)
+        return
+      }
       const requestId = projectContextRequestId.current + 1
       projectContextRequestId.current = requestId
       setProjectMembers([])
@@ -462,13 +706,13 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       setAuditLogs([])
       setDetailLoading(true)
       setErrorMessage('')
-      const auditRequest = canReadAudit
+      const auditRequest = auditReadable
         ? callApi(listAuditLogs as ApiFunction, teamId, { project_id: projectId })
         : Promise.resolve([])
       const [memberResult, dataResult, resultResult, auditResult] = await Promise.allSettled([
-        callApi(listProjectMembers as ApiFunction, teamId, projectId),
-        callApi(listTestData as ApiFunction, teamId, projectId),
-        callApi(listTestResults as ApiFunction, teamId, projectId),
+        projectMembersReadable ? callApi(listProjectMembers as ApiFunction, teamId, projectId) : Promise.resolve([]),
+        testDataReadable ? callApi(listTestData as ApiFunction, teamId, projectId) : Promise.resolve([]),
+        testResultReadable ? callApi(listTestResults as ApiFunction, teamId, projectId) : Promise.resolve([]),
         auditRequest,
       ])
       if (
@@ -491,7 +735,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       setDetailLoading(false)
       await loadSync(teamId, projectId)
     },
-    [canReadAudit, loadSync],
+    [canReadAudit, canReadProjectMembers, canReadTestData, canReadTestResult, hasActiveTeamPermission, loadSync],
   )
 
   const loadLocalProjects = useCallback(async () => {
@@ -517,9 +761,119 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     }
   }, [])
 
+  const refreshCurrentContext = useCallback(async () => {
+    const teamId = toPositiveTeamId(selectedTeamIdRef.current)
+    const currentContext = recordContextRef.current
+    await loadTeams(teamId)
+    if (teamId !== null && selectedTeamIdRef.current === String(teamId)) {
+      await loadTeamContext(String(teamId))
+      if (
+        currentContext.teamId === String(teamId) &&
+        currentContext.projectId &&
+        recordContextRef.current.teamId === currentContext.teamId &&
+        recordContextRef.current.projectId === currentContext.projectId
+      ) {
+        await loadProjectContext(currentContext.teamId, currentContext.projectId)
+      }
+    }
+    await loadLocalProjects()
+  }, [loadLocalProjects, loadProjectContext, loadTeamContext, loadTeams])
+
+  const handleTeamChange = useCallback(
+    (value: string | number) => {
+      const teamId = toPositiveTeamId(value)
+      commitPermissionSnapshots(new Map())
+      selectedTeamIdRef.current = teamId === null ? '' : `${teamId}`
+      setSelectedTeamId(selectedTeamIdRef.current)
+      if (teamId === null) {
+        permissionRequestSequence.current += 1
+        currentPermissionRequest.current = undefined
+        return
+      }
+      void loadTeams(teamId)
+    },
+    [commitPermissionSnapshots, loadTeams],
+  )
+
+  const invalidateAuthenticationSession = useCallback(() => {
+    permissionRequestSequence.current += 1
+    currentPermissionRequest.current = undefined
+    teamContextRequestId.current += 1
+    projectContextRequestId.current += 1
+    syncRequestId.current += 1
+    snapshotRequestId.current += 1
+    recordDetailRequestId.current += 1
+    recordSaveRequestId.current += 1
+    activeRecordSave.current = undefined
+    commitPermissionSnapshots(new Map(), authenticationSessionKeyRef.current)
+    setTeams([])
+    selectedTeamIdRef.current = ''
+    setSelectedTeamId('')
+    setTeamMembers([])
+    setProjects([])
+    setSelectedProjectId('')
+    setProjectMembers([])
+    setTestData([])
+    setTestResults([])
+    setAuditLogs([])
+    setSyncInfo(undefined)
+    setLoading(false)
+    setDetailLoading(false)
+    setSyncLoading(false)
+    setSnapshotLoading(false)
+    setRecordSavingKind(undefined)
+    setRecordEditorKind(undefined)
+    setRecordDraft(createSharedRecordDraft('test-data'))
+    setRecordEditorError('')
+    setTestDataName('')
+    setTestResultName('')
+    sharedHTTPIndexRequestId.current += 1
+    sharedHTTPIndexBuildRef.current = {
+      requestId: sharedHTTPIndexRequestId.current,
+      completion: Promise.resolve(),
+    }
+    sharedHTTPRecordsRef.current = []
+    setSharedHTTPRecords([])
+    setRecordDetailKind(undefined)
+    setRecordDetail(undefined)
+    setSharedHTTPDetailContent('')
+    setSharedRiskDetailContent('')
+    setRecordDetailLoading(false)
+    setRecordDetailError('')
+  }, [commitPermissionSnapshots])
+
   useEffect(() => {
-    loadTeams()
-    loadLocalProjects()
+    if (appliedAuthenticationSessionKeyRef.current === authenticationSessionKey) return
+    appliedAuthenticationSessionKeyRef.current = authenticationSessionKey
+    invalidateAuthenticationSession()
+  }, [authenticationSessionKey, invalidateAuthenticationSession])
+
+  useEffect(() => {
+    const unsubscribePermissionInvalidation = subscribeTeamPermissionInvalidation((teamId) => {
+      invalidatePermissionSnapshot(teamId)
+      if (toPositiveTeamId(selectedTeamIdRef.current) === teamId) {
+        recordDetailRequestId.current += 1
+        setRecordDetailKind(undefined)
+        setRecordDetail(undefined)
+        setSharedHTTPDetailContent('')
+        setSharedRiskDetailContent('')
+        setRecordDetailLoading(false)
+        setRecordDetailError('')
+        void loadTeams(teamId)
+      }
+    })
+    const unsubscribeAuthenticationInvalidation = subscribeTeamAuthenticationInvalidation(
+      invalidateAuthenticationSession,
+    )
+    return () => {
+      unsubscribePermissionInvalidation()
+      unsubscribeAuthenticationInvalidation()
+    }
+  }, [invalidateAuthenticationSession, invalidatePermissionSnapshot, loadTeams])
+
+  useEffect(() => {
+    void loadTeams(toPositiveTeamId(selectedTeamIdRef.current))
+    void loadLocalProjects()
   }, [loadLocalProjects, loadTeams])
 
   useEffect(() => {
@@ -528,10 +882,6 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     setSyncConflict(false)
     loadTeamContext(selectedTeamId)
   }, [loadTeamContext, selectedTeamId])
-
-  useEffect(() => {
-    loadProjectContext(selectedTeamId, selectedProjectId)
-  }, [loadProjectContext, selectedProjectId, selectedTeamId])
 
   useEffect(() => {
     syncRequestId.current += 1
@@ -548,9 +898,98 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     setRecordEditorKind(undefined)
     setRecordDetailKind(undefined)
     setRecordDetail(undefined)
+    setSharedHTTPDetailContent('')
+    setSharedRiskDetailContent('')
     setRecordDetailLoading(false)
     recordDetailRequestId.current += 1
   }, [selectedProjectId, selectedTeamId])
+
+  useEffect(() => {
+    loadProjectContext(selectedTeamId, selectedProjectId)
+  }, [loadProjectContext, selectedProjectId, selectedTeamId])
+
+  useEffect(() => {
+    const requestId = sharedHTTPIndexRequestId.current + 1
+    sharedHTTPIndexRequestId.current = requestId
+    sharedHTTPRecordsRef.current = []
+    setSharedHTTPRecords([])
+    let resolveCompletion = () => {}
+    const completion = new Promise<void>((resolve) => {
+      resolveCompletion = resolve
+    })
+    sharedHTTPIndexBuildRef.current = { requestId, completion }
+
+    const buildIndex = async () => {
+      try {
+        if (!canReadTestData || !hasActiveTeamPermission('test_data.read')) return
+        const parsedRecords = await Promise.all(
+          testData.map(async (record): Promise<ParsedSharedHTTPRecord | undefined> => {
+            const recordId = getId(record)
+            try {
+              let recordWithContent = record
+              if (record.content === undefined || record.content === '') {
+                getRemoteSharedHTTPFlowKey(record, recordId, selectedTeamId, selectedProjectId)
+                const response = await callApi(getTestData as ApiFunction, selectedTeamId, selectedProjectId, recordId)
+                recordWithContent = (response?.data || response) as ApiEntity
+              }
+              const parsed = await parseRemoteSharedHTTPRecord(
+                recordWithContent,
+                recordId,
+                selectedTeamId,
+                selectedProjectId,
+              )
+              return { record, parsed }
+            } catch {
+              return undefined
+            }
+          }),
+        )
+        if (
+          sharedHTTPIndexRequestId.current !== requestId ||
+          recordContextRef.current.teamId !== selectedTeamId ||
+          recordContextRef.current.projectId !== selectedProjectId ||
+          !hasActiveTeamPermission('test_data.read')
+        ) {
+          return
+        }
+        const next = parsedRecords.filter((record): record is ParsedSharedHTTPRecord => Boolean(record))
+        sharedHTTPRecordsRef.current = next
+        setSharedHTTPRecords(next)
+      } finally {
+        resolveCompletion()
+      }
+    }
+
+    void buildIndex()
+    return () => {
+      if (sharedHTTPIndexRequestId.current === requestId) sharedHTTPIndexRequestId.current += 1
+      resolveCompletion()
+    }
+  }, [canReadTestData, hasActiveTeamPermission, selectedProjectId, selectedTeamId, testData])
+
+  useEffect(() => {
+    const refreshSharedRecords = (event: CustomEvent<TeamSharedRecordsRefreshDetail>) => {
+      const detail: unknown = event.detail
+      if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return
+      const teamId = Reflect.get(detail, 'teamId')
+      const projectId = Reflect.get(detail, 'projectId')
+      if (
+        !Number.isSafeInteger(teamId) ||
+        teamId <= 0 ||
+        !Number.isSafeInteger(projectId) ||
+        projectId <= 0 ||
+        recordContextRef.current.teamId !== String(teamId) ||
+        recordContextRef.current.projectId !== String(projectId)
+      ) {
+        return
+      }
+      void loadProjectContext(String(teamId), String(projectId))
+    }
+    window.addEventListener(TEAM_SHARED_RECORDS_REFRESH_EVENT, refreshSharedRecords)
+    return () => {
+      window.removeEventListener(TEAM_SHARED_RECORDS_REFRESH_EVENT, refreshSharedRecords)
+    }
+  }, [loadProjectContext])
 
   useEffect(() => {
     const name = getValue(selectedProject, ['name', 'project_name', 'projectName'], '')
@@ -563,7 +1002,16 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   }, [])
 
   const publishLocalProject = useCallback(async () => {
-    if (!selectedTeamId || !selectedProjectId || !selectedLocalProject || !canPublishProject) return
+    if (
+      !selectedTeamId ||
+      !selectedProjectId ||
+      !selectedLocalProject ||
+      !canPublishProject ||
+      !hasActiveTeamPermission('project.manage') ||
+      !hasActiveTeamPermission('test_data.write')
+    ) {
+      return
+    }
     setActionLoading('publish-project-bundle')
     setErrorMessage('')
     setBundleMessage('')
@@ -590,6 +1038,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     }
   }, [
     canPublishProject,
+    hasActiveTeamPermission,
     loadProjectContext,
     loadTeamContext,
     selectedLocalProject,
@@ -600,7 +1049,15 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
 
   const executeProjectDownload = useCallback(
     async (name: string, overwriteProject?: ApiEntity) => {
-      if (!selectedTeamId || !selectedProjectId || !name) return
+      if (
+        !selectedTeamId ||
+        !selectedProjectId ||
+        !name ||
+        !canReadProject ||
+        !hasActiveTeamPermission('project.read')
+      ) {
+        return false
+      }
       setActionLoading('download-project-bundle')
       setErrorMessage('')
       setBundleMessage('')
@@ -640,7 +1097,15 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
         setActionLoading('')
       }
     },
-    [loadLocalProjects, selectedProjectId, selectedTeamId, syncInfo, updateBundleProgress],
+    [
+      canReadProject,
+      hasActiveTeamPermission,
+      loadLocalProjects,
+      selectedProjectId,
+      selectedTeamId,
+      syncInfo,
+      updateBundleProgress,
+    ],
   )
 
   const downloadLocalProject = useCallback(async () => {
@@ -674,7 +1139,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
 
   const createProject = useCallback(async () => {
     const name = projectName.trim()
-    if (!selectedTeamId || !canManageProject || !name) return
+    if (!selectedTeamId || !canManageProject || !hasActiveTeamPermission('project.manage') || !name) return
     setActionLoading('create-project')
     setErrorMessage('')
     try {
@@ -686,11 +1151,13 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     } finally {
       setActionLoading('')
     }
-  }, [canManageProject, loadTeamContext, projectName, selectedTeamId])
+  }, [canManageProject, hasActiveTeamPermission, loadTeamContext, projectName, selectedTeamId])
 
   const updateSnapshot = useCallback(async () => {
     const { teamId, projectId } = recordContext
-    if (!teamId || !projectId || !canManageProject || !snapshotReady) return
+    if (!teamId || !projectId || !canManageProject || !hasActiveTeamPermission('project.manage') || !snapshotReady) {
+      return
+    }
     let snapshot: ApiEntity
     try {
       snapshot = JSON.parse(snapshotText)
@@ -723,7 +1190,16 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     } finally {
       if (isCurrentRequest()) setSnapshotLoading(false)
     }
-  }, [canManageProject, loadSync, recordContext, selectedProject, snapshotReady, snapshotText, syncInfo])
+  }, [
+    canManageProject,
+    hasActiveTeamPermission,
+    loadSync,
+    recordContext,
+    selectedProject,
+    snapshotReady,
+    snapshotText,
+    syncInfo,
+  ])
 
   const openRecordEditor = useCallback((kind: SharedRecordKind) => {
     setRecordEditorKind(kind)
@@ -740,7 +1216,15 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     const name = testDataName.trim()
     const type = recordDraft.type.trim()
     const { teamId, projectId } = recordContext
-    if (!teamId || !projectId || !canWriteTestData || !name || !type || !recordDraft.content.trim()) {
+    if (
+      !teamId ||
+      !projectId ||
+      !canWriteTestData ||
+      !hasActiveTeamPermission('test_data.write') ||
+      !name ||
+      !type ||
+      !recordDraft.content.trim()
+    ) {
       return
     }
     let metadata: Record<string, unknown>
@@ -779,6 +1263,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
         setRecordSavingKind(undefined)
       }
       try {
+        if (!hasActiveTeamPermission('test_data.read')) return
         const response = await callApi(listTestData as ApiFunction, teamId, projectId)
         if (
           recordSaveRequestId.current !== requestId ||
@@ -803,13 +1288,21 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
         setRecordSavingKind(undefined)
       }
     }
-  }, [canWriteTestData, recordContext, recordDraft, testDataName])
+  }, [canWriteTestData, hasActiveTeamPermission, recordContext, recordDraft, testDataName])
 
   const addTestResult = useCallback(async () => {
     const name = testResultName.trim()
     const type = recordDraft.type.trim()
     const { teamId, projectId } = recordContext
-    if (!teamId || !projectId || !canWriteTestResult || !name || !type || !recordDraft.content.trim()) {
+    if (
+      !teamId ||
+      !projectId ||
+      !canWriteTestResult ||
+      !hasActiveTeamPermission('test_result.write') ||
+      !name ||
+      !type ||
+      !recordDraft.content.trim()
+    ) {
       return
     }
     let metadata: Record<string, unknown>
@@ -851,6 +1344,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
         setRecordSavingKind(undefined)
       }
       try {
+        if (!hasActiveTeamPermission('test_result.read')) return
         const response = await callApi(listTestResults as ApiFunction, teamId, projectId)
         if (
           recordSaveRequestId.current !== requestId ||
@@ -875,48 +1369,145 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
         setRecordSavingKind(undefined)
       }
     }
-  }, [canWriteTestResult, recordContext, recordDraft, testResultName])
+  }, [canWriteTestResult, hasActiveTeamPermission, recordContext, recordDraft, testResultName])
+
+  const waitForCurrentSharedHTTPIndex = useCallback(async (isCurrentRequest: () => boolean): Promise<boolean> => {
+    while (isCurrentRequest()) {
+      const build = sharedHTTPIndexBuildRef.current
+      await build.completion
+      if (!isCurrentRequest()) return false
+      if (
+        sharedHTTPIndexBuildRef.current.requestId === build.requestId &&
+        sharedHTTPIndexRequestId.current === build.requestId
+      ) {
+        return true
+      }
+      if (sharedHTTPIndexBuildRef.current === build) return false
+    }
+    return false
+  }, [])
 
   const openRecordDetail = useCallback(
     async (kind: SharedRecordKind, item: ApiEntity) => {
-      if (!selectedTeamId || !selectedProjectId || !getId(item)) return
+      const permissionCode = kind === 'test-data' ? 'test_data.read' : 'test_result.read'
+      const recordId = getId(item)
+      if (!selectedTeamId || !selectedProjectId || !recordId || !hasActiveTeamPermission(permissionCode)) {
+        return
+      }
+      const context = { teamId: selectedTeamId, projectId: selectedProjectId }
+      const sharedHTTP = kind === 'test-data' && item.data_type === 'http_flow'
+      const sharedRisk = kind === 'test-result' && item.result_type === 'risk'
       const requestId = recordDetailRequestId.current + 1
       recordDetailRequestId.current = requestId
+      const isCurrentRequest = () =>
+        recordDetailRequestId.current === requestId &&
+        isSameRecordContext(recordContextRef.current, context) &&
+        hasActiveTeamPermission(permissionCode)
       setRecordDetailKind(kind)
-      setRecordDetail(item)
+      setRecordDetail(sharedHTTP || sharedRisk ? { name: item.name } : item)
+      setSharedHTTPDetailContent('')
+      setSharedRiskDetailContent('')
       setRecordDetailError('')
       setRecordDetailLoading(true)
       try {
         const response = await callApi(
           (kind === 'test-data' ? getTestData : getTestResult) as ApiFunction,
-          selectedTeamId,
-          selectedProjectId,
-          getId(item),
+          context.teamId,
+          context.projectId,
+          recordId,
         )
-        if (recordDetailRequestId.current !== requestId) return
-        setRecordDetail((response?.data || response) as ApiEntity)
+        if (!isCurrentRequest()) return
+        const freshRecord = (response?.data || response) as ApiEntity
+
+        if (sharedHTTP) {
+          await parseRemoteSharedHTTPRecord(freshRecord, recordId, context.teamId, context.projectId)
+          if (!isCurrentRequest()) return
+          setRecordDetail(freshRecord)
+          setSharedHTTPDetailContent(freshRecord.content)
+          return
+        }
+
+        if (sharedRisk) {
+          if (
+            !hasExactRemoteRecordIdentity(freshRecord, recordId, context.teamId, context.projectId) ||
+            freshRecord.result_type !== 'risk' ||
+            freshRecord.status !== 'active' ||
+            typeof freshRecord.content !== 'string' ||
+            !freshRecord.content
+          ) {
+            throw new Error('共享 Risk 记录身份无效')
+          }
+          const deduplication = RISK_DEDUPLICATION_PATTERN.exec(freshRecord.deduplication_key)
+          if (!deduplication) throw new Error('共享 Risk 去重标识无效')
+          const parsedRisk = await parseSharedRisk(freshRecord.content)
+          if (!isCurrentRequest()) return
+          if (deduplication[1] !== parsedRisk.riskKey) throw new Error('共享 Risk 去重标识不匹配')
+          if (!(await waitForCurrentSharedHTTPIndex(isCurrentRequest))) return
+
+          const linkedRecords = sharedHTTPRecordsRef.current.filter(
+            (entry) => entry.parsed.flowKey === parsedRisk.flowKey,
+          )
+          if (linkedRecords.length === 0) throw new Error('关联流量尚未同步')
+          if (linkedRecords.length > 1) throw new Error('关联流量记录不唯一')
+          const sharedHTTPIndexSequence = sharedHTTPIndexRequestId.current
+          const linkedRecordId = getId(linkedRecords[0].record)
+          const linkedResponse = await callApi(
+            getTestData as ApiFunction,
+            context.teamId,
+            context.projectId,
+            linkedRecordId,
+          )
+          if (!isCurrentRequest()) return
+          if (sharedHTTPIndexRequestId.current !== sharedHTTPIndexSequence) {
+            throw new Error('关联流量索引已更新，请重试')
+          }
+          const freshHTTPRecord = (linkedResponse?.data || linkedResponse) as ApiEntity
+          const parsedHTTP = await parseRemoteSharedHTTPRecord(
+            freshHTTPRecord,
+            linkedRecordId,
+            context.teamId,
+            context.projectId,
+          )
+          if (!isCurrentRequest()) return
+          if (sharedHTTPIndexRequestId.current !== sharedHTTPIndexSequence) {
+            throw new Error('关联流量索引已更新，请重试')
+          }
+          if (parsedHTTP.flowKey !== parsedRisk.flowKey) throw new Error('Risk 关联的 HTTP Flow 不匹配')
+          setRecordDetail(freshRecord)
+          setSharedHTTPDetailContent(freshHTTPRecord.content)
+          setSharedRiskDetailContent(freshRecord.content)
+          return
+        }
+
+        setRecordDetail(freshRecord)
       } catch (error) {
-        if (recordDetailRequestId.current !== requestId) return
+        if (!isCurrentRequest()) return
         setRecordDetailError(getErrorMessage(error))
       } finally {
-        if (recordDetailRequestId.current === requestId) setRecordDetailLoading(false)
+        if (isCurrentRequest()) setRecordDetailLoading(false)
       }
     },
-    [selectedProjectId, selectedTeamId],
+    [hasActiveTeamPermission, selectedProjectId, selectedTeamId, waitForCurrentSharedHTTPIndex],
   )
 
   const closeRecordDetail = useCallback(() => {
     recordDetailRequestId.current += 1
     setRecordDetailKind(undefined)
     setRecordDetail(undefined)
+    setSharedHTTPDetailContent('')
+    setSharedRiskDetailContent('')
     setRecordDetailLoading(false)
     setRecordDetailError('')
   }, [])
 
   const recordEditorName = recordEditorKind === 'test-data' ? testDataName : testResultName
   const recordEditorSaving = Boolean(recordEditorKind) && recordSavingKind === recordEditorKind
+  const canWriteEditedRecord =
+    (recordEditorKind === 'test-data' && canWriteTestData) || (recordEditorKind === 'test-result' && canWriteTestResult)
   const canSaveRecord =
-    Boolean(recordEditorKind) &&
+    canWriteEditedRecord &&
+    Boolean(selectedTeamId) &&
+    Boolean(selectedProjectId) &&
     Boolean(recordEditorName.trim()) &&
     Boolean(recordDraft.type.trim()) &&
     Boolean(recordDraft.content.trim())
@@ -933,11 +1524,12 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
         <div className={styles['team-selector']}>
           <span>当前团队</span>
           <YakitSelect
+            data-testid="team-selector"
             style={{ flex: 1 }}
             value={selectedTeamId || undefined}
             placeholder="请选择团队"
-            onChange={(value) => setSelectedTeamId(`${value}`)}
-            disabled={loading || teams.length === 0}
+            onChange={handleTeamChange}
+            disabled={teams.length === 0}
           >
             {teams.map((team) => (
               <YakitSelect.Option key={getId(team)} value={getId(team)}>
@@ -946,7 +1538,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
             ))}
           </YakitSelect>
           <YakitTag color={canWrite ? 'green' : 'blue'}>{canWrite ? '可编辑' : '只读'}</YakitTag>
-          <YakitButton type="outline1" onClick={loadTeams} loading={loading}>
+          <YakitButton type="outline1" onClick={() => void refreshCurrentContext()} loading={loading}>
             刷新
           </YakitButton>
         </div>
@@ -1080,11 +1672,12 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                           value={localCopyName}
                           placeholder="本地副本名称"
                           onChange={(event) => setLocalCopyName(event.target.value)}
+                          disabled={!canReadProject}
                         />
                         <YakitButton
                           type="outline1"
                           onClick={downloadLocalProject}
-                          disabled={!localCopyName.trim()}
+                          disabled={!canReadProject || !localCopyName.trim()}
                           loading={actionLoading === 'download-project-bundle'}
                         >
                           下载为本地副本
@@ -1113,6 +1706,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                           type="outline1"
                           onClick={() => loadSync(selectedTeamId, selectedProjectId)}
                           loading={syncLoading}
+                          disabled={!canReadProject}
                         >
                           重试同步
                         </YakitButton>
@@ -1130,6 +1724,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                         type="outline1"
                         onClick={() => loadSync(selectedTeamId, selectedProjectId)}
                         loading={syncLoading}
+                        disabled={!canReadProject}
                       >
                         同步项目
                       </YakitButton>
@@ -1170,9 +1765,22 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                       }
                     >
                       {(item) => (
-                        <div className={styles['result-row']} key={getId(item)}>
+                        <div
+                          className={styles['result-row']}
+                          key={getId(item)}
+                          data-testid={
+                            sharedHTTPRecordById.has(getId(item))
+                              ? `team-test-data-row-${sharedHTTPRecordById.get(getId(item))?.parsed.flowKey}`
+                              : undefined
+                          }
+                        >
                           <div>
-                            <YakitButton type="text" size="small" onClick={() => openRecordDetail('test-data', item)}>
+                            <YakitButton
+                              type="text"
+                              size="small"
+                              onClick={() => openRecordDetail('test-data', item)}
+                              disabled={!canReadTestData}
+                            >
                               {getValue(item, ['name', 'title'], '未命名数据')}
                             </YakitButton>
                             <small>{getRecordContentPreview(item)}</small>
@@ -1201,7 +1809,12 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                       {(item) => (
                         <div className={styles['result-row']} key={getId(item)}>
                           <div>
-                            <YakitButton type="text" size="small" onClick={() => openRecordDetail('test-result', item)}>
+                            <YakitButton
+                              type="text"
+                              size="small"
+                              onClick={() => openRecordDetail('test-result', item)}
+                              disabled={!canReadTestResult}
+                            >
                               {getValue(item, ['name', 'title'], '未命名结果')}
                             </YakitButton>
                             <small>{getRecordContentPreview(item, ['summary', 'message'])}</small>
@@ -1395,7 +2008,12 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                     readOnly
                   />
                 </label>
-                {recordDetailContent ? (
+                {sharedHTTPDetailContent ? (
+                  <SharedHTTPFlowDetail
+                    httpContent={sharedHTTPDetailContent}
+                    riskContent={sharedRiskDetailContent || undefined}
+                  />
+                ) : recordDetailContent ? (
                   <label>
                     <span>正文</span>
                     <YakitInput.TextArea
@@ -1436,6 +2054,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
             key="overwrite"
             type="outline1"
             loading={actionLoading === 'download-project-bundle'}
+            disabled={!canReadProject}
             onClick={overwriteConflictProject}
           >
             覆盖本地副本
@@ -1445,6 +2064,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
             type="primary"
             loading={actionLoading === 'download-project-bundle'}
             disabled={
+              !canReadProject ||
               !conflictCopyName.trim() ||
               localProjects.some((project) => getLocalProjectName(project) === conflictCopyName.trim())
             }

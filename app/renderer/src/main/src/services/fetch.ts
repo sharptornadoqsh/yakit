@@ -95,7 +95,7 @@ export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, res
       break
     case 401:
       tokenOverdue(res)
-      reject(message)
+      reject(createNetworkApiError(code, message, data))
       break
     default:
       reject((data as any)?.error ? createNetworkApiError(code, message, data) : message)

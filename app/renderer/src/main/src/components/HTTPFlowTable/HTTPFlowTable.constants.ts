@@ -204,6 +204,7 @@ export interface UpdateCacheData {
 export interface HistoryMenuData {
   key: string
   label: ReactNode
+  testId?: string
   keybindings?: string[]
   number?: number
   webSocket?: boolean

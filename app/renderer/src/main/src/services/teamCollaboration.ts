@@ -1,4 +1,8 @@
 import { NetWorkApi } from './fetch'
+import {
+  publishTeamAuthenticationInvalidation,
+  publishTeamPermissionInvalidation,
+} from '../pages/teamCollaboration/teamPermissionContext'
 
 export type V2Identifier = number | string
 export type V2Timestamp = string | number
@@ -58,6 +62,7 @@ export interface TeamMember {
   team_id: number
   user_id: number
   status: string
+  version: number
   joined_at?: V2Timestamp
   created_at?: V2Timestamp
   updated_at?: V2Timestamp
@@ -351,6 +356,17 @@ export interface TeamPlugin {
   updated_at?: V2Timestamp
 }
 
+export interface TeamPluginVersion {
+  id: number
+  team_id: number
+  plugin_id: number
+  version: number
+  file_hash: string
+  change_note: string
+  created_by: number
+  created_at: string
+}
+
 export interface CreateTeamPluginInput {
   category_id?: number
   source_name?: string
@@ -379,6 +395,8 @@ export interface ImportTeamPluginsInput {
   plugins: PluginImportEntry[]
 }
 
+export type PluginImportItemStatus = 'created' | 'updated' | 'skipped' | 'failed'
+
 export interface PluginImportResult {
   total: number
   success: number
@@ -389,8 +407,9 @@ export interface PluginImportResult {
     name: string
     source_name: string
     plugin_name: string
-    status: string
+    status: PluginImportItemStatus
     message: string
+    error?: string
     reason?: string
     skipped?: boolean
     overwritten?: boolean
@@ -403,30 +422,47 @@ export interface PluginImportResult {
   failures: Array<{ index: number; script_name: string; reason: string }>
 }
 
+export interface ProjectShareSnapshot {
+  project_name: string
+  data_count: number
+  result_count: number
+  plugin_count: number
+  archive_size: number
+  archive_sha256: string
+}
+
 export interface ProjectShare {
   id: number
   team_id: number
   project_id: number
+  snapshot_id?: number
+  binding_version: 1 | 2
   name: string
-  expires_at?: string
+  expires_at: string | null
   max_uses: number
   used_count: number
   enabled: boolean
-  revoked_at?: string
+  revoked_at: string | null
+  invalidated_at: string | null
+  invalidated_reason: string
   created_by: number
   version: number
-  created_at?: V2Timestamp
-  updated_at?: V2Timestamp
+  created_at: V2Timestamp
+  updated_at: V2Timestamp
+  snapshot?: ProjectShareSnapshot
 }
 
-export interface ProjectShareCreation extends ProjectShare {
+export interface ProjectShareCreation {
+  share: ProjectShare
   token: string
 }
 
 export interface CreateProjectShareInput {
+  bundle_id: string
   name: string
-  expires_at?: string
+  expires_at: string | null
   max_uses: number
+  enabled: boolean
 }
 
 export interface UpdateProjectShareInput {
@@ -439,24 +475,88 @@ export interface UpdateProjectShareInput {
 
 export interface ProjectSharePreview {
   share_id: number
-  share_name: string
-  team_id: number
-  project_id: number
+  snapshot_id: number
   project_name: string
-  project_description: string
-  snapshot_hash: string
-  expires_at?: string
-  max_uses: number
-  used_count: number
-  test_data_count: number
-  test_result_count: number
-  project_bundle_available: boolean
+  data_count: number
+  result_count: number
+  plugin_count: number
+  archive_size: number
+  archive_sha256: string
+  media_type: 'application/vnd.yakit.team-project-bundle.v2+zip'
 }
 
 export interface ImportProjectShareInput {
   token: string
-  project_key?: string
-  name?: string
+  project_key: string
+  name: string
+  idempotency_key: string
+}
+
+export interface ProjectShareBundleSummary {
+  id: number
+  team_id: number
+  source_project_id: number
+  bundle_id: string
+  status: 'staging' | 'finalizing' | 'ready' | 'failed'
+  failure_code: string
+  manifest_sha256: string
+  archive_sha256: string
+  file_size: number
+  chunk_size: number
+  chunk_count: number
+  uploaded_chunks: number[]
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateProjectShareBundleInput {
+  bundle_id: string
+  manifest_sha256: string
+  archive_sha256: string
+  file_size: number
+  chunk_size: 4194304
+  chunk_count: number
+  idempotency_key: string
+}
+
+export interface UploadProjectShareBundleChunkInput {
+  raw_base64: string
+  byte_length: number
+  sha256: string
+}
+
+export interface ProjectShareBundleChunk {
+  bundle_id: string
+  chunk_index: number
+  byte_length: number
+  sha256: string
+  status: 'uploaded'
+}
+
+export interface ProjectShareImportReceipt {
+  receipt_id: number
+  share_id: number
+  snapshot_id: number
+  project_id: number
+  project_key: string
+  name: string
+  status: 'prepared' | 'failed' | 'abandoned' | 'completed'
+  failure_code: string
+  lease_expires_at: string | null
+  bundle: {
+    file_size: number
+    archive_sha256: string
+    media_type: 'application/vnd.yakit.team-project-bundle.v2+zip'
+  }
+  project?: {
+    id: number
+    team_id: number
+    project_key: string
+    name: string
+    status: 'active'
+  }
+  version: number
 }
 
 export interface ProjectShareUse {
@@ -475,11 +575,30 @@ export interface ProjectShareUse {
   updated_at?: V2Timestamp
 }
 
+const getErrorStatus = (error: unknown): number => {
+  if (!error || typeof error !== 'object') return 0
+  const response = 'response' in error ? error.response : undefined
+  const responseStatus =
+    response && typeof response === 'object' && 'status' in response ? Number(response.status) : undefined
+  return responseStatus || ('status' in error ? Number(error.status) : 0)
+}
+
+const rethrowV2Error = (url: string, error: unknown): never => {
+  const status = getErrorStatus(error)
+  if (status === 401) {
+    publishTeamAuthenticationInvalidation()
+  } else if (status === 403) {
+    const match = /^v2\/teams\/([1-9][0-9]*)(?:\/|$)/.exec(url)
+    if (match) publishTeamPermissionInvalidation(Number(match[1]))
+  }
+  throw error
+}
+
 const getV2 = <P extends Record<string, unknown>, R>(url: string, params: P) =>
-  NetWorkApi<P, R>({ method: 'get', url, params })
+  NetWorkApi<P, R>({ method: 'get', url, params }).catch((error) => rethrowV2Error(url, error))
 
 const writeV2 = <P, R>(method: 'post' | 'patch' | 'put' | 'delete', url: string, data?: P) =>
-  NetWorkApi<P, R>({ method, url, data })
+  NetWorkApi<P, R>({ method, url, data }).catch((error) => rethrowV2Error(url, error))
 
 export const getMe = () => getV2<Record<string, never>, V2Response<CurrentCollaborationUser>>('v2/me', {})
 
@@ -663,6 +782,9 @@ export const listTeamPlugins = (teamId: V2Identifier, params: V2ListQuery = {}) 
 export const getTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier) =>
   getV2<Record<string, never>, V2Response<TeamPlugin>>(`v2/teams/${teamId}/plugins/${pluginId}`, {})
 
+export const listTeamPluginVersions = (teamId: V2Identifier, pluginId: V2Identifier, params: V2ListQuery = {}) =>
+  getV2<V2ListQuery, V2Response<TeamPluginVersion[]>>(`v2/teams/${teamId}/plugins/${pluginId}/versions`, params)
+
 export const createTeamPlugin = (teamId: V2Identifier, data: CreateTeamPluginInput) =>
   writeV2<CreateTeamPluginInput, V2Response<TeamPlugin>>('post', `v2/teams/${teamId}/plugins`, data)
 
@@ -734,13 +856,29 @@ export const unbindPluginGroup = (teamId: V2Identifier, pluginId: V2Identifier, 
 export const importTeamPlugins = (teamId: V2Identifier, data: ImportTeamPluginsInput) =>
   writeV2<ImportTeamPluginsInput, V2Response<PluginImportResult>>('post', `v2/teams/${teamId}/plugins/import`, data)
 
-export const downloadTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier) =>
-  NetWorkApi<Record<string, never>, ArrayBuffer>({
+export const downloadTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier) => {
+  const url = `v2/teams/${teamId}/plugins/${pluginId}/download`
+  return NetWorkApi<Record<string, never>, ArrayBuffer>({
     method: 'get',
-    url: `v2/teams/${teamId}/plugins/${pluginId}/download`,
+    url,
     params: {},
     responseType: 'arraybuffer',
-  })
+  }).catch((error) => rethrowV2Error(url, error))
+}
+
+export const downloadTeamPluginVersion = (
+  teamId: V2Identifier,
+  pluginId: V2Identifier,
+  version: number,
+): Promise<ArrayBuffer> => {
+  const url = `v2/teams/${teamId}/plugins/${pluginId}/versions/${version}/download`
+  return NetWorkApi<Record<string, never>, ArrayBuffer>({
+    method: 'get',
+    url,
+    params: {},
+    responseType: 'arraybuffer',
+  }).catch((error) => rethrowV2Error(url, error))
+}
 
 export const setPluginVisibility = (
   teamId: V2Identifier,
@@ -752,6 +890,36 @@ export const setPluginVisibility = (
     'patch',
     `v2/teams/${teamId}/plugins/${pluginId}/visibility`,
     { visibility, revision },
+  )
+
+export const createProjectShareBundle = (
+  teamId: V2Identifier,
+  projectId: V2Identifier,
+  data: CreateProjectShareBundleInput,
+) =>
+  writeV2<CreateProjectShareBundleInput, V2Response<ProjectShareBundleSummary>>(
+    'post',
+    `v2/teams/${teamId}/projects/${projectId}/share-bundles`,
+    data,
+  )
+
+export const uploadProjectShareBundleChunk = (
+  teamId: V2Identifier,
+  projectId: V2Identifier,
+  bundleId: string,
+  index: number,
+  data: UploadProjectShareBundleChunkInput,
+) =>
+  writeV2<UploadProjectShareBundleChunkInput, V2Response<ProjectShareBundleChunk>>(
+    'put',
+    `v2/teams/${teamId}/projects/${projectId}/share-bundles/${bundleId}/chunks/${index}`,
+    data,
+  )
+
+export const finalizeProjectShareBundle = (teamId: V2Identifier, projectId: V2Identifier, bundleId: string) =>
+  writeV2<undefined, V2Response<ProjectShareBundleSummary>>(
+    'post',
+    `v2/teams/${teamId}/projects/${projectId}/share-bundles/${bundleId}/finalize`,
   )
 
 export const listProjectShares = (teamId: V2Identifier, projectId: V2Identifier, params: V2ListQuery = {}) =>
@@ -781,18 +949,38 @@ export const revokeProjectShare = (
   projectId: V2Identifier,
   shareId: V2Identifier,
   version: number,
-) =>
-  NetWorkApi<{ version: number }, V2Response<ProjectShare>>({
+) => {
+  const url = `v2/teams/${teamId}/projects/${projectId}/shares/${shareId}`
+  return NetWorkApi<{ version: number }, V2Response<ProjectShare>>({
     method: 'delete',
-    url: `v2/teams/${teamId}/projects/${projectId}/shares/${shareId}`,
+    url,
     params: { version },
-  })
+  }).catch((error) => rethrowV2Error(url, error))
+}
 
 export const previewProjectShare = (token: string) =>
   writeV2<{ token: string }, V2Response<ProjectSharePreview>>('post', 'v2/project-shares/preview', { token })
 
-export const importProjectShare = (data: ImportProjectShareInput) =>
-  writeV2<ImportProjectShareInput, V2Response<CollaborationProject>>('post', 'v2/project-shares/import', data)
+export const prepareProjectShareImport = (data: ImportProjectShareInput) =>
+  writeV2<ImportProjectShareInput, V2Response<ProjectShareImportReceipt>>('post', 'v2/project-shares/import', data)
+
+export const importProjectShare = prepareProjectShareImport
+
+export const resumeProjectShareImport = (receiptId: V2Identifier) =>
+  writeV2<undefined, V2Response<ProjectShareImportReceipt>>('post', `v2/project-share-imports/${receiptId}/resume`)
+
+export const heartbeatProjectShareImport = (receiptId: V2Identifier) =>
+  writeV2<undefined, V2Response<ProjectShareImportReceipt>>('post', `v2/project-share-imports/${receiptId}/heartbeat`)
+
+export const completeProjectShareImport = (receiptId: V2Identifier) =>
+  writeV2<undefined, V2Response<ProjectShareImportReceipt>>('post', `v2/project-share-imports/${receiptId}/complete`)
+
+export const failProjectShareImport = (receiptId: V2Identifier, data: { failure_code: 'local_import_failed' }) =>
+  writeV2<{ failure_code: 'local_import_failed' }, V2Response<ProjectShareImportReceipt>>(
+    'post',
+    `v2/project-share-imports/${receiptId}/fail`,
+    data,
+  )
 
 export const listProjectShareUses = (
   teamId: V2Identifier,

@@ -1,0 +1,22 @@
+.share-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.share-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  > span {
+    color: var(--Colors-Use-Neutral-Text-1-Title);
+    font-size: 12px;
+    font-weight: 500;
+  }
+}
+
+.share-error {
+  color: var(--Colors-Use-Error-Primary);
+  font-size: 12px;
+}

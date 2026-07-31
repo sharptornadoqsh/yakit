@@ -1,19 +1,33 @@
+/// <reference types="vitest/globals" />
+
 import React from 'react'
 import { readFileSync } from 'fs'
+import { createHash } from 'crypto'
+import { resolve } from 'path'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useStore } from '@/store'
+import {
+  publishTeamAuthenticationInvalidation,
+  publishTeamPermissionInvalidation,
+} from '@/pages/teamCollaboration/teamPermissionContext'
 
 const mocks = vi.hoisted(() => ({
+  apiQueryYakScriptBase: vi.fn(),
   createPluginCategory: vi.fn(),
   createPluginGroup: vi.fn(),
   createTeamPlugin: vi.fn(),
   deletePluginCategory: vi.fn(),
   deletePluginGroup: vi.fn(),
   deleteTeamPlugin: vi.fn(),
+  downloadTeamPlugin: vi.fn(),
+  downloadTeamPluginVersion: vi.fn(),
+  getMe: vi.fn(),
   getTeamPlugin: vi.fn(),
+  importTeamPlugins: vi.fn(),
   ipcInvoke: vi.fn(),
   listPluginCategories: vi.fn(),
   listPluginGroups: vi.fn(),
+  listTeamPluginVersions: vi.fn(),
   listTeamPlugins: vi.fn(),
   listTeams: vi.fn(),
   setPluginVisibility: vi.fn(),
@@ -36,7 +50,9 @@ const createPluginRecord = (overrides: Record<string, unknown> = {}) => ({
   category_id: 4,
   group_ids: [9],
   visibility: 'team',
+  version: 2,
   revision: 3,
+  file_hash: '2'.repeat(64),
   ...overrides,
 })
 
@@ -55,6 +71,33 @@ const createDeferred = <T,>() => {
   return { promise, reject, resolve }
 }
 
+const allPluginPermissions = [
+  'plugin.read',
+  'plugin.manage',
+  'plugin.import',
+  'plugin_group.read',
+  'plugin_group.manage',
+]
+
+const createMeResponse = (permissions = allPluginPermissions, teamId = 3, version = 1) => ({
+  data: {
+    user: { id: 7, name: '测试用户', status: 'active' },
+    memberships: [
+      {
+        member: { id: teamId + 10, team_id: teamId, user_id: 7, status: 'active', version },
+        team: { id: teamId, name: `团队 ${teamId}`, status: 'active' },
+        roles: [],
+        permissions,
+        projects: [],
+      },
+    ],
+  },
+})
+
+const pluginBody = 'println("historical")'
+const pluginBodyBytes = new TextEncoder().encode(pluginBody)
+const pluginBodyHash = createHash('sha256').update(pluginBodyBytes).digest('hex')
+
 interface MockSelectOption {
   label: React.ReactNode
   value: string | number
@@ -72,11 +115,14 @@ vi.mock('@/services/teamCollaboration', () => ({
   deletePluginCategory: mocks.deletePluginCategory,
   deletePluginGroup: mocks.deletePluginGroup,
   deleteTeamPlugin: mocks.deleteTeamPlugin,
-  downloadTeamPlugin: vi.fn(),
+  downloadTeamPlugin: mocks.downloadTeamPlugin,
+  downloadTeamPluginVersion: mocks.downloadTeamPluginVersion,
+  getMe: mocks.getMe,
   getTeamPlugin: mocks.getTeamPlugin,
-  importTeamPlugins: vi.fn(),
+  importTeamPlugins: mocks.importTeamPlugins,
   listPluginCategories: mocks.listPluginCategories,
   listPluginGroups: mocks.listPluginGroups,
+  listTeamPluginVersions: mocks.listTeamPluginVersions,
   listTeamPlugins: mocks.listTeamPlugins,
   listTeams: mocks.listTeams,
   setPluginVisibility: mocks.setPluginVisibility,
@@ -106,7 +152,17 @@ vi.mock('@/components/yakitUI/YakitInput/YakitInput', () => {
 })
 
 vi.mock('@/components/yakitUI/YakitModal/YakitModal', () => ({
-  YakitModal: ({ children, footer, okText = '确定', cancelText = '取消', onCancel, onOk, title, visible }) =>
+  YakitModal: ({
+    children,
+    footer,
+    okButtonProps,
+    okText = '确定',
+    cancelText = '取消',
+    onCancel,
+    onOk,
+    title,
+    visible,
+  }) =>
     visible ? (
       <div role="dialog" aria-label={title}>
         <h2>{title}</h2>
@@ -118,7 +174,7 @@ vi.mock('@/components/yakitUI/YakitModal/YakitModal', () => ({
             <button type="button" onClick={onCancel}>
               {cancelText}
             </button>
-            <button type="button" onClick={onOk}>
+            <button type="button" onClick={onOk} {...okButtonProps}>
               {okText}
             </button>
           </div>
@@ -158,13 +214,13 @@ vi.mock('antd', () => ({
       ))}
     </select>
   ),
-  Table: ({ columns, dataSource = [] as MockTableRecord[], pagination, rowSelection }) => (
+  Table: ({ columns, dataSource = [] as MockTableRecord[], onRow, pagination, rowSelection }) => (
     <>
       <span data-testid="plugin-total">{pagination?.total}</span>
       <table>
         <tbody>
           {dataSource.map((record) => (
-            <tr key={record.id}>
+            <tr key={record.id} {...onRow?.(record)}>
               {rowSelection ? (
                 <td>
                   <input
@@ -194,7 +250,19 @@ vi.mock('antd', () => ({
     ...props
   }) => <input {...props} type="checkbox" checked={checked} onChange={(event) => onChange?.(event.target.checked)} />,
   Tag: ({ children }) => <span>{children}</span>,
-  Upload: ({ children }) => <div>{children}</div>,
+  Upload: ({ beforeUpload, children }) => (
+    <div>
+      {children}
+      <input
+        aria-label="导入插件清单文件"
+        type="file"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          if (file) void beforeUpload?.(file)
+        }}
+      />
+    </div>
+  ),
 }))
 
 vi.mock('@/utils/notification', () => ({
@@ -204,7 +272,7 @@ vi.mock('@/utils/notification', () => ({
 
 vi.mock('@/pages/plugins/utils', () => ({
   apiFetchSaveYakScriptGroupLocal: vi.fn(),
-  apiQueryYakScriptBase: vi.fn(),
+  apiQueryYakScriptBase: mocks.apiQueryYakScriptBase,
 }))
 
 vi.mock('@/utils/kv', () => ({
@@ -218,12 +286,52 @@ vi.mock('@/utils/envfile', () => ({
 
 describe('团队插件仓库管理', () => {
   beforeEach(() => {
+    publishTeamAuthenticationInvalidation()
     vi.clearAllMocks()
+    if (!globalThis.crypto?.subtle) {
+      Object.defineProperty(globalThis, 'crypto', {
+        configurable: true,
+        value: {
+          subtle: {
+            digest: async (_algorithm: string, content: ArrayBuffer) => {
+              const digest = createHash('sha256').update(new Uint8Array(content)).digest()
+              return Uint8Array.from(digest).buffer
+            },
+          },
+        },
+      })
+    }
+    useStore.setState({
+      userInfo: {
+        isLogin: true,
+        platform: 'company',
+        githubName: null,
+        githubHeadImg: null,
+        wechatName: null,
+        wechatHeadImg: null,
+        qqName: null,
+        qqHeadImg: null,
+        companyName: '测试用户',
+        companyHeadImg: null,
+        role: null,
+        user_id: 7,
+        token: 'plugin-token-a',
+      },
+    })
     Object.defineProperty(window, 'require', {
       configurable: true,
       value: () => ({ ipcRenderer: { invoke: mocks.ipcInvoke } }),
     })
     mocks.listTeams.mockResolvedValue({ data: [{ id: 3, name: '研发团队' }] })
+    mocks.getMe.mockResolvedValue({
+      data: {
+        user: { id: 7, name: '测试用户', status: 'active' },
+        memberships: [
+          createMeResponse(allPluginPermissions, 3).data.memberships[0],
+          createMeResponse(allPluginPermissions, 4).data.memberships[0],
+        ],
+      },
+    })
     mocks.listPluginCategories.mockResolvedValue({
       data: [{ id: 4, name: 'Web', description: 'Web 插件', sort_order: 1, status: 'active' }],
     })
@@ -231,6 +339,41 @@ describe('团队插件仓库管理', () => {
       data: [{ id: 9, name: '基线', description: '基线插件', sort_order: 2, status: 'active' }],
     })
     mocks.listTeamPlugins.mockResolvedValue(createPluginListResponse())
+    mocks.listTeamPluginVersions.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 52,
+          team_id: 3,
+          plugin_id: 5,
+          version: 2,
+          file_hash: '2'.repeat(64),
+          change_note: '当前版本',
+          created_by: 7,
+          created_at: '2026-07-30T12:00:00Z',
+        },
+        {
+          id: 51,
+          team_id: 3,
+          plugin_id: 5,
+          version: 1,
+          file_hash: pluginBodyHash,
+          change_note: '历史版本',
+          created_by: 7,
+          created_at: '2026-07-29T12:00:00Z',
+        },
+      ],
+    })
+    mocks.downloadTeamPluginVersion.mockResolvedValue(pluginBodyBytes)
+    mocks.apiQueryYakScriptBase.mockResolvedValue({
+      Data: [{ Id: 17, ScriptName: '本地插件', Type: 'yak', Content: 'println(1)' }],
+    })
+    mocks.importTeamPlugins.mockResolvedValue({ data: { items: [] } })
+    mocks.ipcInvoke.mockImplementation(async (channel) => {
+      if (channel === 'QueryYakScript') return { Data: [] }
+      if (channel === 'SaveYakScript') return { Id: 71, ScriptName: 'Plugin A', UUID: 'local-plugin-uuid' }
+      return undefined
+    })
     mocks.getTeamPlugin.mockResolvedValue({ data: createPluginRecord() })
     for (const mock of [
       mocks.createPluginCategory,
@@ -239,6 +382,7 @@ describe('团队插件仓库管理', () => {
       mocks.deletePluginCategory,
       mocks.deletePluginGroup,
       mocks.deleteTeamPlugin,
+      mocks.importTeamPlugins,
       mocks.updatePluginCategory,
       mocks.updatePluginGroup,
       mocks.updateTeamPlugin,
@@ -252,6 +396,12 @@ describe('团队插件仓库管理', () => {
     const { HubListTeam } = await import('../HubListTeam')
     render(<HubListTeam />)
     expect(await screen.findByText('Plugin A')).toBeInTheDocument()
+  }
+
+  const renderShell = async () => {
+    const { HubListTeam } = await import('../HubListTeam')
+    render(<HubListTeam />)
+    await waitFor(() => expect(mocks.getMe).toHaveBeenCalled())
   }
 
   it('使用响应顶层分页总数', async () => {
@@ -334,6 +484,36 @@ describe('团队插件仓库管理', () => {
     expect(screen.getAllByText('最新分类').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('过期分类')).not.toBeInTheDocument()
   }, 15000)
+
+  it('分类读取失败时保留原分类并提交成功的分组响应', async () => {
+    await renderPage()
+    mocks.listPluginCategories.mockRejectedValueOnce(new Error('分类读取失败'))
+    mocks.listPluginGroups.mockResolvedValueOnce({
+      data: [{ id: 10, name: '最新分组', description: '', sort_order: 0, status: 'active' }],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
+    const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
+
+    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith('加载插件分类与分组失败：分类读取失败'))
+    expect(within(manager).getByText('Web')).toBeInTheDocument()
+    expect(within(manager).getByText('最新分组')).toBeInTheDocument()
+  })
+
+  it('分组读取失败时保留原分组并提交成功的分类响应', async () => {
+    await renderPage()
+    mocks.listPluginCategories.mockResolvedValueOnce({
+      data: [{ id: 7, name: '最新分类', description: '', sort_order: 0, status: 'active' }],
+    })
+    mocks.listPluginGroups.mockRejectedValueOnce(new Error('分组读取失败'))
+
+    fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
+    const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
+
+    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith('加载插件分类与分组失败：分组读取失败'))
+    expect(within(manager).getByText('最新分类')).toBeInTheDocument()
+    expect(within(manager).getByText('基线')).toBeInTheDocument()
+  })
 
   it('创建、完整修改并删除单个远端插件', async () => {
     await renderPage()
@@ -541,15 +721,9 @@ describe('团队插件仓库管理', () => {
     expect(screen.getByLabelText('全部分类')).toHaveValue('4')
   }, 15000)
 
-  it('删除分类前清除全部分页插件引用', async () => {
-    mocks.listTeamPlugins.mockImplementation((_teamId, params = {}) => {
-      if (params.category_id !== 4) return Promise.resolve(createPluginListResponse())
-      return Promise.resolve({
-        data: [createPluginRecord({ id: params.page === 1 ? 5 : 6, revision: params.page === 1 ? 3 : 7 })],
-        paging: { total: 2 },
-      })
-    })
+  it('分类级联删除只发送一次删除请求且不在客户端预清引用', async () => {
     await renderPage()
+    mocks.listTeamPlugins.mockClear()
     fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
     const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
 
@@ -557,22 +731,15 @@ describe('团队插件仓库管理', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: '删除分类' })).getByRole('button', { name: '确认删除' }))
 
     await waitFor(() => expect(mocks.deletePluginCategory).toHaveBeenCalledWith(3, 4, { cascade: true }))
-    expect(mocks.updateTeamPlugin).toHaveBeenCalledWith(3, 5, { category_id: 0, revision: 3 })
-    expect(mocks.updateTeamPlugin).toHaveBeenCalledWith(3, 6, { category_id: 0, revision: 7 })
-    expect(mocks.updateTeamPlugin.mock.invocationCallOrder[1]).toBeLessThan(
-      mocks.deletePluginCategory.mock.invocationCallOrder[0],
-    )
+    expect(mocks.deletePluginCategory).toHaveBeenCalledTimes(1)
+    expect(mocks.updateTeamPlugin).not.toHaveBeenCalled()
+    expect(mocks.unbindPluginGroup).not.toHaveBeenCalled()
+    expect(mocks.listTeamPlugins).not.toHaveBeenCalled()
   })
 
-  it('删除分组前清除全部分页插件引用', async () => {
-    mocks.listTeamPlugins.mockImplementation((_teamId, params = {}) => {
-      if (params.group_id !== 9) return Promise.resolve(createPluginListResponse())
-      return Promise.resolve({
-        data: [createPluginRecord({ id: params.page === 1 ? 5 : 6, revision: params.page === 1 ? 3 : 7 })],
-        paging: { total: 2 },
-      })
-    })
+  it('分组级联删除只发送一次删除请求且不在客户端预清绑定', async () => {
     await renderPage()
+    mocks.listTeamPlugins.mockClear()
     fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
     const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
 
@@ -580,29 +747,77 @@ describe('团队插件仓库管理', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: '删除分组' })).getByRole('button', { name: '确认删除' }))
 
     await waitFor(() => expect(mocks.deletePluginGroup).toHaveBeenCalledWith(3, 9, { cascade: true }))
-    expect(mocks.unbindPluginGroup).toHaveBeenCalledWith(3, 5, 9)
-    expect(mocks.unbindPluginGroup).toHaveBeenCalledWith(3, 6, 9)
-    expect(mocks.unbindPluginGroup.mock.invocationCallOrder[1]).toBeLessThan(
-      mocks.deletePluginGroup.mock.invocationCallOrder[0],
-    )
+    expect(mocks.deletePluginGroup).toHaveBeenCalledTimes(1)
+    expect(mocks.updateTeamPlugin).not.toHaveBeenCalled()
+    expect(mocks.unbindPluginGroup).not.toHaveBeenCalled()
+    expect(mocks.listTeamPlugins).not.toHaveBeenCalled()
   })
 
   it.each([
     {
       kind: '分类',
       itemName: 'Web',
-      failCleanup: () => mocks.updateTeamPlugin.mockRejectedValueOnce(new Error('解除引用失败')),
+      deleteResource: () => mocks.deletePluginCategory,
+      expectedPluginReferences: { category_id: 0, group_ids: [9] },
+      expectedRevision: 4,
+    },
+    {
+      kind: '分组',
+      itemName: '基线',
+      deleteResource: () => mocks.deletePluginGroup,
+      expectedPluginReferences: { category_id: 4, group_ids: [] },
+      expectedRevision: 3,
+    },
+  ])(
+    '删除$kind后继续编辑插件时提交与服务端级联一致的修订号',
+    async ({ deleteResource, expectedPluginReferences, expectedRevision, itemName, kind }) => {
+      await renderPage()
+      fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
+      const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
+      await waitFor(() => expect(mocks.listPluginCategories).toHaveBeenCalledTimes(2))
+      await waitFor(() => expect(mocks.listPluginGroups).toHaveBeenCalledTimes(2))
+
+      fireEvent.click(within(manager).getByRole('button', { name: `删除${kind} ${itemName}` }))
+      fireEvent.click(
+        within(screen.getByRole('dialog', { name: `删除${kind}` })).getByRole('button', { name: '确认删除' }),
+      )
+
+      await waitFor(() => expect(deleteResource()).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(within(manager).queryByText(itemName)).not.toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: '编辑插件 Plugin A' }))
+      const editor = screen.getByRole('dialog', { name: '编辑远端插件' })
+      fireEvent.click(within(editor).getByRole('button', { name: '保存' }))
+
+      await waitFor(() =>
+        expect(mocks.updateTeamPlugin).toHaveBeenCalledWith(
+          3,
+          5,
+          expect.objectContaining({
+            ...expectedPluginReferences,
+            revision: expectedRevision,
+          }),
+        ),
+      )
+    },
+  )
+
+  it.each([
+    {
+      kind: '分类',
+      itemName: 'Web',
+      failDelete: () => mocks.deletePluginCategory.mockRejectedValueOnce(new Error('级联删除失败')),
       deleteResource: () => mocks.deletePluginCategory,
     },
     {
       kind: '分组',
       itemName: '基线',
-      failCleanup: () => mocks.unbindPluginGroup.mockRejectedValueOnce(new Error('解除引用失败')),
+      failDelete: () => mocks.deletePluginGroup.mockRejectedValueOnce(new Error('级联删除失败')),
       deleteResource: () => mocks.deletePluginGroup,
     },
-  ])('清除$kind引用失败时不删除目标资源', async ({ deleteResource, failCleanup, itemName, kind }) => {
+  ])('$kind级联删除失败时保留管理项和插件引用', async ({ deleteResource, failDelete, itemName, kind }) => {
     await renderPage()
-    failCleanup()
+    mocks.listTeamPlugins.mockClear()
+    failDelete()
     fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
     const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
 
@@ -611,8 +826,13 @@ describe('团队插件仓库管理', () => {
       within(screen.getByRole('dialog', { name: `删除${kind}` })).getByRole('button', { name: '确认删除' }),
     )
 
-    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith(`删除${kind}失败：解除引用失败`))
-    expect(deleteResource()).not.toHaveBeenCalled()
+    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith(`删除${kind}失败：级联删除失败`))
+    expect(deleteResource()).toHaveBeenCalledTimes(1)
+    expect(within(manager).getByText(itemName)).toBeInTheDocument()
+    expect(screen.getAllByText(itemName).length).toBeGreaterThanOrEqual(2)
+    expect(mocks.updateTeamPlugin).not.toHaveBeenCalled()
+    expect(mocks.unbindPluginGroup).not.toHaveBeenCalled()
+    expect(mocks.listTeamPlugins).not.toHaveBeenCalled()
   })
 
   it('创建、修改并删除分类和分组', async () => {
@@ -827,65 +1047,38 @@ describe('团队插件仓库管理', () => {
     {
       kind: '分类',
       itemName: 'Web',
-      failingList: () => mocks.listPluginCategories,
+      deleteResource: () => mocks.deletePluginCategory,
     },
     {
       kind: '分组',
       itemName: '基线',
-      failingList: () => mocks.listPluginGroups,
+      deleteResource: () => mocks.deletePluginGroup,
     },
   ])(
-    '删除$kind后的筛选刷新失败可通过重新打开管理窗口恢复',
-    async ({ failingList, itemName, kind }) => {
+    '删除$kind成功后只提交本地状态且不触发额外读取',
+    async ({ deleteResource, itemName, kind }) => {
       mocks.listTeamPlugins.mockResolvedValue(createPluginListResponse({ category_id: 0, group_ids: [] }))
       await renderPage()
       fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
       const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
-      failingList().mockRejectedValueOnce(new Error('管理数据刷新失败'))
+      await waitFor(() => expect(mocks.listPluginCategories).toHaveBeenCalledTimes(2))
+      mocks.listPluginCategories.mockClear()
+      mocks.listPluginGroups.mockClear()
+      mocks.listTeamPlugins.mockClear()
 
       fireEvent.click(within(manager).getByRole('button', { name: `删除${kind} ${itemName}` }))
       fireEvent.click(
         within(screen.getByRole('dialog', { name: `删除${kind}` })).getByRole('button', { name: '确认删除' }),
       )
 
-      await waitFor(() =>
-        expect(screen.getByRole('status')).toHaveTextContent(`删除${kind}已提交，但分类与分组刷新失败`),
-      )
-      fireEvent.click(within(manager).getByRole('button', { name: '关闭' }))
-      fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
-
-      await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
+      await waitFor(() => expect(deleteResource()).toHaveBeenCalledTimes(1))
+      expect(within(manager).queryByText(itemName)).not.toBeInTheDocument()
+      expect(mocks.listPluginCategories).not.toHaveBeenCalled()
+      expect(mocks.listPluginGroups).not.toHaveBeenCalled()
+      expect(mocks.listTeamPlugins).not.toHaveBeenCalled()
     },
     10000,
   )
-
-  it('双重刷新失败时只清除已成功刷新的错误状态', async () => {
-    mocks.listTeamPlugins.mockResolvedValue(createPluginListResponse({ category_id: 0, group_ids: [] }))
-    await renderPage()
-    fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
-    const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
-    mocks.listPluginCategories.mockRejectedValueOnce(new Error('筛选刷新失败'))
-    let rejectPluginRefresh = true
-    mocks.listTeamPlugins.mockImplementation((_teamId, params = {}) => {
-      if (params.category_id === 4) return Promise.resolve({ data: [], paging: { total: 0 } })
-      if (rejectPluginRefresh) {
-        rejectPluginRefresh = false
-        return Promise.reject(new Error('插件刷新失败'))
-      }
-      return Promise.resolve(createPluginListResponse({ category_id: 0, group_ids: [] }))
-    })
-
-    fireEvent.click(within(manager).getByRole('button', { name: '删除分类 Web' }))
-    fireEvent.click(within(screen.getByRole('dialog', { name: '删除分类' })).getByRole('button', { name: '确认删除' }))
-
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('删除分类已提交，但页面数据刷新失败'))
-    fireEvent.click(within(manager).getByRole('button', { name: '关闭' }))
-    fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
-
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('删除分类已提交，但插件列表刷新失败'))
-    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
-    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
-  }, 10000)
 
   it('不同操作的刷新失败分别保留并按数据域恢复', async () => {
     await renderPage()
@@ -905,16 +1098,12 @@ describe('团队插件仓库管理', () => {
     fireEvent.click(screen.getByRole('button', { name: '编辑插件 Plugin A' }))
     fireEvent.click(within(screen.getByRole('dialog', { name: '编辑远端插件' })).getByRole('button', { name: '保存' }))
 
-    await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent('更新远端插件已提交，但插件列表刷新失败')
-      expect(screen.getByRole('status')).toHaveTextContent('创建分类已提交，但分类与分组刷新失败')
-    })
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('更新远端插件已提交，但插件列表刷新失败'))
+    expect(screen.getByRole('status')).toHaveTextContent('创建分类已提交，但分类与分组刷新失败')
 
     fireEvent.click(screen.getByRole('button', { name: '刷新' }))
-    await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent('创建分类已提交，但分类与分组刷新失败')
-      expect(screen.getByRole('status')).not.toHaveTextContent('更新远端插件已提交')
-    })
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('创建分类已提交，但分类与分组刷新失败'))
+    expect(screen.getByRole('status')).not.toHaveTextContent('更新远端插件已提交')
 
     fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
@@ -927,6 +1116,7 @@ describe('团队插件仓库管理', () => {
       itemName: 'Web',
       queryField: 'category_id',
       value: 4,
+      deleteResource: () => mocks.deletePluginCategory,
     },
     {
       kind: '分组',
@@ -934,10 +1124,11 @@ describe('团队插件仓库管理', () => {
       itemName: '基线',
       queryField: 'group_id',
       value: 9,
+      deleteResource: () => mocks.deletePluginGroup,
     },
   ])(
-    '删除当前$kind后清除筛选并使用新查询刷新插件',
-    async ({ filterLabel, itemName, kind, queryField, value }) => {
+    '删除当前$kind后在本地清除筛选且不重新读取插件',
+    async ({ deleteResource, filterLabel, itemName, kind, queryField, value }) => {
       mocks.listTeamPlugins.mockResolvedValue(createPluginListResponse({ category_id: 0, group_ids: [] }))
       await renderPage()
       mocks.listTeamPlugins.mockClear()
@@ -948,6 +1139,7 @@ describe('团队插件仓库管理', () => {
           expect.objectContaining({ [queryField]: value, page: 1, limit: 20 }),
         ),
       )
+      mocks.listTeamPlugins.mockClear()
 
       fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
       const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
@@ -955,17 +1147,448 @@ describe('团队插件仓库管理', () => {
       const deleteDialog = screen.getByRole('dialog', { name: `删除${kind}` })
       fireEvent.click(within(deleteDialog).getByRole('button', { name: '确认删除' }))
 
-      await waitFor(() => expect(mocks.listTeamPlugins).toHaveBeenLastCalledWith(3, { page: 1, limit: 20 }))
+      await waitFor(() => expect(deleteResource()).toHaveBeenCalledTimes(1))
       expect(screen.getByLabelText(filterLabel)).toHaveValue('')
+      expect(mocks.listTeamPlugins).not.toHaveBeenCalled()
     },
     10000,
   )
 
-  it('为十一项工具栏和管理表单提供响应式样式', () => {
-    const source = readFileSync(
-      'app/renderer/src/main/src/pages/pluginHub/pluginHubList/HubListTeam.module.scss',
-      'utf8',
+  it.each([
+    {
+      label: '分类',
+      permissions: ['plugin.read'],
+      expectedRead: () => mocks.listPluginCategories,
+      forbiddenRead: () => mocks.listPluginGroups,
+    },
+    {
+      label: '分组',
+      permissions: ['plugin_group.read'],
+      expectedRead: () => mocks.listPluginGroups,
+      forbiddenRead: () => mocks.listPluginCategories,
+    },
+  ])('$label读取只使用对应的精确权限', async ({ expectedRead, forbiddenRead, permissions }) => {
+    mocks.getMe.mockResolvedValue(createMeResponse(permissions))
+
+    await renderShell()
+
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '选择团队' })).toHaveValue('3'))
+    expect(expectedRead()).toHaveBeenCalledWith(3, { page: 1, limit: 200 })
+    expect(forbiddenRead()).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      label: '分类',
+      permissions: ['plugin.read', 'plugin.manage'],
+      expectedCreate: '新建分类',
+      expectedEdit: '编辑分类 Web',
+      expectedDelete: '删除分类 Web',
+      forbiddenCreate: '新建分组',
+    },
+    {
+      label: '分组',
+      permissions: ['plugin.read', 'plugin_group.read', 'plugin_group.manage'],
+      expectedCreate: '新建分组',
+      expectedEdit: '编辑分组 基线',
+      expectedDelete: '删除分组 基线',
+      forbiddenCreate: '新建分类',
+    },
+  ])(
+    '$label管理区和写操作只使用对应的精确权限',
+    async ({ expectedCreate, expectedDelete, expectedEdit, forbiddenCreate, permissions }) => {
+      mocks.getMe.mockResolvedValue(createMeResponse(permissions))
+
+      await renderPage()
+      fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
+      const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
+
+      expect(within(manager).getByRole('button', { name: expectedCreate })).toBeInTheDocument()
+      expect(within(manager).getByRole('button', { name: expectedEdit })).toBeInTheDocument()
+      expect(within(manager).getByRole('button', { name: expectedDelete })).toBeInTheDocument()
+      expect(within(manager).queryByRole('button', { name: forbiddenCreate })).not.toBeInTheDocument()
+    },
+  )
+
+  it('插件保存引用已有分类和分组时不额外要求分组管理权限', async () => {
+    mocks.getMe.mockResolvedValue(createMeResponse(['plugin.read', 'plugin.manage', 'plugin_group.read']))
+
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '编辑插件 Plugin A' }))
+    const editor = screen.getByRole('dialog', { name: '编辑远端插件' })
+
+    expect(within(editor).getByLabelText('插件分类')).not.toBeDisabled()
+    expect(within(editor).getByLabelText('插件分组')).not.toBeDisabled()
+    fireEvent.click(within(editor).getByRole('button', { name: '保存' }))
+
+    await waitFor(() =>
+      expect(mocks.updateTeamPlugin).toHaveBeenCalledWith(
+        3,
+        5,
+        expect.objectContaining({ category_id: 4, group_ids: [9] }),
+      ),
     )
+  })
+
+  it('上传引用已有分类和分组时仅要求导入权限', async () => {
+    mocks.getMe.mockResolvedValue(createMeResponse(['plugin.read', 'plugin.import', 'plugin_group.read']))
+
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '上传本地插件' }))
+    const dialog = await screen.findByRole('dialog', { name: '上传本地插件' })
+    fireEvent.change(within(dialog).getByRole('listbox', { name: '选择一个或多个本地插件' }), {
+      target: { value: '17' },
+    })
+    const category = within(dialog).getByRole('combobox', { name: '不设置分类' })
+    const group = within(dialog).getByRole('listbox', { name: '不设置分组' })
+    expect(category).not.toBeDisabled()
+    expect(group).not.toBeDisabled()
+    fireEvent.change(category, { target: { value: '4' } })
+    fireEvent.change(group, { target: { value: '9' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '上传' }))
+
+    await waitFor(() =>
+      expect(mocks.importTeamPlugins).toHaveBeenCalledWith(3, {
+        plugins: [
+          expect.objectContaining({
+            script_name: '本地插件',
+            category_id: 4,
+            group_ids: [9],
+            overwrite: false,
+          }),
+        ],
+      }),
+    )
+  }, 15000)
+
+  it('缺少插件管理权限时覆盖选择器不可用', async () => {
+    mocks.getMe.mockResolvedValue(createMeResponse(['plugin.read', 'plugin.import']))
+
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '上传本地插件' }))
+    const dialog = await screen.findByRole('dialog', { name: '上传本地插件' })
+    const overwrite = within(dialog)
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'skip')
+
+    expect(overwrite).toBeDefined()
+    expect(overwrite).toBeDisabled()
+  })
+
+  it('同时具有导入和插件管理权限时可上传覆盖项', async () => {
+    mocks.getMe.mockResolvedValue(createMeResponse(['plugin.import', 'plugin.manage']))
+
+    await renderShell()
+    fireEvent.click(await screen.findByRole('button', { name: '上传本地插件' }))
+    const dialog = await screen.findByRole('dialog', { name: '上传本地插件' })
+    fireEvent.change(within(dialog).getByRole('listbox', { name: '选择一个或多个本地插件' }), {
+      target: { value: '17' },
+    })
+    const overwrite = within(dialog)
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'skip')
+    expect(overwrite).toBeDefined()
+    fireEvent.change(overwrite as HTMLSelectElement, { target: { value: 'overwrite' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '上传' }))
+
+    await waitFor(() =>
+      expect(mocks.importTeamPlugins).toHaveBeenCalledWith(3, {
+        plugins: [expect.objectContaining({ script_name: '本地插件', overwrite: true })],
+      }),
+    )
+  })
+
+  it('覆盖上传计算摘要期间撤销插件管理权限后保持零写请求', async () => {
+    const digest = createDeferred<ArrayBuffer>()
+    const digestSpy = vi.spyOn(globalThis.crypto.subtle, 'digest').mockReturnValueOnce(digest.promise)
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '上传本地插件' }))
+    const dialog = await screen.findByRole('dialog', { name: '上传本地插件' })
+    fireEvent.change(within(dialog).getByRole('listbox', { name: '选择一个或多个本地插件' }), {
+      target: { value: '17' },
+    })
+    const overwrite = within(dialog)
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'skip')
+    fireEvent.change(overwrite as HTMLSelectElement, { target: { value: 'overwrite' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '上传' }))
+    await waitFor(() => expect(digestSpy).toHaveBeenCalled())
+
+    mocks.getMe.mockResolvedValue(
+      createMeResponse(
+        allPluginPermissions.filter((permission) => permission !== 'plugin.manage'),
+        3,
+        2,
+      ),
+    )
+    act(() => publishTeamPermissionInvalidation(3))
+    await screen.findByTestId('team-plugin-import')
+    await act(async () => {
+      digest.resolve(new Uint8Array(32).buffer)
+      await digest.promise
+    })
+
+    expect(mocks.importTeamPlugins).not.toHaveBeenCalled()
+  }, 15000)
+
+  it.each([
+    { overwrite: false, permissions: ['plugin.import'], expectedRequests: 1 },
+    { overwrite: true, permissions: ['plugin.import'], expectedRequests: 0 },
+    { overwrite: true, permissions: ['plugin.import', 'plugin.manage'], expectedRequests: 1 },
+  ])(
+    '文件导入 overwrite=$overwrite 时按插件导入和管理权限组合决定是否发送',
+    async ({ expectedRequests, overwrite, permissions }) => {
+      mocks.getMe.mockResolvedValue(createMeResponse(permissions))
+      const file = {
+        name: 'plugins.json',
+        text: vi.fn().mockResolvedValue(
+          JSON.stringify({
+            plugins: [{ script_name: '文件插件', type: 'yak', content: 'println(9)', overwrite }],
+          }),
+        ),
+      } as unknown as File
+
+      await renderShell()
+      fireEvent.change(await screen.findByLabelText('导入插件清单文件'), { target: { files: [file] } })
+
+      await waitFor(() => expect(file.text).toHaveBeenCalled())
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(mocks.importTeamPlugins).toHaveBeenCalledTimes(expectedRequests)
+      const submittedPlugin = mocks.importTeamPlugins.mock.calls[0]?.[1]?.plugins?.[0]
+      expect(submittedPlugin?.script_name).toBe(expectedRequests ? '文件插件' : undefined)
+      expect(submittedPlugin?.overwrite).toBe(expectedRequests ? overwrite : undefined)
+      expect(submittedPlugin?.source_name).toBe(expectedRequests ? 'plugins.json#1' : undefined)
+    },
+  )
+
+  it.each([
+    {
+      label: '插件',
+      openDelete: () => {
+        fireEvent.click(screen.getByRole('button', { name: '删除插件 Plugin A' }))
+        return within(screen.getByRole('dialog', { name: '删除远端插件' })).getByRole('button', {
+          name: '确认删除',
+        })
+      },
+      revokedPermissions: allPluginPermissions.filter((permission) => permission !== 'plugin.manage'),
+      deleteRequest: () => mocks.deleteTeamPlugin,
+    },
+    {
+      label: '分组',
+      openDelete: () => {
+        fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
+        const manager = screen.getByRole('dialog', { name: '管理分类与分组' })
+        fireEvent.click(within(manager).getByRole('button', { name: '删除分组 基线' }))
+        return within(screen.getByRole('dialog', { name: '删除分组' })).getByRole('button', {
+          name: '确认删除',
+        })
+      },
+      revokedPermissions: allPluginPermissions.filter((permission) => permission !== 'plugin_group.manage'),
+      deleteRequest: () => mocks.deletePluginGroup,
+    },
+  ])('撤销$label删除权限后旧确认回调保持零写请求', async ({ deleteRequest, openDelete, revokedPermissions }) => {
+    await renderPage()
+    const staleDelete = openDelete()
+
+    mocks.getMe.mockResolvedValue(createMeResponse(revokedPermissions, 3, 2))
+    act(() => publishTeamPermissionInvalidation(3))
+    await waitFor(() => expect(screen.queryByText('确认删除')).not.toBeInTheDocument())
+    fireEvent.click(staleDelete)
+    await act(async () => Promise.resolve())
+
+    expect(deleteRequest()).not.toHaveBeenCalled()
+  })
+
+  it('覆盖文件读取期间撤销插件管理权限后旧导入回调保持零写请求', async () => {
+    const fileText = createDeferred<string>()
+    const file = {
+      name: 'overwrite.json',
+      text: vi.fn(() => fileText.promise),
+    } as unknown as File
+    await renderPage()
+
+    fireEvent.change(screen.getByLabelText('导入插件清单文件'), { target: { files: [file] } })
+    await waitFor(() => expect(file.text).toHaveBeenCalled())
+    mocks.getMe.mockResolvedValue(
+      createMeResponse(
+        allPluginPermissions.filter((permission) => permission !== 'plugin.manage'),
+        3,
+        2,
+      ),
+    )
+    act(() => publishTeamPermissionInvalidation(3))
+    await screen.findByTestId('team-plugin-import')
+
+    await act(async () => {
+      fileText.resolve(
+        JSON.stringify({
+          plugins: [{ script_name: '覆盖插件', type: 'yak', content: 'println(10)', overwrite: true }],
+        }),
+      )
+      await fileText.promise
+    })
+
+    expect(mocks.importTeamPlugins).not.toHaveBeenCalled()
+  }, 15000)
+
+  it('精确权限控制按钮且列表行和导入入口提供稳定测试标识', async () => {
+    mocks.getMe.mockResolvedValue(createMeResponse(['plugin.read', 'plugin_group.read']))
+
+    await renderPage()
+
+    expect(screen.getByTestId('team-plugin-row-5')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '下载到本地' })).toBeInTheDocument()
+    expect(screen.queryByTestId('team-plugin-import')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '上传本地插件' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '新建远端插件' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '管理分类与分组' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '编辑插件 Plugin A' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '删除插件 Plugin A' })).not.toBeInTheDocument()
+  })
+
+  it('从版本列表选择历史版本，当前插件漂移后仍下载选中的旧正文', async () => {
+    await renderPage()
+
+    expect(screen.getByTestId('team-plugin-import')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '下载到本地' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '选择插件版本' })
+    fireEvent.change(within(versionDialog).getByRole('combobox', { name: '插件历史版本' }), {
+      target: { value: '1' },
+    })
+
+    mocks.listTeamPlugins.mockResolvedValue(createPluginListResponse({ version: 3, file_hash: '3'.repeat(64) }))
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    expect(await screen.findByText('Plugin A')).toBeInTheDocument()
+
+    fireEvent.click(within(versionDialog).getByRole('button', { name: '安装选中版本' }))
+
+    await waitFor(() => expect(mocks.downloadTeamPluginVersion).toHaveBeenCalledWith(3, 5, 1))
+    expect(mocks.downloadTeamPlugin).not.toHaveBeenCalled()
+    expect(mocks.ipcInvoke).toHaveBeenCalledWith('SaveYakScript', expect.objectContaining({ Content: pluginBody }))
+  }, 15000)
+
+  it('版本请求迟到时切换团队会丢弃旧响应且不打开旧弹窗', async () => {
+    mocks.listTeams.mockResolvedValue({
+      data: [
+        { id: 3, name: '研发团队' },
+        { id: 4, name: '外部团队' },
+      ],
+    })
+    mocks.getMe.mockResolvedValue({
+      data: {
+        user: { id: 7, name: '测试用户', status: 'active' },
+        memberships: [
+          createMeResponse(allPluginPermissions, 3).data.memberships[0],
+          createMeResponse(allPluginPermissions, 4).data.memberships[0],
+        ],
+      },
+    })
+    const versions = createDeferred<any>()
+    mocks.listTeamPluginVersions.mockReturnValueOnce(versions.promise)
+
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '下载到本地' }))
+    await waitFor(() => expect(mocks.listTeamPluginVersions).toHaveBeenCalledWith(3, 5, { page: 1, limit: 200 }))
+
+    fireEvent.change(screen.getByRole('combobox', { name: '选择团队' }), { target: { value: '4' } })
+    await act(async () => {
+      versions.resolve({
+        ok: true,
+        data: [
+          {
+            id: 51,
+            team_id: 3,
+            plugin_id: 5,
+            version: 1,
+            file_hash: pluginBodyHash,
+            change_note: '历史版本',
+            created_by: 7,
+            created_at: '2026-07-29T12:00:00Z',
+          },
+        ],
+      })
+      await versions.promise
+    })
+
+    expect(screen.queryByRole('dialog', { name: '选择插件版本' })).not.toBeInTheDocument()
+    expect(mocks.downloadTeamPluginVersion).not.toHaveBeenCalled()
+  }, 15000)
+
+  it('撤权后旧插件、上传和分类弹窗的确认回调均保持零写入', async () => {
+    await renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: '编辑插件 Plugin A' }))
+    const pluginDialog = screen.getByRole('dialog', { name: '编辑远端插件' })
+    const stalePluginSave = within(pluginDialog).getByRole('button', { name: '保存' })
+
+    fireEvent.click(screen.getByRole('button', { name: '上传本地插件' }))
+    const uploadDialog = await screen.findByRole('dialog', { name: '上传本地插件' })
+    const staleUpload = within(uploadDialog).getByRole('button', { name: '上传' })
+
+    fireEvent.click(screen.getByRole('button', { name: '管理分类与分组' }))
+    const managerDialog = await screen.findByRole('dialog', { name: '管理分类与分组' })
+    fireEvent.click(within(managerDialog).getByRole('button', { name: '新建分类' }))
+    const filterDialog = screen.getByRole('dialog', { name: '新建分类' })
+    fireEvent.change(within(filterDialog).getByRole('textbox', { name: '资源名称' }), {
+      target: { value: '撤权分类' },
+    })
+    const staleFilterSave = within(filterDialog).getByRole('button', { name: '创建' })
+
+    mocks.getMe.mockResolvedValue(createMeResponse(['plugin.read', 'plugin_group.read']))
+    act(() => publishTeamPermissionInvalidation(3))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '编辑远端插件' })).not.toBeInTheDocument())
+
+    fireEvent.click(stalePluginSave)
+    fireEvent.click(staleUpload)
+    fireEvent.click(staleFilterSave)
+    await act(async () => Promise.resolve())
+
+    expect(mocks.updateTeamPlugin).not.toHaveBeenCalled()
+    expect(mocks.importTeamPlugins).not.toHaveBeenCalled()
+    expect(mocks.createPluginCategory).not.toHaveBeenCalled()
+  }, 15000)
+
+  it('批量上传部分失败时不得显示全成功通知', async () => {
+    mocks.importTeamPlugins.mockResolvedValue({
+      data: {
+        items: [
+          {
+            name: '本地插件',
+            plugin_name: '本地插件',
+            status: 'created',
+            remote_plugin_id: 31,
+            version: 1,
+            content_hash: '1'.repeat(64),
+          },
+          {
+            name: '失败插件',
+            plugin_name: '失败插件',
+            status: 'failed',
+            error: '摘要校验失败',
+            remote_plugin_id: 32,
+            version: 2,
+          },
+        ],
+      },
+    })
+
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '上传本地插件' }))
+    const uploadDialog = await screen.findByRole('dialog', { name: '上传本地插件' })
+    fireEvent.change(within(uploadDialog).getByRole('listbox', { name: '选择一个或多个本地插件' }), {
+      target: { value: '17' },
+    })
+    fireEvent.click(within(uploadDialog).getByRole('button', { name: '上传' }))
+
+    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith(expect.stringContaining('失败 1')))
+    expect(mocks.success).not.toHaveBeenCalledWith(expect.stringContaining('已提交 1 个本地插件'))
+  }, 15000)
+
+  it('为十一项工具栏和管理表单提供响应式样式', () => {
+    const source = readFileSync(resolve(__dirname, '../HubListTeam.module.scss'), 'utf8')
 
     expect(source).toContain('repeat(6, max-content)')
     expect(source).toContain('@media (max-width: 1600px)')

@@ -1,4 +1,5 @@
-import { vi } from 'vitest'
+/// <reference types="vitest/globals" />
+
 import { buildTeamPluginUploadEntries } from '../teamPluginUpload'
 
 describe('本地插件上传到团队仓库', () => {

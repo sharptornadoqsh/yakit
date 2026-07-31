@@ -1,9 +1,12 @@
 import React from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { useStore } from '@/store'
 import { TeamCollaborationPage } from '../TeamCollaborationPage'
+import { publishTeamAuthenticationInvalidation, publishTeamPermissionInvalidation } from '../teamPermissionContext'
 import { restoreTeamProjectBundle } from '../teamProjectBundle'
+import { prepareSharedHTTPFlow, prepareSharedRisk } from '../sharedRecordAdapters'
 import {
+  createTeamProject,
   createTestData,
   createTestResult,
   getMe,
@@ -19,6 +22,31 @@ import {
   listTestResults,
   updateProjectSnapshot,
 } from '@/services/teamCollaboration'
+
+const networkMocks = vi.hoisted(() => ({
+  axiosApi: vi.fn(),
+  logoutDynamicControl: vi.fn(),
+}))
+
+vi.mock('@/services/electronBridge', () => ({
+  yakitApp: {
+    userSignOut: vi.fn(),
+  },
+  yakitNetwork: {
+    axiosApi: networkMocks.axiosApi,
+    logoutDynamicControl: networkMocks.logoutDynamicControl,
+  },
+  yakitPlugin: {
+    deleteByUserId: vi.fn(),
+  },
+  yakitRelease: {
+    setEditionRaw: vi.fn().mockResolvedValue(undefined),
+  },
+}))
+
+vi.mock('@/utils/login', () => ({
+  loginOutLocal: vi.fn(),
+}))
 
 vi.mock('@/components/yakitUI/YakitButton/YakitButton', () => ({
   YakitButton: ({ children, loading, type: _type, ...props }) => (
@@ -73,28 +101,39 @@ vi.mock('@/components/yakitUI/YakitTag/YakitTag', () => ({
   YakitTag: ({ children }) => <span>{children}</span>,
 }))
 
-vi.mock('@/services/teamCollaboration', () => ({
-  getMe: vi.fn(),
-  listTeams: vi.fn(),
-  listTeamMembers: vi.fn(),
-  listTeamProjects: vi.fn(),
-  createTeamProject: vi.fn(),
-  listProjectMembers: vi.fn(),
-  getProjectSync: vi.fn(),
-  updateProjectSnapshot: vi.fn(),
-  listTestData: vi.fn(),
-  createTestData: vi.fn(),
-  getTestData: vi.fn(),
-  listTestResults: vi.fn(),
-  createTestResult: vi.fn(),
-  getTestResult: vi.fn(),
-  listAuditLogs: vi.fn(),
-}))
+vi.mock('@/services/teamCollaboration', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/teamCollaboration')>()
+  return {
+    __actualListTeamMembers: actual.listTeamMembers,
+    getMe: vi.fn(),
+    listTeams: vi.fn(),
+    listTeamMembers: vi.fn(),
+    listTeamProjects: vi.fn(),
+    createTeamProject: vi.fn(),
+    listProjectMembers: vi.fn(),
+    getProjectSync: vi.fn(),
+    updateProjectSnapshot: vi.fn(),
+    listTestData: vi.fn(),
+    createTestData: vi.fn(),
+    getTestData: vi.fn(),
+    listTestResults: vi.fn(),
+    createTestResult: vi.fn(),
+    getTestResult: vi.fn(),
+    listAuditLogs: vi.fn(),
+  }
+})
 
 vi.mock('../teamProjectBundle', async () => {
   const actual = await vi.importActual<typeof import('../teamProjectBundle')>('../teamProjectBundle')
   return { ...actual, restoreTeamProjectBundle: vi.fn() }
 })
+
+vi.mock('../SharedHTTPFlowDetail', () => ({
+  TEAM_SHARED_RECORDS_REFRESH_EVENT: 'yakit:team-shared-records-refresh',
+  SharedHTTPFlowDetail: ({ httpContent, riskContent }) => (
+    <div data-testid="shared-http-flow-detail" data-http-content={httpContent} data-risk-content={riskContent || ''} />
+  ),
+}))
 
 const createDeferred = <T,>() => {
   let resolve!: (value: T) => void
@@ -106,9 +145,112 @@ const createDeferred = <T,>() => {
   return { promise, reject, resolve }
 }
 
+const createMembership = ({
+  teamId = 1,
+  teamName = '蓝队',
+  status = 'active',
+  version = 1,
+  permissions = [],
+}: {
+  teamId?: number
+  teamName?: string
+  status?: string
+  version?: number
+  permissions?: string[]
+} = {}) => ({
+  member: { id: teamId + 10, team_id: teamId, user_id: 7, status, version },
+  team: { id: teamId, name: teamName, status: 'active' },
+  roles: [],
+  permissions,
+  projects: [],
+})
+
+const createMeResponse = (memberships: ReturnType<typeof createMembership>[]) =>
+  ({
+    data: {
+      user: { id: 7, name: '小周', status: 'active' },
+      memberships,
+    },
+  }) as never
+
+const createSharedProjectRecords = async () => {
+  const http = await prepareSharedHTTPFlow({
+    clientId: 'desktop-client-7',
+    localFlowId: '101',
+    capturedAt: '2026-07-31T00:00:00Z',
+    request: new Uint8Array([1, 2, 3]),
+    response: new Uint8Array([4, 5, 6]),
+    summary: {
+      method: 'POST',
+      url: 'https://shared.example/api',
+      host: 'shared.example:443',
+      status_code: 201,
+    },
+  })
+  const risk = await prepareSharedRisk({
+    clientId: 'desktop-client-7',
+    localRiskId: '202',
+    flowKey: http.flowKey,
+    payload: new TextEncoder().encode('{"evidence":"strict"}'),
+    summary: {
+      title: '共享风险',
+      severity: 'high',
+      risk_type: 'fixture',
+    },
+  })
+  return {
+    http,
+    risk,
+    httpRecord: {
+      id: 41,
+      team_id: 1,
+      project_id: 21,
+      name: '共享 HTTP Flow',
+      data_type: 'http_flow',
+      status: 'active',
+      version: 1,
+      metadata: '{}',
+      deduplication_key: `http-flow:${http.flowKey}`,
+      content: http.content,
+    },
+    riskRecord: {
+      id: 51,
+      team_id: 1,
+      project_id: 21,
+      test_data_id: 999,
+      name: '共享 Risk',
+      result_type: 'risk',
+      severity: 'high',
+      status: 'active',
+      version: 1,
+      metadata: '{}',
+      deduplication_key: `risk:${risk.riskKey}`,
+      content: risk.content,
+    },
+  }
+}
+
 describe('团队协作页面', () => {
   beforeEach(() => {
+    publishTeamAuthenticationInvalidation()
     vi.clearAllMocks()
+    useStore.setState({
+      userInfo: {
+        isLogin: true,
+        platform: 'company',
+        githubName: null,
+        githubHeadImg: null,
+        wechatName: null,
+        wechatHeadImg: null,
+        qqName: null,
+        qqHeadImg: null,
+        companyName: '小周',
+        companyHeadImg: null,
+        role: null,
+        user_id: 7,
+        token: 'token-a',
+      },
+    })
     Object.defineProperty(window, 'require', {
       configurable: true,
       value: undefined,
@@ -121,7 +263,7 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'tester', name: '测试人员' }],
             permissions: [
@@ -246,11 +388,9 @@ describe('团队协作页面', () => {
     fireEvent.click(screen.getByRole('button', { name: '同步项目' }))
 
     await waitFor(() => expect(getProjectSync).toHaveBeenCalledTimes(2))
-    await waitFor(() => {
-      expect(screen.queryByText('待移除项目成员')).not.toBeInTheDocument()
-      expect(screen.queryByText('登录样本')).not.toBeInTheDocument()
-      expect(screen.queryByText('基线结果')).not.toBeInTheDocument()
-    })
+    await waitFor(() => expect(screen.queryByText('待移除项目成员')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByText('登录样本')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByText('基线结果')).not.toBeInTheDocument())
   })
 
   test('团队上下文乱序返回时仅展示当前团队项目', async () => {
@@ -265,17 +405,17 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'tester', name: '测试人员' }],
-            permissions: ['project.read'],
+            permissions: ['member.read', 'project.read'],
             projects: [],
           },
           {
-            member: { id: 12, team_id: 2, user_id: 7, status: 'active' },
+            member: { id: 12, team_id: 2, user_id: 7, status: 'active', version: 1 },
             team: { id: 2, name: '红队' },
             roles: [{ code: 'tester', name: '测试人员' }],
-            permissions: ['project.read'],
+            permissions: ['member.read', 'project.read'],
             projects: [],
           },
         ],
@@ -427,17 +567,17 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'tester', name: '测试人员' }],
-            permissions: ['project.read'],
+            permissions: ['member.read', 'project.read'],
             projects: [],
           },
           {
-            member: { id: 12, team_id: 2, user_id: 7, status: 'active' },
+            member: { id: 12, team_id: 2, user_id: 7, status: 'active', version: 1 },
             team: { id: 2, name: '红队' },
             roles: [{ code: 'tester', name: '测试人员' }],
-            permissions: ['project.read'],
+            permissions: ['member.read', 'project.read'],
             projects: [],
           },
         ],
@@ -540,10 +680,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'maintainer', name: '维护人员' }],
-            permissions: ['project.manage'],
+            permissions: ['project.read', 'project.manage'],
             projects: [],
           },
         ],
@@ -610,10 +750,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'data_writer', name: '数据维护人员' }],
-            permissions: ['test_data.read', 'test_data.write'],
+            permissions: ['project.read', 'test_data.read', 'test_data.write'],
             projects: [],
           },
         ],
@@ -670,10 +810,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'maintainer', name: '维护人员' }],
-            permissions: ['project.manage', 'test_data.write', 'test_result.write'],
+            permissions: ['project.read', 'test_data.read', 'test_data.write', 'test_result.read', 'test_result.write'],
             projects: [],
           },
         ],
@@ -745,10 +885,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'data_writer', name: '数据维护人员' }],
-            permissions: ['test_data.write'],
+            permissions: ['project.read', 'test_data.read', 'test_data.write'],
             projects: [],
           },
         ],
@@ -792,10 +932,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'data_writer', name: '数据维护人员' }],
-            permissions: ['test_data.read', 'test_data.write'],
+            permissions: ['project.read', 'test_data.read', 'test_data.write'],
             projects: [],
           },
         ],
@@ -849,10 +989,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'data_writer', name: '数据维护人员' }],
-            permissions: ['test_data.read', 'test_data.write'],
+            permissions: ['project.read', 'test_data.read', 'test_data.write'],
             projects: [],
           },
         ],
@@ -903,10 +1043,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'data_writer', name: '数据维护人员' }],
-            permissions: ['test_data.read', 'test_data.write'],
+            permissions: ['project.read', 'test_data.read', 'test_data.write'],
             projects: [],
           },
         ],
@@ -946,16 +1086,72 @@ describe('团队协作页面', () => {
     expect(createTestData).toHaveBeenCalledTimes(1)
   })
 
+  test('认证切换作废旧记录保存并允许新会话独立保存', async () => {
+    vi.mocked(getMe).mockResolvedValue(
+      createMeResponse([
+        createMembership({
+          version: 1,
+          permissions: ['project.read', 'test_data.read', 'test_data.write'],
+        }),
+      ]),
+    )
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    const previousSessionSave = createDeferred<any>()
+    const currentSessionSave = createDeferred<any>()
+    vi.mocked(createTestData)
+      .mockReturnValueOnce(previousSessionSave.promise as never)
+      .mockReturnValueOnce(currentSessionSave.promise as never)
+
+    render(<TeamCollaborationPage />)
+    expect(await screen.findByText('登录样本')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('测试数据名称'), { target: { value: '旧会话样本' } })
+    fireEvent.click(screen.getByRole('button', { name: '新增数据' }))
+    fireEvent.change(await screen.findByLabelText('测试数据正文'), { target: { value: 'previous session' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存测试数据' }))
+    await waitFor(() => expect(createTestData).toHaveBeenCalledTimes(1))
+
+    act(() => {
+      useStore.setState((state) => ({
+        userInfo: { ...state.userInfo, token: 'token-b' },
+      }))
+    })
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByPlaceholderText('测试数据名称')).not.toBeDisabled())
+
+    fireEvent.change(screen.getByPlaceholderText('测试数据名称'), { target: { value: '新会话样本' } })
+    expect(screen.getByRole('button', { name: '新增数据' })).not.toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '新增数据' }))
+    fireEvent.change(await screen.findByLabelText('测试数据正文'), { target: { value: 'current session' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存测试数据' }))
+    await waitFor(() => expect(createTestData).toHaveBeenCalledTimes(2))
+
+    await act(async () => {
+      previousSessionSave.resolve({ data: { id: 71, name: '旧会话样本', content: 'previous session' } })
+      await previousSessionSave.promise
+    })
+    expect(screen.getByRole('dialog', { name: '新增共享测试数据' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '保存测试数据' })).toBeDisabled()
+
+    await act(async () => {
+      currentSessionSave.resolve({ data: { id: 72, name: '新会话样本', content: 'current session' } })
+      await currentSessionSave.promise
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '新增共享测试数据' })).not.toBeInTheDocument())
+  })
+
   test('创建接口失败时保留测试结果编辑内容且省略空关联字段', async () => {
     vi.mocked(getMe).mockResolvedValue({
       data: {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'result_writer', name: '结果维护人员' }],
-            permissions: ['test_result.write'],
+            permissions: ['project.read', 'test_result.read', 'test_result.write'],
             projects: [],
           },
         ],
@@ -1138,10 +1334,10 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'maintainer', name: '维护人员' }],
-            permissions: ['test_data.write'],
+            permissions: ['project.read', 'test_data.read', 'test_data.write'],
             projects: [],
           },
         ],
@@ -1172,7 +1368,7 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'data_writer', name: '数据维护人员' }],
             permissions: ['project.read', 'test_data.read', 'test_data.write', 'test_result.read'],
@@ -1195,16 +1391,19 @@ describe('团队协作页面', () => {
     expect(screen.getByPlaceholderText('测试结果名称')).toBeDisabled()
   })
 
-  test('管理员角色获得团队写入入口', async () => {
+  test('管理员角色、can_write 和通配符均不能替代精确权限码', async () => {
+    vi.mocked(listTeams).mockResolvedValue({
+      data: [{ id: 1, name: '蓝队', can_write: true }],
+    } as never)
     vi.mocked(getMe).mockResolvedValue({
       data: {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 5 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'administrator', name: '管理员' }],
-            permissions: [],
+            permissions: ['*', 'project.read'],
             projects: [],
           },
         ],
@@ -1217,10 +1416,297 @@ describe('团队协作页面', () => {
     render(<TeamCollaborationPage />)
     expect(await screen.findByText('供应链评估')).toBeInTheDocument()
 
+    fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: '不应创建' } })
+    expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled()
+    expect(screen.getByRole('button', { name: '创建团队项目' })).toBeDisabled()
+    expect(screen.getByPlaceholderText('测试数据名称')).toBeDisabled()
+    expect(screen.getByPlaceholderText('测试结果名称')).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+    expect(createTeamProject).not.toHaveBeenCalled()
+  })
+
+  test('成员版本缺失时仍请求 /me 但不建立权限快照', async () => {
+    const membership = createMembership({ permissions: ['project.manage'] })
+    delete (membership.member as { version?: number }).version
+    vi.mocked(getMe).mockResolvedValue(createMeResponse([membership]))
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+
+    expect(await screen.findByText('暂无团队项目')).toBeInTheDocument()
+    expect(getMe).toHaveBeenCalledTimes(1)
+    expect(listTeamMembers).not.toHaveBeenCalled()
+    expect(listTeamProjects).not.toHaveBeenCalled()
+    expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled()
+    expect(screen.getByRole('button', { name: '创建团队项目' })).toBeDisabled()
+  })
+
+  test('停用成员不选择团队，也不读取团队上下文', async () => {
+    vi.mocked(getMe).mockResolvedValue(
+      createMeResponse([createMembership({ status: 'disabled', permissions: ['project.manage'] })]),
+    )
+
+    render(<TeamCollaborationPage />)
+
+    expect(await screen.findByText('暂无团队')).toBeInTheDocument()
+    expect(listTeamMembers).not.toHaveBeenCalled()
+    expect(listTeamProjects).not.toHaveBeenCalled()
+  })
+
+  test.each([401, 403])('/me 返回 %i 时清空团队权限和上下文', async (status) => {
+    vi.mocked(getMe).mockRejectedValue({ response: { status }, message: '认证失效' })
+
+    render(<TeamCollaborationPage />)
+
+    expect(await screen.findByText('暂无团队')).toBeInTheDocument()
+    expect(listTeamMembers).not.toHaveBeenCalled()
+    expect(listTeamProjects).not.toHaveBeenCalled()
+    expect(screen.queryByPlaceholderText('输入项目名称')).not.toBeInTheDocument()
+  })
+
+  test('bootstrap 无活动 membership 时保持空快照和空团队', async () => {
+    vi.mocked(getMe).mockResolvedValue(createMeResponse([]))
+
+    render(<TeamCollaborationPage />)
+
+    expect(await screen.findByText('暂无团队')).toBeInTheDocument()
+    expect(getMe).toHaveBeenCalledTimes(1)
+    expect(listTeamMembers).not.toHaveBeenCalled()
+    expect(listTeamProjects).not.toHaveBeenCalled()
+  })
+
+  test('当前团队失效立即清空写权限，且版本水位拒绝迟到的较低版本', async () => {
+    const staleResponse = createDeferred<never>()
+    vi.mocked(getMe)
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 5, permissions: ['project.manage'] })]))
+      .mockReturnValueOnce(staleResponse.promise)
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+
+    act(() => publishTeamPermissionInvalidation(1))
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+    expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled()
+
+    fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: '禁止创建' } })
+    fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+    expect(createTeamProject).not.toHaveBeenCalled()
+
+    await act(async () => {
+      staleResponse.resolve(
+        createMeResponse([createMembership({ version: 4, permissions: ['project.manage'] })]) as never,
+      )
+    })
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled())
+  })
+
+  test('/me 403 只清权限快照，后续低于会话水位的版本仍失败关闭', async () => {
+    vi.mocked(getMe)
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 5, permissions: ['project.manage'] })]))
+      .mockRejectedValueOnce({ response: { status: 403 }, message: '团队访问已失效' })
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 4, permissions: ['project.manage'] })]))
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+    expect(screen.queryByPlaceholderText('输入项目名称')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled())
+  })
+
+  test('同一用户和 Authorization 卸载重挂后仍拒绝低于最高水位的版本', async () => {
+    vi.mocked(getMe)
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 5, permissions: ['project.manage'] })]))
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 4, permissions: ['project.manage'] })]))
+
+    const view = render(<TeamCollaborationPage />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+    view.unmount()
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled())
+  })
+
+  test('认证令牌改变后的首次提交阶段即拒绝旧快照和旧处理函数', async () => {
+    const nextAuthenticationResponse = createDeferred<never>()
+    let disabledBeforePassiveEffects: boolean | undefined
+    vi.mocked(getMe)
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 5, permissions: ['project.manage'] })]))
+      .mockReturnValueOnce(nextAuthenticationResponse.promise)
+
+    const AuthenticationSwitchHarness = () => {
+      const [switched, setSwitched] = React.useState(false)
+      React.useLayoutEffect(() => {
+        if (!switched) return
+        const createButton = screen.getByRole('button', { name: '创建团队项目' }) as HTMLButtonElement
+        disabledBeforePassiveEffects = createButton.disabled
+        createButton.click()
+      }, [switched])
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              useStore.setState((state) => ({
+                userInfo: { ...state.userInfo, token: 'token-b' },
+              }))
+              setSwitched(true)
+            }}
+          >
+            切换认证
+          </button>
+          <TeamCollaborationPage />
+        </>
+      )
+    }
+
+    render(<AuthenticationSwitchHarness />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+    fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: '不应创建' } })
+
+    fireEvent.click(screen.getByRole('button', { name: '切换认证' }))
+
+    expect(disabledBeforePassiveEffects).toBe(true)
+    expect(createTeamProject).not.toHaveBeenCalled()
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+  })
+
+  test('非 /me 的第二版接口 401 经真实 fetch 和 service 链路立即使页面权限失效', async () => {
+    vi.mocked(getMe).mockResolvedValue(
+      createMeResponse([createMembership({ version: 5, permissions: ['project.manage'] })]),
+    )
+    networkMocks.axiosApi.mockResolvedValueOnce({
+      code: 401,
+      message: 'token过期',
+      data: { ok: false, error: { code: 'unauthorized', message: 'token过期' } },
+    })
+    const actualService =
+      (await import('@/services/teamCollaboration')) as typeof import('@/services/teamCollaboration') & {
+        __actualListTeamMembers: typeof listTeamMembers
+      }
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+
+    const requestResult = actualService.__actualListTeamMembers(1).then(
+      (value) => ({ rejected: false as const, value }),
+      (error) => ({ rejected: true as const, error }),
+    )
+    await waitFor(() => expect(networkMocks.axiosApi).toHaveBeenCalledTimes(1))
+    await expect(requestResult).resolves.toMatchObject({
+      rejected: true,
+      error: { status: 401, response: { status: 401 } },
+    })
+
+    expect(screen.queryByPlaceholderText('输入项目名称')).not.toBeInTheDocument()
+    expect(screen.getByTestId('team-selector')).toBeDisabled()
+    expect(screen.getByText('只读')).toBeInTheDocument()
+  })
+
+  test('A 团队权限请求迟到时不能覆盖已切换到 B 的权限快照', async () => {
+    const lateAResponse = createDeferred<never>()
+    vi.mocked(listTeams).mockResolvedValue({
+      data: [
+        { id: 1, name: '蓝队' },
+        { id: 2, name: '红队' },
+      ],
+    } as never)
+    const initialMemberships = [
+      createMembership({ teamId: 1, teamName: '蓝队', version: 5, permissions: ['project.manage'] }),
+      createMembership({ teamId: 2, teamName: '红队', version: 3, permissions: ['project.manage'] }),
+    ]
+    vi.mocked(getMe)
+      .mockResolvedValueOnce(createMeResponse(initialMemberships))
+      .mockReturnValueOnce(lateAResponse.promise)
+      .mockResolvedValueOnce(createMeResponse(initialMemberships))
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+    fireEvent.change(screen.getByTestId('team-selector'), { target: { value: '2' } })
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+    expect(screen.getByTestId('team-selector')).toHaveValue('2')
+
+    await act(async () => {
+      lateAResponse.resolve(
+        createMeResponse([
+          createMembership({ teamId: 1, teamName: '蓝队', version: 6, permissions: [] }),
+          createMembership({ teamId: 2, teamName: '红队', version: 3, permissions: ['project.manage'] }),
+        ]) as never,
+      )
+    })
+
+    expect(screen.getByTestId('team-selector')).toHaveValue('2')
     expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled()
-    expect(screen.getByPlaceholderText('测试数据名称')).not.toBeDisabled()
-    expect(screen.getByPlaceholderText('测试结果名称')).not.toBeDisabled()
-    expect(screen.getByText('写入权限')).toBeInTheDocument()
+  })
+
+  test('迟到的 A 团队失效只清 A，不刷新当前 B 团队', async () => {
+    vi.mocked(listTeams).mockResolvedValue({
+      data: [
+        { id: 1, name: '蓝队' },
+        { id: 2, name: '红队' },
+      ],
+    } as never)
+    const memberships = [
+      createMembership({ teamId: 1, teamName: '蓝队', version: 5, permissions: ['project.manage'] }),
+      createMembership({ teamId: 2, teamName: '红队', version: 3, permissions: ['project.manage'] }),
+    ]
+    vi.mocked(getMe).mockResolvedValue(createMeResponse(memberships))
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+
+    fireEvent.change(screen.getByTestId('team-selector'), { target: { value: '2' } })
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+    expect(screen.getByTestId('team-selector')).toHaveValue('2')
+    expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled()
+
+    act(() => publishTeamPermissionInvalidation(1))
+    await act(async () => Promise.resolve())
+
+    expect(getMe).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('team-selector')).toHaveValue('2')
+    expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled()
+  })
+
+  test('Authorization 改变开启新会话并允许接受较低的正整数版本', async () => {
+    vi.mocked(getMe)
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 5, permissions: ['project.manage'] })]))
+      .mockResolvedValueOnce(createMeResponse([createMembership({ version: 1, permissions: ['project.manage'] })]))
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+
+    act(() => {
+      useStore.setState((state) => ({
+        userInfo: { ...state.userInfo, token: 'token-b' },
+      }))
+    })
+
+    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(2))
+    expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled()
   })
 
   test('没有审计权限时不请求审计接口', async () => {
@@ -1229,7 +1715,7 @@ describe('团队协作页面', () => {
         user: { id: 7, name: '小周' },
         memberships: [
           {
-            member: { id: 11, team_id: 1, user_id: 7, status: 'active' },
+            member: { id: 11, team_id: 1, user_id: 7, status: 'active', version: 1 },
             team: { id: 1, name: '蓝队' },
             roles: [{ code: 'tester', name: '测试人员' }],
             permissions: [
@@ -1318,5 +1804,267 @@ describe('团队协作页面', () => {
       }),
       expect.any(Object),
     )
+  })
+
+  test('共享 HTTP Flow 仅在严格解析与 dedup 匹配后提供稳定行标识和远端只读详情', async () => {
+    const records = await createSharedProjectRecords()
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    vi.mocked(listTestData).mockResolvedValue({ data: [records.httpRecord] } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [] } as never)
+    vi.mocked(getTestData).mockResolvedValue({ data: records.httpRecord } as never)
+
+    render(<TeamCollaborationPage />)
+
+    expect(await screen.findByTestId(`team-test-data-row-${records.http.flowKey}`)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '共享 HTTP Flow' }))
+
+    await waitFor(() => expect(getTestData).toHaveBeenCalledWith('1', '21', '41'))
+    expect(await screen.findByTestId('shared-http-flow-detail')).toHaveAttribute(
+      'data-http-content',
+      records.http.content,
+    )
+    expect(screen.getByTestId('shared-http-flow-detail')).toHaveAttribute('data-risk-content', '')
+  })
+
+  test('共享 HTTP Flow 的列表或 fresh 响应身份不匹配时失败关闭', async () => {
+    const records = await createSharedProjectRecords()
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    vi.mocked(listTestData).mockResolvedValue({
+      data: [{ ...records.httpRecord, deduplication_key: `http-flow:${'0'.repeat(64)}` }],
+    } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [] } as never)
+    vi.mocked(getTestData).mockResolvedValue({
+      data: { ...records.httpRecord, project_id: 22 },
+    } as never)
+
+    render(<TeamCollaborationPage />)
+
+    expect(await screen.findByText('共享 HTTP Flow')).toBeInTheDocument()
+    expect(screen.queryByTestId(`team-test-data-row-${records.http.flowKey}`)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '共享 HTTP Flow' }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByTestId('shared-http-flow-detail')).not.toBeInTheDocument()
+  })
+
+  test('共享 Risk 只按解析后的 flowKey 唯一关联当前 HTTP，不信任远端 test_data_id', async () => {
+    const records = await createSharedProjectRecords()
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    vi.mocked(listTestData).mockResolvedValue({ data: [records.httpRecord] } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [records.riskRecord] } as never)
+    vi.mocked(getTestResult).mockResolvedValue({ data: records.riskRecord } as never)
+    vi.mocked(getTestData).mockResolvedValue({ data: records.httpRecord } as never)
+
+    render(<TeamCollaborationPage />)
+    expect(await screen.findByTestId(`team-test-data-row-${records.http.flowKey}`)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '共享 Risk' }))
+
+    await waitFor(() => expect(getTestData).toHaveBeenCalledWith('1', '21', '41'))
+    expect(screen.getByTestId('shared-http-flow-detail')).toHaveAttribute('data-http-content', records.http.content)
+    expect(screen.getByTestId('shared-http-flow-detail')).toHaveAttribute('data-risk-content', records.risk.content)
+    expect(getTestData).not.toHaveBeenCalledWith('1', '21', '999')
+  })
+
+  test('文件型共享 HTTP 从详情建立索引，Risk 点击会等待当前索引完成', async () => {
+    const records = await createSharedProjectRecords()
+    const indexDetailRequest = createDeferred<any>()
+    const fileRecord = {
+      ...records.httpRecord,
+      content: '',
+      file_size: records.http.content.length,
+      content_hash: records.http.contentHash,
+    }
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    vi.mocked(listTestData).mockResolvedValue({ data: [fileRecord] } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [records.riskRecord] } as never)
+    vi.mocked(getTestResult).mockResolvedValue({ data: records.riskRecord } as never)
+    vi.mocked(getTestData)
+      .mockReturnValueOnce(indexDetailRequest.promise as never)
+      .mockResolvedValue({ data: records.httpRecord } as never)
+
+    render(<TeamCollaborationPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '共享 Risk' }))
+    await waitFor(() => expect(getTestResult).toHaveBeenCalledWith('1', '21', '51'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByTestId(`team-test-data-row-${records.http.flowKey}`)).not.toBeInTheDocument()
+
+    await act(async () => {
+      indexDetailRequest.resolve({ data: records.httpRecord })
+      await indexDetailRequest.promise
+    })
+
+    expect(await screen.findByTestId(`team-test-data-row-${records.http.flowKey}`)).toBeInTheDocument()
+    expect(await screen.findByTestId('shared-http-flow-detail')).toHaveAttribute(
+      'data-http-content',
+      records.http.content,
+    )
+    expect(screen.getByTestId('shared-http-flow-detail')).toHaveAttribute('data-risk-content', records.risk.content)
+    expect(getTestData).toHaveBeenCalledTimes(2)
+    expect(getTestData).not.toHaveBeenCalledWith('1', '21', '999')
+  })
+
+  test('关联 HTTP 读取期间索引更新会显示稳定错误而不是空详情', async () => {
+    const records = await createSharedProjectRecords()
+    const linkedDetailRequest = createDeferred<any>()
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValueOnce({ version: 4, snapshot: {} } as never)
+      .mockResolvedValue({
+        version: 5,
+        snapshot: {},
+        test_data: [{ ...records.httpRecord, name: '共享 HTTP Flow 已更新', version: 2 }],
+      } as never)
+    vi.mocked(listTestData).mockResolvedValue({ data: [records.httpRecord] } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [records.riskRecord] } as never)
+    vi.mocked(getTestResult).mockResolvedValue({ data: records.riskRecord } as never)
+    vi.mocked(getTestData).mockReturnValue(linkedDetailRequest.promise as never)
+
+    render(<TeamCollaborationPage />)
+    expect(await screen.findByTestId(`team-test-data-row-${records.http.flowKey}`)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '共享 Risk' }))
+    await waitFor(() => expect(getTestData).toHaveBeenCalledWith('1', '21', '41'))
+
+    fireEvent.click(screen.getByRole('button', { name: '同步项目' }))
+    await waitFor(() => expect(getProjectSync).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('共享 HTTP Flow 已更新')).toBeInTheDocument()
+
+    await act(async () => {
+      linkedDetailRequest.resolve({ data: records.httpRecord })
+      await linkedDetailRequest.promise
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('关联流量索引已更新，请重试')
+    expect(screen.queryByTestId('shared-http-flow-detail')).not.toBeInTheDocument()
+  })
+
+  test('文件型索引等待期间卸载会终止 Risk 详情请求', async () => {
+    const records = await createSharedProjectRecords()
+    const indexDetailRequest = createDeferred<any>()
+    const fileRecord = {
+      ...records.httpRecord,
+      content: '',
+      file_size: records.http.content.length,
+      content_hash: records.http.contentHash,
+    }
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    vi.mocked(listTestData).mockResolvedValue({ data: [fileRecord] } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [records.riskRecord] } as never)
+    vi.mocked(getTestResult).mockResolvedValue({ data: records.riskRecord } as never)
+    vi.mocked(getTestData).mockReturnValue(indexDetailRequest.promise as never)
+
+    const view = render(<TeamCollaborationPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '共享 Risk' }))
+    await waitFor(() => expect(getTestResult).toHaveBeenCalledWith('1', '21', '51'))
+    expect(getTestData).toHaveBeenCalledTimes(1)
+
+    view.unmount()
+    await act(async () => {
+      indexDetailRequest.resolve({ data: records.httpRecord })
+      await indexDetailRequest.promise
+      await Promise.resolve()
+    })
+
+    expect(getTestData).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('shared-http-flow-detail')).not.toBeInTheDocument()
+  })
+
+  test('共享 Risk 没有同步关联流量或关联不唯一时不读取任何远端 Flow 详情', async () => {
+    const records = await createSharedProjectRecords()
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    vi.mocked(listTestData).mockResolvedValue({ data: [] } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [records.riskRecord] } as never)
+    vi.mocked(getTestResult).mockResolvedValue({ data: records.riskRecord } as never)
+
+    const view = render(<TeamCollaborationPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '共享 Risk' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('关联流量尚未同步')
+    expect(getTestData).not.toHaveBeenCalled()
+
+    const duplicate = { ...records.httpRecord, id: 42, name: '共享 HTTP Flow 副本' }
+    vi.mocked(listTestData).mockResolvedValue({ data: [records.httpRecord, duplicate] } as never)
+    view.unmount()
+    render(<TeamCollaborationPage />)
+    expect(await screen.findAllByTestId(`team-test-data-row-${records.http.flowKey}`)).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: '共享 Risk' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('关联流量记录不唯一')
+    expect(getTestData).not.toHaveBeenCalled()
+  })
+
+  test('分享成功事件和刷新按钮都只通过当前项目权威接口重载记录', async () => {
+    const records = await createSharedProjectRecords()
+    const refreshRequest = createDeferred<any>()
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    vi.mocked(listTestData)
+      .mockResolvedValueOnce({ data: [] } as never)
+      .mockReturnValueOnce(refreshRequest.promise as never)
+      .mockResolvedValue({ data: [records.httpRecord] } as never)
+    vi.mocked(listTestResults).mockResolvedValue({ data: [] } as never)
+
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(listTestData).toHaveBeenCalledTimes(1))
+
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('yakit:team-shared-records-refresh', {
+          detail: { teamId: 1, projectId: 21 },
+        }),
+      )
+    })
+    await waitFor(() => expect(listTestData).toHaveBeenCalledTimes(2))
+    expect(screen.queryByTestId(`team-test-data-row-${records.http.flowKey}`)).not.toBeInTheDocument()
+
+    await act(async () => {
+      refreshRequest.resolve({ data: [records.httpRecord] })
+      await refreshRequest.promise
+    })
+    expect(await screen.findByTestId(`team-test-data-row-${records.http.flowKey}`)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }))
+    await waitFor(() => expect(listTestData).toHaveBeenCalledTimes(3))
+  })
+
+  test('畸形分享刷新事件不抛错也不触发上下文重载', async () => {
+    render(<TeamCollaborationPage />)
+    await waitFor(() => expect(listTestData).toHaveBeenCalledTimes(1))
+    const eventError = vi.fn((event: ErrorEvent) => event.preventDefault())
+    window.addEventListener('error', eventError)
+
+    act(() => {
+      window.dispatchEvent(new Event('yakit:team-shared-records-refresh'))
+      window.dispatchEvent(
+        new CustomEvent('yakit:team-shared-records-refresh', {
+          detail: null,
+        }),
+      )
+      window.dispatchEvent(
+        new CustomEvent('yakit:team-shared-records-refresh', {
+          detail: { teamId: '1', projectId: 21 },
+        }),
+      )
+      window.dispatchEvent(
+        new CustomEvent('yakit:team-shared-records-refresh', {
+          detail: { teamId: 2, projectId: 21 },
+        }),
+      )
+    })
+    window.removeEventListener('error', eventError)
+
+    expect(eventError).not.toHaveBeenCalled()
+    expect(listTestData).toHaveBeenCalledTimes(1)
+    expect(listTestResults).toHaveBeenCalledTimes(1)
   })
 })

@@ -1522,6 +1522,14 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
       <ProjectShareModal
         open={projectShareModal.open}
         mode={projectShareModal.mode}
+        localProject={
+          latestProject
+            ? {
+                id: latestProject.Id,
+                name: latestProject.ProjectName,
+              }
+            : undefined
+        }
         onClose={() => setProjectShareModal((current) => ({ ...current, open: false }))}
         onImported={() => update(1)}
       />

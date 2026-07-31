@@ -7,6 +7,11 @@ const grpc = require('@grpc/grpc-js')
 const protoLoader = require('@grpc/proto-loader')
 const { printLogOutputFile } = require('./logFile')
 const { assertTrustedAppSender, normalizeHttpBaseUrl } = require('./security')
+const {
+  registerCollaborationClientIdentityIPC,
+  sanitizeRendererConfig,
+  setRendererConfig,
+} = require('./collaborationClientIdentity')
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
   longs: String,
@@ -25,6 +30,14 @@ const global = {
 }
 
 let _client
+
+const registerCollaborationClientIdentityProductionIPC = () => {
+  registerCollaborationClientIdentityIPC({
+    ipcMain,
+    assertTrustedAppSender,
+    getCollaborationClientID: () => require('./httpServer').getCollaborationClientID(),
+  })
+}
 
 function createGrpcInterceptor() {
   return (options, nextCall) => {
@@ -195,6 +208,7 @@ function testEngineAvaiableVersion(params) {
 module.exports = {
   testRemoteClient,
   testEngineAvaiableVersion,
+  registerCollaborationClientIdentityProductionIPC,
   clearing: () => {
     require('./handlers/yakLocal').clearing()
   },
@@ -202,13 +216,14 @@ module.exports = {
     // YAKIT_HOME 配置管理
     const { getConfig, setConfig, getYakitHome, getAppConfigDir } = require('./filePath')
 
+    registerCollaborationClientIdentityProductionIPC()
+
     ipcMain.handle('get-yakit-home-config', async () => {
-      return { ...getConfig(), currentHome: getYakitHome(), configDir: getAppConfigDir() }
+      return { ...sanitizeRendererConfig(getConfig()), currentHome: getYakitHome(), configDir: getAppConfigDir() }
     })
 
     ipcMain.handle('set-yakit-home-config', async (e, key, value) => {
-      const ok = setConfig(key, value)
-      return { success: ok }
+      return setRendererConfig(setConfig, key, value)
     })
 
     ipcMain.handle('relaunch-app', async () => {
@@ -438,12 +453,11 @@ module.exports = {
     const { getConfig, setConfig, getYakitHome, getAppConfigDir } = require('./filePath')
 
     ipcMain.handle(ipcEventPre + 'get-yakit-home-config', async () => {
-      return { ...getConfig(), currentHome: getYakitHome(), configDir: getAppConfigDir() }
+      return { ...sanitizeRendererConfig(getConfig()), currentHome: getYakitHome(), configDir: getAppConfigDir() }
     })
 
     ipcMain.handle(ipcEventPre + 'set-yakit-home-config', async (e, key, value) => {
-      const ok = setConfig(key, value)
-      return { success: ok }
+      return setRendererConfig(setConfig, key, value)
     })
 
     ipcMain.handle(ipcEventPre + 'relaunch-app', async () => {

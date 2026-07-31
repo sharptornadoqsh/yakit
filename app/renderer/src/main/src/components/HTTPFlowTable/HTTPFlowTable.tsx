@@ -95,6 +95,8 @@ import {
   safeParseHTTPFlowTableCache,
   splitHTTPFlowTableShieldData,
 } from './HTTPFlowTable.utils'
+import { ShareToTeamProjectModal } from '@/pages/teamCollaboration/ShareToTeamProjectModal'
+import { dispatchTeamSharedRecordsRefresh } from '@/pages/teamCollaboration/SharedHTTPFlowDetail'
 import {
   AdvancedSet,
   ColorSearch,
@@ -2006,46 +2008,47 @@ export const HTTPFlowTable = React.memo<HTTPFlowTableProp>((props) => {
     setParams((prev) => ({ ...prev, Keyword: searchValue, KeywordType: searchType }))
   })
 
-  const { getBatchContextMenu, onMultipleClick, onRowContextMenu } = useHTTPFlowTableContextMenu({
-    t,
-    i18n,
-    userInfo,
-    data,
-    setData,
-    onlyFavorite,
-    selected,
-    selectedRowKeys,
-    selectedRows,
-    isAllSelect,
-    total,
-    downstreamProxyStr,
-    fromMITM,
-    setSelected,
-    setSelectedRowKeys,
-    setSelectedRows,
-    setBatchVisible,
-    setCompareLeft,
-    setCompareRight,
-    getUrlWithoutQuery,
-    getCodecHistoryPlugin,
-    codecMultipleHistoryPluginCom,
-    codecSingleHistoryPluginCom,
-    selectedRowKeysCom,
-    onRemoveHttpHistory,
-    onShareData,
-    onUploadData,
-    onEditTags,
-    onHTTPFlowTableRowDoubleClick,
-    onExcelExport,
-    onHarExport,
-    onPocMould,
-    onBatchPocMould,
-    onShieldRecord,
-    onShieldURL,
-    onShieldDomain,
-    onBatch,
-    onViewAttachmentDataRefresh,
-  })
+  const { getBatchContextMenu, onMultipleClick, onRowContextMenu, preparedTeamShare, clearPreparedTeamShare } =
+    useHTTPFlowTableContextMenu({
+      t,
+      i18n,
+      userInfo,
+      data,
+      setData,
+      onlyFavorite,
+      selected,
+      selectedRowKeys,
+      selectedRows,
+      isAllSelect,
+      total,
+      downstreamProxyStr,
+      fromMITM,
+      setSelected,
+      setSelectedRowKeys,
+      setSelectedRows,
+      setBatchVisible,
+      setCompareLeft,
+      setCompareRight,
+      getUrlWithoutQuery,
+      getCodecHistoryPlugin,
+      codecMultipleHistoryPluginCom,
+      codecSingleHistoryPluginCom,
+      selectedRowKeysCom,
+      onRemoveHttpHistory,
+      onShareData,
+      onUploadData,
+      onEditTags,
+      onHTTPFlowTableRowDoubleClick,
+      onExcelExport,
+      onHarExport,
+      onPocMould,
+      onBatchPocMould,
+      onShieldRecord,
+      onShieldURL,
+      onShieldDomain,
+      onBatch,
+      onViewAttachmentDataRefresh,
+    })
 
   useEffect(() => {
     if (props.params?.SourceType !== undefined) {
@@ -2761,6 +2764,17 @@ export const HTTPFlowTable = React.memo<HTTPFlowTableProp>((props) => {
         okButtonText={t('YakitButton.ok')}
         onOk={() => setShowShieldTooManyHint(false)}
       />
+      {preparedTeamShare && (
+        <ShareToTeamProjectModal
+          visible={true}
+          prepared={preparedTeamShare}
+          onCancel={clearPreparedTeamShare}
+          onSuccess={({ teamId, projectId }) => {
+            dispatchTeamSharedRecordsRefresh({ teamId, projectId })
+            clearPreparedTeamShare()
+          }}
+        />
+      )}
     </div>
   )
 })

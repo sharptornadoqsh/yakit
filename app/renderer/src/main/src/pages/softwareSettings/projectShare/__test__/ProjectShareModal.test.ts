@@ -1,63 +1,43 @@
 import { buildProjectShareCreateRequest, getProjectSharePreviewItems } from '../projectShareData'
 
-describe('项目密令归档状态', () => {
-  it('在预览中明确展示完整本地归档是否可用', () => {
-    expect(
-      getProjectSharePreviewItems({
-        project_name: '共享项目',
-        project_bundle_available: true,
-      }),
-    ).toContainEqual(['本地归档', '可完整导入'])
-    expect(
-      getProjectSharePreviewItems({
-        project_name: '旧项目',
-        project_bundle_available: false,
-      }),
-    ).toContainEqual(['本地归档', '未发布'])
-  })
-})
-
 describe('项目密令数据转换', () => {
-  it('创建请求仅使用团队项目标识', () => {
-    const result = buildProjectShareCreateRequest(
-      { id: 73, name: '团队基线项目' },
-      {
-        name: '交付密令',
-        expiresAt: new Date('2026-08-01T00:00:00.000Z'),
-        maxUses: 5,
-        enabled: true,
-      },
-    )
+  it('创建请求绑定已经 ready 的不可变 bundle', () => {
+    const result = buildProjectShareCreateRequest('55555555-5555-4555-8555-555555555555', {
+      name: '交付密令',
+      expiresAt: new Date('2026-08-01T00:00:00.000Z'),
+      maxUses: 5,
+      enabled: true,
+    })
 
     expect(result).toEqual({
-      projectId: 73,
-      payload: {
-        name: '交付密令',
-        expires_at: '2026-08-01T00:00:00.000Z',
-        max_uses: 5,
-        enabled: true,
-      },
+      bundle_id: '55555555-5555-4555-8555-555555555555',
+      name: '交付密令',
+      expires_at: '2026-08-01T00:00:00.000Z',
+      max_uses: 5,
+      enabled: true,
     })
   })
 
-  it('预览完整展示项目、创建人、团队、时间、有效期与摘要', () => {
+  it('预览只展示不可变快照中的项目、数据、结果、插件和归档摘要', () => {
     expect(
       getProjectSharePreviewItems({
+        share_id: 1,
+        snapshot_id: 3,
         project_name: '攻防演练',
-        creator_name: '张三',
-        team_name: '红队',
-        created_at: '2026-07-22T08:00:00Z',
-        expires_at: '2026-07-29T08:00:00Z',
-        summary: '包含测试数据与结果',
+        data_count: 12,
+        result_count: 8,
+        plugin_count: 2,
+        archive_size: 1_572_864,
+        archive_sha256: 'a'.repeat(64),
+        media_type: 'application/vnd.yakit.team-project-bundle.v2+zip',
       }),
     ).toEqual([
       ['项目名', '攻防演练'],
-      ['创建人', '张三'],
-      ['团队', '红队'],
-      ['创建时间', '2026-07-22T08:00:00Z'],
-      ['有效期至', '2026-07-29T08:00:00Z'],
-      ['内容摘要', '包含测试数据与结果'],
-      ['本地归档', '未发布'],
+      ['测试数据', '12 项'],
+      ['测试结果', '8 项'],
+      ['项目插件', '2 个'],
+      ['归档大小', '1.5 MiB'],
+      ['归档摘要', 'a'.repeat(64)],
     ])
   })
 })

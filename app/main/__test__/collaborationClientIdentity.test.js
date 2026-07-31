@@ -1,6 +1,19 @@
 import { validateHeaderValue } from 'http'
-import { describe, expect, it, vi } from 'vitest'
-import { applyCollaborationClientHeaders, createCollaborationClientHeaders } from '../collaborationClientIdentity'
+import Module, { createRequire } from 'module'
+import {
+  applyCollaborationClientHeaders,
+  createCollaborationClientHeaders,
+  registerCollaborationClientIdentityIPC,
+  sanitizeRendererConfig,
+  setRendererConfig,
+} from '../collaborationClientIdentity'
+
+var productionIPCHandlers = new Map()
+var productionIPCMain = {
+  handle: vi.fn((channel, handler) => productionIPCHandlers.set(channel, handler)),
+  on: vi.fn(),
+}
+var productionConfig = {}
 
 const createIdentityHeaders = (hostname, overrides = {}) =>
   createCollaborationClientHeaders({
@@ -34,6 +47,52 @@ describe('团队协作客户端标识', () => {
       'X-Yakit-OS': 'win32/x64',
       'X-Yakit-Version': '1.4.0',
     })
+  })
+
+  it('持久化失败时拒绝返回无法跨重启复用的标识', () => {
+    expect(() =>
+      createIdentityHeaders('workstation-a', {
+        getConfig: () => ({}),
+        setConfig: () => false,
+        createId: () => '67a9ff5a-3a08-4f08-aa11-770205ace231',
+      }),
+    ).toThrow('collaboration_client_id_persist_failed')
+  })
+
+  it('拒绝使用生成器返回的非法标识', () => {
+    const setConfig = vi.fn()
+
+    expect(() =>
+      createIdentityHeaders('workstation-a', {
+        getConfig: () => ({}),
+        setConfig,
+        createId: () => 'invalid\r\nclient-id',
+      }),
+    ).toThrow('invalid_collaboration_client_id')
+    expect(setConfig).not.toHaveBeenCalled()
+  })
+
+  it('模拟应用重启后仍复用首次持久化的标识', () => {
+    const persistedConfig = {}
+    const setConfig = vi.fn((key, value) => {
+      persistedConfig[key] = value
+      return true
+    })
+    const firstHeaders = createIdentityHeaders('workstation-a', {
+      getConfig: () => persistedConfig,
+      setConfig,
+      createId: () => '67a9ff5a-3a08-4f08-aa11-770205ace231',
+    })
+    const restartedHeaders = createIdentityHeaders('workstation-a', {
+      getConfig: () => persistedConfig,
+      setConfig,
+      createId: () => {
+        throw new Error('重启后不应重新生成客户端标识')
+      },
+    })
+
+    expect(restartedHeaders['X-Yakit-Client-ID']).toBe(firstHeaders['X-Yakit-Client-ID'])
+    expect(setConfig).toHaveBeenCalledTimes(1)
   })
 
   it('复用持久化标识并覆盖调用方伪造的客户端头', () => {
@@ -123,5 +182,154 @@ describe('团队协作客户端标识', () => {
       expect(value).toMatch(/^[\x20-\x7e]+$/)
       expect(() => validateHeaderValue(name, value)).not.toThrow()
     })
+  })
+})
+
+describe('团队协作客户端标识 IPC 边界', () => {
+  it('生产 IPC handler 与 HTTP 拦截器读取同一惰性身份缓存', async () => {
+    productionIPCHandlers.clear()
+    productionIPCMain.handle.mockClear()
+    productionIPCMain.on.mockClear()
+    productionConfig = {}
+    const localRequire = createRequire(import.meta.url)
+    const httpServerPath = localRequire.resolve('../httpServer')
+    const ipcPath = localRequire.resolve('../ipc')
+    const originalLoad = Module._load
+    Module._load = function (request, parent, isMain) {
+      if (request === 'electron') {
+        return {
+          app: {
+            exit: vi.fn(),
+            getVersion: () => '1.4.0',
+            relaunch: vi.fn(),
+          },
+          ipcMain: productionIPCMain,
+          nativeImage: { createEmpty: vi.fn() },
+          Notification: class {
+            show() {}
+          },
+        }
+      }
+      if (request === './filePath') {
+        return {
+          getAppConfigDir: () => 'test-config',
+          getConfig: () => productionConfig,
+          getEngineLogDir: () => 'test-logs',
+          getPrintLogDir: () => 'test-logs',
+          getRenderLogDir: () => 'test-logs',
+          getYakitHome: () => 'test-home',
+          setConfig: (key, value) => {
+            productionConfig[key] = value
+            return true
+          },
+        }
+      }
+      return originalLoad.call(this, request, parent, isMain)
+    }
+    delete localRequire.cache[httpServerPath]
+    delete localRequire.cache[ipcPath]
+
+    try {
+      const httpServer = localRequire(httpServerPath)
+      const ipc = localRequire(ipcPath)
+
+      ipc.registerCollaborationClientIdentityProductionIPC()
+      const requestInterceptor = httpServer.service.interceptors.request.handlers[0].fulfilled
+      const firstRequest = requestInterceptor({ headers: {} })
+      const handler = productionIPCHandlers.get('GetCollaborationClientID')
+      const firstIPCValue = await handler({ senderFrame: { url: 'file:///renderer/index.html' } })
+      const secondRequest = requestInterceptor({ headers: {} })
+
+      expect(firstIPCValue).toBe(firstRequest.headers['X-Yakit-Client-ID'])
+      expect(secondRequest.headers['X-Yakit-Client-ID']).toBe(firstIPCValue)
+      expect(productionConfig.collaborationClientId).toBe(firstIPCValue)
+      expect(productionIPCMain.handle).toHaveBeenCalledWith('GetCollaborationClientID', handler)
+    } finally {
+      Module._load = originalLoad
+      delete localRequire.cache[httpServerPath]
+      delete localRequire.cache[ipcPath]
+    }
+  })
+
+  it('只读 IPC 返回值与 Main 请求头使用同一持久化标识', async () => {
+    const handlers = new Map()
+    const persistedConfig = {}
+    const identityHeaders = createIdentityHeaders('workstation-a', {
+      getConfig: () => persistedConfig,
+      setConfig: (key, value) => {
+        persistedConfig[key] = value
+        return true
+      },
+      createId: () => '67a9ff5a-3a08-4f08-aa11-770205ace231',
+    })
+    registerCollaborationClientIdentityIPC({
+      ipcMain: {
+        handle: (channel, handler) => handlers.set(channel, handler),
+      },
+      assertTrustedAppSender: vi.fn(),
+      getCollaborationClientID: () => identityHeaders['X-Yakit-Client-ID'],
+    })
+
+    await expect(handlers.get('GetCollaborationClientID')({})).resolves.toBe(identityHeaders['X-Yakit-Client-ID'])
+  })
+
+  it('只注册可信的只读客户端标识 IPC，且忽略渲染端伪造参数', async () => {
+    const handlers = new Map()
+    const ipcMain = {
+      handle: vi.fn((channel, handler) => handlers.set(channel, handler)),
+    }
+    const callOrder = []
+    const assertTrustedAppSender = vi.fn(() => callOrder.push('trusted'))
+    const getCollaborationClientID = vi.fn(() => {
+      callOrder.push('identity')
+      return 'main-owned-client-id'
+    })
+
+    registerCollaborationClientIdentityIPC({
+      ipcMain,
+      assertTrustedAppSender,
+      getCollaborationClientID,
+    })
+
+    expect(ipcMain.handle).toHaveBeenCalledTimes(1)
+    expect(ipcMain.handle).toHaveBeenCalledWith('GetCollaborationClientID', expect.any(Function))
+    await expect(handlers.get('GetCollaborationClientID')({ senderFrame: {} }, 'spoofed-client-id')).resolves.toBe(
+      'main-owned-client-id',
+    )
+    expect(assertTrustedAppSender).toHaveBeenCalledWith({ senderFrame: {} }, 'GetCollaborationClientID')
+    expect(getCollaborationClientID).toHaveBeenCalledWith()
+    expect(callOrder).toEqual(['trusted', 'identity'])
+  })
+
+  it('不可信发送方不会触发客户端标识生成', async () => {
+    const handlers = new Map()
+    const getCollaborationClientID = vi.fn()
+    registerCollaborationClientIdentityIPC({
+      ipcMain: {
+        handle: (channel, handler) => handlers.set(channel, handler),
+      },
+      assertTrustedAppSender: () => {
+        throw new Error('untrusted_ipc_sender')
+      },
+      getCollaborationClientID,
+    })
+
+    await expect(handlers.get('GetCollaborationClientID')({})).rejects.toThrow('untrusted_ipc_sender')
+    expect(getCollaborationClientID).not.toHaveBeenCalled()
+  })
+
+  it('配置 IPC 不泄露也不允许改写保留的客户端标识', () => {
+    expect(
+      sanitizeRendererConfig({
+        YAKIT_HOME: 'projects',
+        collaborationClientId: 'main-owned-client-id',
+      }),
+    ).toEqual({ YAKIT_HOME: 'projects' })
+
+    const setConfig = vi.fn(() => true)
+    expect(setRendererConfig(setConfig, 'collaborationClientId', 'spoofed-client-id')).toEqual({ success: false })
+    expect(setConfig).not.toHaveBeenCalled()
+    expect(setRendererConfig(setConfig, 'YAKIT_HOME', 'other-projects')).toEqual({ success: true })
+    expect(setConfig).toHaveBeenCalledWith('YAKIT_HOME', 'other-projects')
   })
 })

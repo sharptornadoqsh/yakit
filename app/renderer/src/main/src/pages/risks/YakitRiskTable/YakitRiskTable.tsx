@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import {
+import type {
   QueryRisksRequest,
   QueryRisksResponse,
   YakitCodeScanRiskDetailsProps,
@@ -11,9 +11,10 @@ import {
 } from './YakitRiskTableType'
 import styles from './YakitRiskTable.module.scss'
 import { TableVirtualResize } from '@/components/TableVirtualResize/TableVirtualResize'
-import { PacketHistory, Risk } from '../schema'
+import type { PacketHistory, Risk } from '../schema'
 import { Badge, CollapseProps, Descriptions, Divider, Form, Tooltip, Typography } from 'antd'
-import { YakScript, genDefaultPagination } from '@/pages/invoker/schema'
+import { genDefaultPagination } from '@/pages/invoker/schema'
+import type { YakScript } from '@/pages/invoker/schema'
 import { YakitPopconfirm } from '@/components/yakitUI/YakitPopconfirm/YakitPopconfirm'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import {
@@ -25,7 +26,7 @@ import {
   useInterval,
   useMemoizedFn,
 } from 'ahooks'
-import { YakitMenuItemProps } from '@/components/yakitUI/YakitMenu/YakitMenu'
+import type { YakitMenuItemProps } from '@/components/yakitUI/YakitMenu/YakitMenu'
 import {
   OutlineChevrondownIcon,
   OutlineChevronleftIcon,
@@ -41,7 +42,7 @@ import {
   OutlineTrashIcon,
   OutlineUploadIcon,
 } from '@/assets/icon/outline'
-import { ColumnsTypeProps, SortProps } from '@/components/TableVirtualResize/TableVirtualResizeType'
+import type { ColumnsTypeProps, SortProps } from '@/components/TableVirtualResize/TableVirtualResizeType'
 import cloneDeep from 'lodash/cloneDeep'
 import { formatTimestamp } from '@/utils/timeUtil'
 import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
@@ -60,12 +61,14 @@ import {
   apiQueryRiskTags,
   apiQueryRisks,
   apiQueryRisksIncrementOrderDesc,
+  prepareRiskForTeamShare,
   apiRiskFeedbackToOnline,
   apiSetTagForRisk,
 } from './utils'
 import { CopyComponents, YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
-import { YakitTagColor } from '@/components/yakitUI/YakitTag/YakitTagType'
-import { YakitResizeBox, YakitResizeBoxProps } from '@/components/yakitUI/YakitResizeBox/YakitResizeBox'
+import type { YakitTagColor } from '@/components/yakitUI/YakitTag/YakitTagType'
+import { YakitResizeBox } from '@/components/yakitUI/YakitResizeBox/YakitResizeBox'
+import type { YakitResizeBoxProps } from '@/components/yakitUI/YakitResizeBox/YakitResizeBox'
 import classNames from 'classnames'
 import {
   IconSolidInfoRiskIcon,
@@ -83,44 +86,45 @@ import { RemoteGV } from '@/yakitGV'
 import { getHtmlEnTemplate, getHtmlTemplate, getHtmlZhTWTemplate } from './htmlTemplate'
 import { yakitNotify } from '@/utils/notification'
 import moment from 'moment'
-import { FieldName } from '../RiskTable'
+import type { FieldName } from '../RiskTable'
 import { defQueryRisksRequest } from './constants'
 import emiter from '@/utils/eventBus/eventBus'
 import { FuncBtn } from '@/pages/plugins/funcTemplate'
 import { showByRightContext } from '@/components/yakitUI/YakitMenu/showByRightContext'
 import { StringToUint8Array, Uint8ArrayToString } from '@/utils/str'
 import { YakitRoute } from '@/enums/yakitRoute'
-import {
-  AuditCodePageInfoProps,
-  PluginHubPageInfoProps,
-  RuleManagementPageInfoProps,
-  usePageInfo,
-} from '@/store/pageInfo'
+import { usePageInfo } from '@/store/pageInfo'
+import type { AuditCodePageInfoProps, PluginHubPageInfoProps, RuleManagementPageInfoProps } from '@/store/pageInfo'
 import { grpcFetchLocalPluginDetail } from '@/pages/pluginHub/utils/grpc'
 import ReactResizeDetector from 'react-resize-detector'
 import { serverPushStatus } from '@/utils/duplex/duplex'
 import useListenWidth from '@/pages/pluginHub/hooks/useListenWidth'
 import { YakitEditor } from '@/components/yakitUI/YakitEditor/YakitEditor'
 import { loadAuditFromYakURLRaw } from '@/pages/yakRunnerAuditCode/utils'
-import { AuditEmiterYakUrlProps, OpenFileByPathProps } from '@/pages/yakRunnerAuditCode/YakRunnerAuditCodeType'
+import type { AuditEmiterYakUrlProps, OpenFileByPathProps } from '@/pages/yakRunnerAuditCode/YakRunnerAuditCodeType'
 import { CollapseList } from '@/pages/yakRunner/CollapseList/CollapseList'
 import { YakCodemirror } from '@/components/yakCodemirror/YakCodemirror'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
-import { SSARisk } from '@/pages/yakRunnerAuditHole/YakitAuditHoleTable/YakitAuditHoleTableType'
+import type { SSARisk } from '@/pages/yakRunnerAuditHole/YakitAuditHoleTable/YakitAuditHoleTableType'
 import { getRemoteValue } from '@/utils/kv'
 import { NoPromptHint } from '@/pages/pluginHub/utilsUI/UtilsTemplate'
 import { RemoteRiskGV } from '@/enums/risk'
 import { useStore } from '@/store'
 import { minWinSendToChildWin, openRiskNewWindow } from '@/utils/openWebsite'
-import { CodeRangeProps } from '@/pages/yakRunnerAuditCode/RightAuditDetail/RightAuditDetail'
-import { JumpToAuditEditorProps } from '@/pages/yakRunnerAuditCode/BottomEditorDetails/BottomEditorDetailsType'
-import { Selection } from '@/pages/yakRunnerAuditCode/RunnerTabs/RunnerTabsType'
+import type { CodeRangeProps } from '@/pages/yakRunnerAuditCode/RightAuditDetail/RightAuditDetail'
+import type { JumpToAuditEditorProps } from '@/pages/yakRunnerAuditCode/BottomEditorDetails/BottomEditorDetailsType'
+import type { Selection } from '@/pages/yakRunnerAuditCode/RunnerTabs/RunnerTabsType'
 import { getNameByPath } from '@/pages/yakRunner/utils'
 import { shallow } from 'zustand/shallow'
-import { TFunction, useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
+import type { TFunction } from '@/i18n/useI18nNamespaces'
 import { SafeMarkdown } from '@/pages/assetViewer/reportRenders/markdownRender'
-import { HTTPFlow } from '@/components/HTTPFlowTable/HTTPFlowTable'
+import type { HTTPFlow } from '@/components/HTTPFlowTable/HTTPFlowTable'
 import { RuiYanDetailPanel, RuiYanPageHeader, RuiYanToolbar } from '@/components/renyanUI'
+import { useTeamShareAccess } from '@/components/HTTPFlowTable/useHTTPFlowTableContextMenu'
+import type { PreparedTeamShare } from '@/pages/teamCollaboration/sharedRecordAdapters'
+import { ShareToTeamProjectModal } from '@/pages/teamCollaboration/ShareToTeamProjectModal'
+import { dispatchTeamSharedRecordsRefresh } from '@/pages/teamCollaboration/SharedHTTPFlowDetail'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -338,6 +342,11 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
     shallow,
   )
   const { userInfo } = useStore()
+  const [preparedTeamShare, setPreparedTeamShare] = useState<PreparedTeamShare>()
+  const teamShareAccess = useTeamShareAccess(userInfo, 'risk')
+  useEffect(() => {
+    if (!teamShareAccess.available) setPreparedTeamShare(undefined)
+  }, [teamShareAccess.available])
   const [loading, setLoading] = useState<boolean>(false)
   const percentContainerRef = useRef<string>(currentPageTabRouteKey)
 
@@ -1217,17 +1226,40 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
   })
   const onRowContextMenu = useMemoizedFn((rowData: Risk) => {
     if (!rowData) return
+    const shareMenu =
+      teamShareAccess.available && selectList.length === 0 && !allCheck
+        ? [
+            {
+              key: 'share-risk',
+              label: <span data-testid="share-risk">分享到团队项目</span>,
+            },
+          ]
+        : []
     showByRightContext({
       width: 180,
       data: [
+        ...shareMenu,
         { key: 'delete-repeat-title', label: t('YakitRiskTable.RowContextMenu.delete_duplicate_title_data') },
         { key: 'open-in-new-window', label: t('YakitRiskTable.RowContextMenu.openInNewWindow') },
       ],
       onClick: ({ key }) => onRightMenuSelect(key, rowData),
     })
   })
-  const onRightMenuSelect = useMemoizedFn((key: string, rowData: Risk) => {
+  const onRightMenuSelect = useMemoizedFn(async (key: string, rowData: Risk) => {
     switch (key) {
+      case 'share-risk': {
+        const operation = await teamShareAccess.begin()
+        if (!operation) break
+        try {
+          const prepared = await prepareRiskForTeamShare(rowData.Id, operation.isCurrent)
+          if (prepared && operation.isCurrent()) setPreparedTeamShare(prepared)
+        } catch (error) {
+          if (operation.isCurrent()) {
+            yakitNotify('error', error instanceof Error ? error.message : '准备 Risk 团队分享失败')
+          }
+        }
+        break
+      }
       case 'delete-repeat-title':
         onDeleteRepeatTitle(rowData)
         break
@@ -1532,6 +1564,17 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
         cacheKey={RemoteRiskGV.RiskMisstatementNoPrompt}
         onCallback={handleMisstatementHint}
       />
+      {preparedTeamShare && (
+        <ShareToTeamProjectModal
+          visible={true}
+          prepared={preparedTeamShare}
+          onCancel={() => setPreparedTeamShare(undefined)}
+          onSuccess={({ teamId, projectId }) => {
+            dispatchTeamSharedRecordsRefresh({ teamId, projectId })
+            setPreparedTeamShare(undefined)
+          }}
+        />
+      )}
     </div>
   )
 })

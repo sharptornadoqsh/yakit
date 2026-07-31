@@ -56,6 +56,10 @@ export interface QueryRisksRequest {
   RuntimeIds?: string[]
 }
 
+export interface QueryRisksByIdsRequest {
+  Ids: number[]
+}
+
 export type QueryRisksResponse = QueryGeneralResponse<Risk>
 
 export interface YakitRiskDetailContentProps {

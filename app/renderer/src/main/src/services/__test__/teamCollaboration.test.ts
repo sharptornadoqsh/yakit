@@ -1,11 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+/// <reference types="vitest/globals" />
+
 import {
   type ProjectSync,
   type V2Response,
   bindPluginGroup,
+  completeProjectShareImport,
   createPluginCategory,
   createPluginGroup,
   createProjectShare,
+  createProjectShareBundle,
   createTeamPlugin,
   createTeamProject,
   createTestData,
@@ -14,9 +17,12 @@ import {
   deletePluginGroup,
   deleteTeamPlugin,
   downloadTeamPlugin,
+  failProjectShareImport,
+  finalizeProjectShareBundle,
   getMe,
   getProjectSync,
   getTeamPlugin,
+  heartbeatProjectShareImport,
   importProjectShare,
   importTeamPlugins,
   listAuditLogs,
@@ -32,6 +38,7 @@ import {
   listTestData,
   listTestResults,
   previewProjectShare,
+  resumeProjectShareImport,
   revokeProjectShare,
   setPluginVisibility,
   updatePluginCategory,
@@ -39,8 +46,13 @@ import {
   updateTeamPlugin,
   updateProjectShare,
   updateProjectSnapshot,
+  uploadProjectShareBundleChunk,
   unbindPluginGroup,
 } from '../teamCollaboration'
+import {
+  subscribeTeamAuthenticationInvalidation,
+  subscribeTeamPermissionInvalidation,
+} from '../../pages/teamCollaboration/teamPermissionContext'
 
 const mocks = vi.hoisted(() => ({
   NetWorkApi: vi.fn(),
@@ -352,7 +364,48 @@ describe('team collaboration service', () => {
       data: { visibility: 'team', revision: 4 },
     })
 
-    const share = { name: 'nightly', max_uses: 5 }
+    const bundle = {
+      bundle_id: 'ef1e1ef2-f7c8-4371-a60f-0983b14518fa',
+      manifest_sha256: 'a'.repeat(64),
+      archive_sha256: 'b'.repeat(64),
+      file_size: 1024,
+      chunk_size: 4194304 as const,
+      chunk_count: 1,
+      idempotency_key: 'b98fe436-8005-4107-a726-1d8572248576',
+    }
+    await createProjectShareBundle(3, 7, bundle)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/teams/3/projects/7/share-bundles',
+      data: bundle,
+    })
+
+    const chunk = {
+      raw_base64: 'YQ==',
+      byte_length: 1,
+      sha256: 'c'.repeat(64),
+    }
+    await uploadProjectShareBundleChunk(3, 7, bundle.bundle_id, 0, chunk)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'put',
+      url: `v2/teams/3/projects/7/share-bundles/${bundle.bundle_id}/chunks/0`,
+      data: chunk,
+    })
+
+    await finalizeProjectShareBundle(3, 7, bundle.bundle_id)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: `v2/teams/3/projects/7/share-bundles/${bundle.bundle_id}/finalize`,
+      data: undefined,
+    })
+
+    const share = {
+      bundle_id: bundle.bundle_id,
+      name: 'nightly',
+      expires_at: null,
+      max_uses: 5,
+      enabled: true,
+    }
     await createProjectShare(3, 7, share)
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
       method: 'post',
@@ -374,11 +427,42 @@ describe('team collaboration service', () => {
       data: { token: 'share-token' },
     })
 
-    await importProjectShare({ token: 'share-token', name: 'Imported' })
+    const importInput = {
+      token: 'share-token',
+      project_key: 'imported-project',
+      name: 'Imported',
+      idempotency_key: 'ed4fe8bb-f794-4334-bf0e-6100772ffbf2',
+    }
+    await importProjectShare(importInput)
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
       method: 'post',
       url: 'v2/project-shares/import',
-      data: { token: 'share-token', name: 'Imported' },
+      data: importInput,
+    })
+
+    await resumeProjectShareImport(13)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/project-share-imports/13/resume',
+      data: undefined,
+    })
+    await heartbeatProjectShareImport(13)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/project-share-imports/13/heartbeat',
+      data: undefined,
+    })
+    await failProjectShareImport(13, { failure_code: 'local_import_failed' })
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/project-share-imports/13/fail',
+      data: { failure_code: 'local_import_failed' },
+    })
+    await completeProjectShareImport(13)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'post',
+      url: 'v2/project-share-imports/13/complete',
+      data: undefined,
     })
   })
 
@@ -399,6 +483,60 @@ describe('team collaboration service', () => {
     })
   })
 
+  it('按分页契约读取插件版本并返回原始第二版响应', async () => {
+    const api = await import('../teamCollaboration')
+    const listTeamPluginVersions = (api as any).listTeamPluginVersions
+    expect(typeof listTeamPluginVersions).toBe('function')
+    const response = {
+      ok: true,
+      data: [
+        {
+          id: 17,
+          team_id: 3,
+          plugin_id: 5,
+          version: 2,
+          file_hash: 'a'.repeat(64),
+          change_note: '历史版本',
+          created_by: 7,
+          created_at: '2026-07-30T12:00:00Z',
+        },
+      ],
+      paging: { page: 2, limit: 10, total: 11, total_pages: 2 },
+    }
+    mocks.NetWorkApi.mockResolvedValueOnce(response)
+
+    await expect(listTeamPluginVersions(3, 5, { page: 2, limit: 10 })).resolves.toBe(response)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'get',
+      url: 'v2/teams/3/plugins/5/versions',
+      params: { page: 2, limit: 10 },
+    })
+  })
+
+  it('精确下载选中版本的原始字节且保留当前版本下载接口', async () => {
+    const api = await import('../teamCollaboration')
+    const downloadTeamPluginVersion = (api as any).downloadTeamPluginVersion
+    expect(typeof downloadTeamPluginVersion).toBe('function')
+    const bytes = new Uint8Array([0, 1, 2, 255]).buffer
+    mocks.NetWorkApi.mockResolvedValueOnce(bytes)
+
+    await expect(downloadTeamPluginVersion(3, 5, 2)).resolves.toBe(bytes)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'get',
+      url: 'v2/teams/3/plugins/5/versions/2/download',
+      params: {},
+      responseType: 'arraybuffer',
+    })
+
+    await downloadTeamPlugin(3, 5)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'get',
+      url: 'v2/teams/3/plugins/5/download',
+      params: {},
+      responseType: 'arraybuffer',
+    })
+  })
+
   it('reads one team plugin from its resource endpoint', async () => {
     await getTeamPlugin(3, 5)
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
@@ -406,5 +544,59 @@ describe('team collaboration service', () => {
       url: 'v2/teams/3/plugins/5',
       params: {},
     })
+  })
+
+  it('团队接口 403 从实际请求 URL 发布精确团队失效', async () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeTeamPermissionInvalidation(listener)
+    const forbidden = { response: { status: 403 } }
+
+    try {
+      mocks.NetWorkApi.mockRejectedValueOnce(forbidden)
+      await expect(listTeamMembers(37)).rejects.toBe(forbidden)
+      expect(listener.mock.calls).toEqual([[37]])
+
+      mocks.NetWorkApi.mockRejectedValueOnce(forbidden)
+      await expect(createTeamProject(42, { project_key: 'p-1', name: '项目' })).rejects.toBe(forbidden)
+      expect(listener.mock.calls).toEqual([[37], [42]])
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('包装与直连的第二版接口 401 都发布认证失效', async () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeTeamAuthenticationInvalidation(listener)
+    const unauthorized = { response: { status: 401 } }
+
+    try {
+      mocks.NetWorkApi.mockRejectedValueOnce(unauthorized)
+      await expect(listTeamMembers(37)).rejects.toBe(unauthorized)
+
+      mocks.NetWorkApi.mockRejectedValueOnce(unauthorized)
+      await expect(downloadTeamPlugin(37, 9)).rejects.toBe(unauthorized)
+
+      expect(listener).toHaveBeenCalledTimes(2)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  it('非团队路径和非正十进制团队路径的 403 不发布团队失效', async () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeTeamPermissionInvalidation(listener)
+    const forbidden = { response: { status: 403 } }
+
+    try {
+      mocks.NetWorkApi.mockRejectedValueOnce(forbidden)
+      await expect(getMe()).rejects.toBe(forbidden)
+
+      mocks.NetWorkApi.mockRejectedValueOnce(forbidden)
+      await expect(listTeamMembers(0)).rejects.toBe(forbidden)
+
+      expect(listener).not.toHaveBeenCalled()
+    } finally {
+      unsubscribe()
+    }
   })
 })

@@ -1,14 +1,23 @@
 import { yakitNotify } from '@/utils/notification'
-import { QueryRisksRequest, QueryRisksResponse } from './YakitRiskTableType'
-import { Risk } from '../schema'
-import { FieldName, Fields } from '../RiskTable'
+import type { QueryRisksByIdsRequest, QueryRisksRequest, QueryRisksResponse } from './YakitRiskTableType'
+import type { Risk } from '../schema'
+import type { FieldName, Fields } from '../RiskTable'
 import { defQueryRisksRequest } from './constants'
 import i18n from '@/i18n/i18n'
+import {
+  prepareSharedRisk,
+  resolveShareableRiskHTTPFlowId,
+  serializeSharedRisk,
+} from '@/pages/teamCollaboration/sharedRecordAdapters'
+import type { PreparedTeamShare } from '@/pages/teamCollaboration/sharedRecordAdapters'
+import { prepareHTTPFlowForTeamShare } from '@/components/HTTPFlowTable/useHTTPFlowTableContextMenu'
 const tOriginal = i18n.getFixedT(null, ['yakitUi', 'risk'])
 
 const { ipcRenderer } = window.require('electron')
 /** QueryRisks */
-export const apiQueryRisks: (query?: QueryRisksRequest) => Promise<QueryRisksResponse> = (query) => {
+export function apiQueryRisks(query?: QueryRisksRequest): Promise<QueryRisksResponse>
+export function apiQueryRisks(query: QueryRisksByIdsRequest): Promise<QueryRisksResponse>
+export function apiQueryRisks(query?: QueryRisksRequest | QueryRisksByIdsRequest): Promise<QueryRisksResponse> {
   return new Promise((resolve, reject) => {
     ipcRenderer
       .invoke('QueryRisks', query)
@@ -18,6 +27,53 @@ export const apiQueryRisks: (query?: QueryRisksRequest) => Promise<QueryRisksRes
         reject(e)
       })
   })
+}
+
+export const apiQueryUniqueRiskById = async (riskId: number): Promise<Risk> => {
+  if (!Number.isSafeInteger(riskId) || riskId <= 0) throw new Error('Risk 标识无效')
+  const response = await apiQueryRisks({ Ids: [riskId] })
+  if (!Array.isArray(response.Data) || response.Data.length !== 1 || response.Data[0]?.Id !== riskId) {
+    throw new Error('无法获取唯一且匹配的 Risk')
+  }
+  return response.Data[0]
+}
+
+export const prepareRiskForTeamShare = async (
+  riskId: number,
+  isCurrent: () => boolean,
+): Promise<PreparedTeamShare | undefined> => {
+  if (!isCurrent()) return undefined
+  const risk = await apiQueryUniqueRiskById(riskId)
+  if (!isCurrent()) return undefined
+  if (
+    typeof risk.Title !== 'string' ||
+    !risk.Title ||
+    typeof risk.Severity !== 'string' ||
+    !risk.Severity ||
+    typeof risk.RiskType !== 'string' ||
+    !risk.RiskType
+  ) {
+    throw new Error('Risk 摘要字段不完整')
+  }
+  const flowId = resolveShareableRiskHTTPFlowId(risk)
+  if (!isCurrent()) return undefined
+  const preparedHTTP = await prepareHTTPFlowForTeamShare(flowId, isCurrent)
+  if (!preparedHTTP || preparedHTTP.kind !== 'http-flow' || !isCurrent()) return undefined
+  const payload = await serializeSharedRisk(risk)
+  if (!isCurrent()) return undefined
+  const preparedRisk = await prepareSharedRisk({
+    clientId: preparedHTTP.http.sourceClientId,
+    localRiskId: String(risk.Id),
+    flowKey: preparedHTTP.http.flowKey,
+    payload,
+    summary: {
+      title: risk.Title,
+      severity: risk.Severity,
+      risk_type: risk.RiskType,
+    },
+  })
+  if (!isCurrent()) return undefined
+  return { kind: 'risk', http: preparedHTTP.http, risk: preparedRisk }
 }
 /** 获取漏洞与风险的总数 通过RuntimeId */
 export const apiQueryRisksTotalByRuntimeId: (RuntimeId: string) => Promise<QueryRisksResponse> = (RuntimeId) => {

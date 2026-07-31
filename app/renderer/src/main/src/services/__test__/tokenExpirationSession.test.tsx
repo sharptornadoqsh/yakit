@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   notifyWarning: vi.fn(),
   loginOutLocal: vi.fn(),
   logoutDynamicControl: vi.fn(),
+  axiosApi: vi.fn(),
   globalUserLogout: vi.fn(),
   isCommunityEdition: vi.fn(),
 }))
@@ -41,7 +42,7 @@ vi.mock('@/utils/envfile', () => ({
 
 vi.mock('../electronBridge', () => ({
   yakitNetwork: {
-    axiosApi: vi.fn(),
+    axiosApi: mocks.axiosApi,
     logoutDynamicControl: mocks.logoutDynamicControl,
   },
 }))
@@ -126,6 +127,50 @@ describe('token expiration session', () => {
 
     expect(resolve).toHaveBeenCalledWith(response)
     expect(reject).not.toHaveBeenCalled()
+  })
+
+  it('401 保留结构化状态供统一服务发布认证失效事件', () => {
+    mocks.isCommunityEdition.mockReturnValue(true)
+    const resolve = vi.fn()
+    const reject = vi.fn()
+
+    handleAxios(
+      {
+        code: 401,
+        message: 'token过期',
+        data: { ok: false, error: { code: 'unauthorized', message: 'token过期' } },
+      } as never,
+      resolve,
+      reject,
+    )
+
+    expect(resolve).not.toHaveBeenCalled()
+    expect(reject).toHaveBeenCalledTimes(1)
+    expect(reject.mock.calls[0][0]).toMatchObject({
+      status: 401,
+      code: 'unauthorized',
+      response: { status: 401, data: { code: 'unauthorized', message: 'token过期' } },
+    })
+  })
+
+  it('非 /me 的第二版接口 401 经真实 fetch 和 service 链路发布认证失效事件', async () => {
+    mocks.isCommunityEdition.mockReturnValue(true)
+    mocks.axiosApi.mockResolvedValueOnce({
+      code: 401,
+      message: 'token过期',
+      data: { ok: false, error: { code: 'unauthorized', message: 'token过期' } },
+    })
+    const permissionContext = await import('../../pages/teamCollaboration/teamPermissionContext')
+    const listener = vi.fn()
+    const unsubscribe = permissionContext.subscribeTeamAuthenticationInvalidation(listener)
+    const { listTeamMembers } = await import('../teamCollaboration')
+
+    await expect(listTeamMembers(1)).rejects.toMatchObject({
+      status: 401,
+      response: { status: 401 },
+    })
+    expect(listener).toHaveBeenCalledTimes(1)
+    unsubscribe()
   })
 
   it('保留第二版接口的冲突状态和服务端错误码', () => {

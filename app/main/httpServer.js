@@ -8,7 +8,11 @@ const { printLogOutputFile } = require('./logFile')
 const { pickAxiosErrorCore } = require('./toolsFunc')
 const { assertTrustedAppSender, normalizeHttpBaseUrl } = require('./security')
 const { getConfig, setConfig } = require('./filePath')
-const { applyCollaborationClientHeaders, createCollaborationClientHeaders } = require('./collaborationClientIdentity')
+const {
+  COLLABORATION_CLIENT_ID_HEADER,
+  applyCollaborationClientHeaders,
+  createCollaborationClientHeaders,
+} = require('./collaborationClientIdentity')
 
 // 请求超时时间
 const DefaultTimeOut = 30 * 1000
@@ -24,6 +28,8 @@ const getCollaborationClientHeaders = () => {
   }
   return collaborationClientHeaders
 }
+
+const getCollaborationClientID = () => getCollaborationClientHeaders()[COLLABORATION_CLIENT_ID_HEADER]
 
 // 软件启动后判断是 CE 版本还是 EE 版本
 ipcMain.handle('is-enpritrace-to-domain', (event, flag) => {
@@ -241,4 +247,5 @@ module.exports = {
   httpApi,
   getSocketUrl,
   buildApiBaseUrl,
+  getCollaborationClientID,
 }

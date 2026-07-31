@@ -4,11 +4,25 @@ import { useMemoizedFn } from 'ahooks'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
 import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
+import { useStore } from '@/store'
 import { success, yakitFailed } from '@/utils/notification'
 import * as teamCollaboration from '@/services/teamCollaboration'
 import { apiFetchSaveYakScriptGroupLocal, apiQueryYakScriptBase } from '@/pages/plugins/utils'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { getRemoteHttpSettingGV } from '@/utils/envfile'
+import {
+  acceptTeamPermissionMemberVersion,
+  buildTeamPermissionSnapshots,
+  hasExactTeamPermission,
+  invalidateTeamPermissionSnapshots,
+  isCurrentTeamPermissionResponse,
+  mergeTeamMemberships,
+  subscribeTeamAuthenticationInvalidation,
+  subscribeTeamPermissionInvalidation,
+  synchronizeTeamPermissionSession,
+  type TeamPermissionRequestIdentity,
+  type TeamPermissionSnapshot,
+} from '@/pages/teamCollaboration/teamPermissionContext'
 import {
   buildTeamPluginQuery,
   summarizeTeamPluginImportResults,
@@ -44,6 +58,7 @@ interface TeamPluginRecord {
   group_ids?: number[]
   group_names?: string[]
   visibility: TeamPluginVisibility
+  version: number
   revision: number
   uuid?: string
   file_hash?: string
@@ -80,11 +95,22 @@ interface RefreshErrorState {
 
 type ManagedFilterKind = 'category' | 'group'
 
+const getManagedFilterPermission = (kind: ManagedFilterKind) =>
+  kind === 'category' ? 'plugin.manage' : 'plugin_group.manage'
+
 interface HubListTeamProps {
   onInstall?: (content: string) => void
 }
 
-const service = teamCollaboration as any
+interface PluginVersionPicker {
+  teamId: number
+  plugin: TeamPluginRecord
+  versions: teamCollaboration.TeamPluginVersion[]
+  selectedVersion: number
+}
+
+const service = teamCollaboration
+const sha256Pattern = /^[0-9a-f]{64}$/
 
 const unwrapData = <T,>(response: any): T => (response?.data?.data ?? response?.data ?? response) as T
 
@@ -130,6 +156,7 @@ const normalizeTeamPlugin = (item: any): TeamPluginRecord => {
     category_id: categoryId === undefined || categoryId === null ? undefined : Number(categoryId),
     group_ids: groupIds,
     visibility: item.visibility ?? (item.is_private ? 'private' : 'team'),
+    version: Number(item.version),
     revision: Number(item.revision ?? 1),
     uuid: item.uuid ?? item.UUID,
     file_hash: item.file_hash ?? item.fileHash,
@@ -203,12 +230,31 @@ const saveTeamPluginMapping = async (mapping: TeamPluginLocalMapping): Promise<v
 }
 
 export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
+  const userInfo = useStore((state) => state.userInfo)
+  const authenticatedUserId = Number(userInfo.user_id)
+  const authenticationSessionKey = `${
+    userInfo.isLogin ? 'authenticated' : 'logged-out'
+  }\u0000${authenticatedUserId}\u0000${userInfo.token}`
+  synchronizeTeamPermissionSession(authenticationSessionKey)
+  const [permissionSnapshots, setPermissionSnapshots] = useState<ReadonlyMap<number, TeamPermissionSnapshot>>(
+    () => new Map(),
+  )
+  const [permissionSnapshotsAuthenticationSessionKey, setPermissionSnapshotsAuthenticationSessionKey] =
+    useState(authenticationSessionKey)
   const [loading, setLoading] = useState(false)
   const [teams, setTeams] = useState<Array<{ id: number; name: string }>>([])
   const [teamId, setTeamId] = useState<number>()
   const activeTeamIdRef = useRef<number>()
+  const permissionSnapshotsRef = useRef<ReadonlyMap<number, TeamPermissionSnapshot>>(new Map())
+  const permissionSnapshotsAuthenticationSessionKeyRef = useRef(authenticationSessionKey)
+  const authenticationSessionKeyRef = useRef(authenticationSessionKey)
+  const appliedAuthenticationSessionKeyRef = useRef(authenticationSessionKey)
+  const permissionRequestSequence = useRef(0)
+  const currentPermissionRequest = useRef<TeamPermissionRequestIdentity>()
   const pluginRequestId = useRef(0)
   const filterRequestId = useRef(0)
+  const versionRequestId = useRef(0)
+  authenticationSessionKeyRef.current = authenticationSessionKey
   const [categories, setCategories] = useState<ManagedFilterRecord[]>([])
   const [groups, setGroups] = useState<ManagedFilterRecord[]>([])
   const [plugins, setPlugins] = useState<TeamPluginRecord[]>([])
@@ -247,8 +293,18 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
     kind: ManagedFilterKind
     item: ManagedFilterRecord
   }>()
+  const [pluginVersionPicker, setPluginVersionPicker] = useState<PluginVersionPicker>()
 
   const importSummary = useMemo(() => summarizeTeamPluginImportResults(importResults), [importResults])
+  const selectedTeamPermission = useMemo(() => {
+    if (permissionSnapshotsAuthenticationSessionKey !== authenticationSessionKey || !teamId) return undefined
+    return permissionSnapshots.get(teamId)
+  }, [authenticationSessionKey, permissionSnapshots, permissionSnapshotsAuthenticationSessionKey, teamId])
+  const canReadPlugins = hasExactTeamPermission(selectedTeamPermission, 'plugin.read')
+  const canManagePlugins = hasExactTeamPermission(selectedTeamPermission, 'plugin.manage')
+  const canImportPlugins = hasExactTeamPermission(selectedTeamPermission, 'plugin.import')
+  const canReadPluginGroups = hasExactTeamPermission(selectedTeamPermission, 'plugin_group.read')
+  const canManagePluginGroups = hasExactTeamPermission(selectedTeamPermission, 'plugin_group.manage')
   const refreshErrorMessage = useMemo(() => {
     if (!refreshError) return ''
     if (refreshError.plugins && refreshError.filters) {
@@ -276,6 +332,84 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
     setRefreshError((current) => ({ ...current, [domain]: action }))
   })
 
+  const commitPermissionSnapshots = useMemoizedFn(
+    (
+      next: ReadonlyMap<number, TeamPermissionSnapshot>,
+      boundAuthenticationSessionKey = authenticationSessionKeyRef.current,
+    ) => {
+      permissionSnapshotsAuthenticationSessionKeyRef.current = boundAuthenticationSessionKey
+      permissionSnapshotsRef.current = next
+      setPermissionSnapshotsAuthenticationSessionKey(boundAuthenticationSessionKey)
+      setPermissionSnapshots(next)
+    },
+  )
+
+  const hasTeamPermission = useMemoizedFn((targetTeamId: number, code: string): boolean => {
+    if (permissionSnapshotsAuthenticationSessionKeyRef.current !== authenticationSessionKeyRef.current) return false
+    return hasExactTeamPermission(permissionSnapshotsRef.current.get(targetTeamId), code)
+  })
+
+  const hasActiveTeamPermission = useMemoizedFn((code: string): boolean => {
+    const currentTeamId = activeTeamIdRef.current
+    return Boolean(currentTeamId && hasTeamPermission(currentTeamId, code))
+  })
+
+  const closeProtectedEditors = useMemoizedFn(() => {
+    versionRequestId.current += 1
+    setPluginVersionPicker(undefined)
+    setPluginEditor(undefined)
+    setPluginToDelete(undefined)
+    setUploadVisible(false)
+    setFilterManagerVisible(false)
+    setFilterEditor(undefined)
+    setFilterToDelete(undefined)
+    setInstallConflict((current) => {
+      current?.resolve({ action: 'skip' })
+      return undefined
+    })
+  })
+
+  const clearTeamData = useMemoizedFn(() => {
+    pluginRequestId.current += 1
+    filterRequestId.current += 1
+    closeProtectedEditors()
+    setCategories([])
+    setGroups([])
+    setPlugins([])
+    setTotal(0)
+    setImportResults([])
+    setSelectedPluginIds([])
+    setSelectedLocalPluginIds([])
+    setUploadVisibility('team')
+    setUploadCategoryId(undefined)
+    setUploadGroupIds([])
+    setUploadOverwrite(false)
+    setOperationMessage('')
+    setRefreshError(undefined)
+  })
+
+  const invalidatePermissionSnapshot = useMemoizedFn((invalidatedTeamId: number) => {
+    const next = invalidateTeamPermissionSnapshots(
+      permissionSnapshotsRef.current,
+      permissionSnapshotsAuthenticationSessionKeyRef.current,
+      authenticationSessionKeyRef.current,
+      invalidatedTeamId,
+    )
+    commitPermissionSnapshots(next.snapshots, next.authenticationSessionKey)
+    if (activeTeamIdRef.current === invalidatedTeamId) closeProtectedEditors()
+  })
+
+  const invalidateAuthenticationSession = useMemoizedFn(() => {
+    permissionRequestSequence.current += 1
+    currentPermissionRequest.current = undefined
+    activeTeamIdRef.current = undefined
+    commitPermissionSnapshots(new Map(), authenticationSessionKeyRef.current)
+    clearTeamData()
+    setTeams([])
+    setTeamId(undefined)
+    setLoading(false)
+  })
+
   const loadPlugins = useMemoizedFn(
     async (nextTeamId = teamId, nextQuery = queryRef.current, refreshAction?: string): Promise<boolean | undefined> => {
       if (nextTeamId && activeTeamIdRef.current !== nextTeamId) return undefined
@@ -286,6 +420,11 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         setTotal(0)
         resolveRefreshError('plugins')
         return true
+      }
+      if (!hasTeamPermission(nextTeamId, 'plugin.read')) {
+        setPlugins([])
+        setTotal(0)
+        return undefined
       }
       const isCurrentRequest = () => pluginRequestId.current === requestId && activeTeamIdRef.current === nextTeamId
       setLoading(true)
@@ -314,89 +453,197 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       const requestId = filterRequestId.current + 1
       filterRequestId.current = requestId
       const isCurrentRequest = () => filterRequestId.current === requestId && activeTeamIdRef.current === nextTeamId
-      try {
-        const [categoryResponse, groupResponse] = await Promise.all([
-          service.listPluginCategories(nextTeamId, { page: 1, limit: 200 }),
-          service.listPluginGroups(nextTeamId, { page: 1, limit: 200 }),
-        ])
-        if (!isCurrentRequest()) return undefined
-        setCategories(
-          unwrapItems<any>(categoryResponse, ['categories']).map((item) => ({
-            id: Number(item.id ?? item.ID),
-            name: item.name ?? item.category_name ?? `#${item.id ?? item.ID}`,
-            description: item.description ?? '',
-            sort_order: Number(item.sort_order ?? 0),
-            status: item.status ?? 'active',
-          })),
-        )
-        setGroups(
-          unwrapItems<any>(groupResponse, ['groups']).map((item) => ({
-            id: Number(item.id ?? item.ID),
-            name: item.name ?? item.group_name ?? `#${item.id ?? item.ID}`,
-            description: item.description ?? '',
-            sort_order: Number(item.sort_order ?? 0),
-            status: item.status ?? 'active',
-          })),
-        )
-        resolveRefreshError('filters')
-        return true
-      } catch (error) {
-        if (!isCurrentRequest()) return undefined
-        notifyOperationError('加载插件分类与分组', error)
+      const canReadCategories = hasTeamPermission(nextTeamId, 'plugin.read')
+      const canReadGroups = hasTeamPermission(nextTeamId, 'plugin_group.read')
+      if (!canReadCategories) setCategories([])
+      if (!canReadGroups) setGroups([])
+      if (!canReadCategories && !canReadGroups) return undefined
+      const [categoryResult, groupResult] = await Promise.allSettled([
+        canReadCategories
+          ? service.listPluginCategories(nextTeamId, { page: 1, limit: 200 })
+          : Promise.resolve(undefined),
+        canReadGroups ? service.listPluginGroups(nextTeamId, { page: 1, limit: 200 }) : Promise.resolve(undefined),
+      ])
+      if (!isCurrentRequest()) return undefined
+      const failures: unknown[] = []
+      if (canReadCategories) {
+        if (categoryResult.status === 'fulfilled') {
+          setCategories(
+            unwrapItems<any>(categoryResult.value, ['categories']).map((item) => ({
+              id: Number(item.id ?? item.ID),
+              name: item.name ?? item.category_name ?? `#${item.id ?? item.ID}`,
+              description: item.description ?? '',
+              sort_order: Number(item.sort_order ?? 0),
+              status: item.status ?? 'active',
+            })),
+          )
+        } else {
+          failures.push(categoryResult.reason)
+        }
+      }
+      if (canReadGroups) {
+        if (groupResult.status === 'fulfilled') {
+          setGroups(
+            unwrapItems<any>(groupResult.value, ['groups']).map((item) => ({
+              id: Number(item.id ?? item.ID),
+              name: item.name ?? item.group_name ?? `#${item.id ?? item.ID}`,
+              description: item.description ?? '',
+              sort_order: Number(item.sort_order ?? 0),
+              status: item.status ?? 'active',
+            })),
+          )
+        } else {
+          failures.push(groupResult.reason)
+        }
+      }
+      if (failures.length) {
+        notifyOperationError('加载插件分类与分组', failures[0])
         if (refreshAction) markRefreshError(refreshAction, 'filters')
         return false
       }
+      resolveRefreshError('filters')
+      return true
     },
   )
 
+  const loadTeamAccess = useMemoizedFn(async (requestedTeamId: number | null) => {
+    if (!userInfo.isLogin || !Number.isSafeInteger(authenticatedUserId) || authenticatedUserId <= 0) {
+      invalidateAuthenticationSession()
+      return
+    }
+    const requestIdentity: TeamPermissionRequestIdentity = {
+      userId: authenticatedUserId,
+      teamId: requestedTeamId,
+      requestSequence: permissionRequestSequence.current + 1,
+    }
+    permissionRequestSequence.current = requestIdentity.requestSequence
+    currentPermissionRequest.current = requestIdentity
+    commitPermissionSnapshots(new Map(), authenticationSessionKey)
+    clearTeamData()
+    setLoading(true)
+    try {
+      const [teamResponse, currentUserResponse] = await Promise.all([
+        service.listTeams({ page: 1, limit: 100 }),
+        service.getMe(),
+      ])
+      if (
+        !currentPermissionRequest.current ||
+        !isCurrentTeamPermissionResponse(currentPermissionRequest.current, requestIdentity) ||
+        authenticationSessionKeyRef.current !== authenticationSessionKey
+      ) {
+        return
+      }
+      const currentUser = unwrapData<teamCollaboration.CurrentCollaborationUser>(currentUserResponse)
+      if (
+        !currentUser?.user ||
+        currentUser.user.id !== authenticatedUserId ||
+        !Array.isArray(currentUser.memberships)
+      ) {
+        throw new Error('团队权限响应用户不匹配')
+      }
+      const joinedTeams = mergeTeamMemberships(
+        unwrapItems<teamCollaboration.CollaborationTeam>(teamResponse, ['teams']),
+        currentUser.memberships,
+      )
+      const nextTeams = joinedTeams
+        .map((item) => ({ id: Number(item.id), name: item.name || `#${item.id}` }))
+        .sort((left, right) => left.id - right.id)
+      setTeams(nextTeams)
+      let nextTeamId = requestedTeamId
+      if (requestedTeamId === null) {
+        if (activeTeamIdRef.current !== undefined) return
+        nextTeamId = nextTeams[0]?.id || null
+      } else if (activeTeamIdRef.current !== requestedTeamId) {
+        return
+      }
+      if (nextTeamId === null || !nextTeams.some((item) => item.id === nextTeamId)) {
+        activeTeamIdRef.current = undefined
+        setTeamId(undefined)
+        return
+      }
+
+      activeTeamIdRef.current = nextTeamId
+      setTeamId(nextTeamId)
+      const snapshots = buildTeamPermissionSnapshots(currentUser)
+      const snapshot = snapshots.get(nextTeamId)
+      if (
+        !snapshot ||
+        !acceptTeamPermissionMemberVersion(
+          authenticationSessionKey,
+          snapshot.userId,
+          snapshot.teamId,
+          snapshot.memberVersion,
+        )
+      ) {
+        return
+      }
+      commitPermissionSnapshots(new Map([[nextTeamId, snapshot]]), authenticationSessionKey)
+      await Promise.all([
+        hasTeamPermission(nextTeamId, 'plugin.read') || hasTeamPermission(nextTeamId, 'plugin_group.read')
+          ? loadFilters(nextTeamId)
+          : Promise.resolve(undefined),
+        hasTeamPermission(nextTeamId, 'plugin.read')
+          ? loadPlugins(nextTeamId, queryRef.current)
+          : Promise.resolve(undefined),
+      ])
+    } catch (error) {
+      if (
+        currentPermissionRequest.current &&
+        isCurrentTeamPermissionResponse(currentPermissionRequest.current, requestIdentity) &&
+        authenticationSessionKeyRef.current === authenticationSessionKey
+      ) {
+        commitPermissionSnapshots(new Map(), authenticationSessionKey)
+        clearTeamData()
+        setTeams([])
+        activeTeamIdRef.current = undefined
+        setTeamId(undefined)
+        notifyOperationError('加载团队', error)
+      }
+    } finally {
+      if (
+        currentPermissionRequest.current &&
+        isCurrentTeamPermissionResponse(currentPermissionRequest.current, requestIdentity) &&
+        authenticationSessionKeyRef.current === authenticationSessionKey
+      ) {
+        setLoading(false)
+      }
+    }
+  })
+
   const selectTeam = useMemoizedFn(async (nextTeamId: number) => {
+    if (!Number.isSafeInteger(nextTeamId) || nextTeamId <= 0) return
     const nextQuery = { ...queryRef.current, categoryId: undefined, groupId: undefined, page: 1 }
     activeTeamIdRef.current = nextTeamId
     queryRef.current = nextQuery
     setTeamId(nextTeamId)
     setQuery(nextQuery)
-    setCategories([])
-    setGroups([])
-    setPlugins([])
-    setTotal(0)
-    setImportResults([])
-    setSelectedPluginIds([])
-    setSelectedLocalPluginIds([])
-    setUploadVisible(false)
-    setUploadVisibility('team')
-    setUploadCategoryId(undefined)
-    setUploadGroupIds([])
-    setUploadOverwrite(false)
-    setPluginEditor(undefined)
-    setPluginToDelete(undefined)
-    setFilterManagerVisible(false)
-    setFilterEditor(undefined)
-    setFilterToDelete(undefined)
-    setOperationMessage('')
-    setRefreshError(undefined)
-    await Promise.all([loadFilters(nextTeamId), loadPlugins(nextTeamId, nextQuery)])
-  })
-
-  const loadTeams = useMemoizedFn(async () => {
-    setLoading(true)
-    try {
-      const response = await service.listTeams({ page: 1, limit: 100 })
-      const nextTeams = unwrapItems<any>(response, ['teams']).map((item) => ({
-        id: Number(item.id ?? item.ID),
-        name: item.name ?? item.team_name ?? item.TeamName ?? `#${item.id ?? item.ID}`,
-      }))
-      setTeams(nextTeams)
-      if (nextTeams[0]?.id) await selectTeam(nextTeams[0].id)
-    } catch (error) {
-      notifyOperationError('加载团队', error)
-    } finally {
-      setLoading(false)
-    }
+    await loadTeamAccess(nextTeamId)
   })
 
   useEffect(() => {
-    loadTeams()
-  }, [])
+    void loadTeamAccess(null)
+  }, [loadTeamAccess])
+
+  useEffect(() => {
+    if (appliedAuthenticationSessionKeyRef.current === authenticationSessionKey) return
+    appliedAuthenticationSessionKeyRef.current = authenticationSessionKey
+    invalidateAuthenticationSession()
+    void loadTeamAccess(null)
+  }, [authenticationSessionKey, invalidateAuthenticationSession, loadTeamAccess])
+
+  useEffect(() => {
+    const unsubscribePermissionInvalidation = subscribeTeamPermissionInvalidation((invalidatedTeamId) => {
+      invalidatePermissionSnapshot(invalidatedTeamId)
+      if (activeTeamIdRef.current === invalidatedTeamId) void loadTeamAccess(invalidatedTeamId)
+    })
+    const unsubscribeAuthenticationInvalidation = subscribeTeamAuthenticationInvalidation(
+      invalidateAuthenticationSession,
+    )
+    return () => {
+      unsubscribePermissionInvalidation()
+      unsubscribeAuthenticationInvalidation()
+    }
+  }, [invalidateAuthenticationSession, invalidatePermissionSnapshot, loadTeamAccess])
 
   const updateQuery = useMemoizedFn((patch: Partial<TeamPluginQueryState>) => {
     const nextQuery = { ...queryRef.current, ...patch, page: patch.page ?? 1 }
@@ -405,25 +652,64 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
     loadPlugins(teamId, nextQuery)
   })
 
-  const listReferencedPlugins = useMemoizedFn(
-    async (filter: { category_id?: number; group_id?: number }): Promise<TeamPluginRecord[]> => {
-      if (!teamId) return []
-      const limit = 200
-      const records = new Map<number, TeamPluginRecord>()
-      let fetchedCount = 0
-      for (let page = 1; ; page += 1) {
-        const response = await service.listTeamPlugins(teamId, { ...filter, page, limit })
-        const pagePlugins = unwrapItems<any>(response, ['plugins']).map(normalizeTeamPlugin)
-        fetchedCount += pagePlugins.length
-        pagePlugins.forEach((plugin) => {
-          if (Number.isFinite(plugin.id) && plugin.id > 0) records.set(plugin.id, plugin)
-        })
-        const total = getTotal(response, fetchedCount)
-        if (!pagePlugins.length || fetchedCount >= total) break
+  const assertOperationPermission = useMemoizedFn((operationTeamId: number, code: string) => {
+    if (activeTeamIdRef.current !== operationTeamId || !hasTeamPermission(operationTeamId, code)) {
+      throw new Error('团队权限已失效，请刷新后重试')
+    }
+  })
+
+  const loadPluginVersions = useMemoizedFn(
+    async (plugin: TeamPluginRecord): Promise<teamCollaboration.TeamPluginVersion[] | undefined> => {
+      const operationTeamId = activeTeamIdRef.current
+      if (!operationTeamId || !hasTeamPermission(operationTeamId, 'plugin.read')) return undefined
+      const requestId = versionRequestId.current + 1
+      versionRequestId.current = requestId
+      const response = await service.listTeamPluginVersions(operationTeamId, plugin.id, { page: 1, limit: 200 })
+      if (
+        versionRequestId.current !== requestId ||
+        activeTeamIdRef.current !== operationTeamId ||
+        !hasTeamPermission(operationTeamId, 'plugin.read')
+      ) {
+        return undefined
       }
-      return Array.from(records.values())
+      const versions = unwrapItems<teamCollaboration.TeamPluginVersion>(response, ['versions'])
+      if (!versions.length) throw new Error('插件没有可下载的历史版本')
+      const valid = versions.every(
+        (item) =>
+          Number(item.team_id) === operationTeamId &&
+          Number(item.plugin_id) === plugin.id &&
+          Number.isSafeInteger(Number(item.version)) &&
+          Number(item.version) > 0 &&
+          sha256Pattern.test(String(item.file_hash)),
+      )
+      if (!valid) throw new Error('插件版本元数据无效')
+      return [...versions].sort((left, right) => right.version - left.version)
     },
   )
+
+  const openPluginVersions = useMemoizedFn(async (plugin: TeamPluginRecord) => {
+    if (!hasActiveTeamPermission('plugin.read')) return
+    const operationTeamId = activeTeamIdRef.current
+    if (!operationTeamId) return
+    setLoading(true)
+    try {
+      const versions = await loadPluginVersions(plugin)
+      if (!versions || activeTeamIdRef.current !== operationTeamId) return
+      const selected = versions.find((item) => item.version === plugin.version) || versions[0]
+      setPluginVersionPicker({
+        teamId: operationTeamId,
+        plugin,
+        versions,
+        selectedVersion: selected.version,
+      })
+    } catch (error) {
+      if (activeTeamIdRef.current === operationTeamId && hasTeamPermission(operationTeamId, 'plugin.read')) {
+        notifyOperationError('加载插件历史版本', error)
+      }
+    } finally {
+      if (activeTeamIdRef.current === operationTeamId) setLoading(false)
+    }
+  })
 
   const resolveInstallConflict = useMemoizedFn(
     (input: { plugin: TeamPluginInstallRecord; existing: LocalPluginRecord }) =>
@@ -455,73 +741,125 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
     )
   })
 
-  const installPlugin = useMemoizedFn(async (plugin: TeamPluginRecord) => {
-    if (!teamId) throw new Error('请选择团队')
-    const onlineBaseUrl = await getOnlineBaseUrl()
-    const categoryName = plugin.category_name || categories.find((item) => item.id === plugin.category_id)?.name
-    const groupNames =
-      plugin.group_names || plugin.group_ids?.map((id) => groups.find((item) => item.id === id)?.name || `#${id}`) || []
-    const result = await installTeamPluginDownload(
-      {
-        id: plugin.id,
-        teamId,
-        scriptName: plugin.script_name,
-        type: plugin.type,
-        uuid: plugin.uuid,
-        description: plugin.description,
-        fileHash: plugin.file_hash,
-        revision: plugin.revision,
-        visibility: plugin.visibility,
-        categoryId: plugin.category_id,
-        categoryName,
-        groupIds: plugin.group_ids,
-        groupNames,
-        tags: plugin.tags,
-      },
-      {
-        onlineBaseUrl,
-        findLocalPlugin,
-        resolveLocalConflict: resolveInstallConflict,
-        download: () => service.downloadTeamPlugin(teamId, plugin.id) as Promise<TeamPluginDownloadContent>,
-        savePlugin: (input) => ipcRenderer.invoke('SaveYakScript', input),
-        saveGroups: async (scriptName, saveGroups) => {
-          await apiFetchSaveYakScriptGroupLocal({
-            Filter: {
-              IncludedScriptNames: [scriptName],
-              Pagination: { Page: 1, Limit: 1, OrderBy: 'updated_at', Order: 'desc' },
-            },
-            SaveGroup: saveGroups,
-            RemoveGroup: [],
-          })
-        },
-        saveMapping: saveTeamPluginMapping,
-      },
-    )
-    return result
-  })
-
-  const downloadPlugin = useMemoizedFn(async (plugin: TeamPluginRecord) => {
-    setLoading(true)
-    setOperationMessage(`正在下载并校验：${plugin.script_name}`)
-    try {
-      const result = await installPlugin(plugin)
-      if ('skipped' in result) {
-        setOperationMessage(`已跳过本地同名插件：${plugin.script_name}`)
-        success(`已跳过本地同名插件“${plugin.script_name}”`)
-      } else {
-        setOperationMessage(`摘要校验通过并已安装：${plugin.script_name}`)
-        notifyInstalledPlugin(result.mapping)
-        success(`插件“${plugin.script_name}”已安装到本地`)
+  const installPlugin = useMemoizedFn(
+    async (plugin: TeamPluginRecord, selectedVersion: teamCollaboration.TeamPluginVersion, operationTeamId: number) => {
+      assertOperationPermission(operationTeamId, 'plugin.read')
+      if (
+        selectedVersion.team_id !== operationTeamId ||
+        selectedVersion.plugin_id !== plugin.id ||
+        !Number.isSafeInteger(selectedVersion.version) ||
+        selectedVersion.version <= 0 ||
+        !sha256Pattern.test(selectedVersion.file_hash)
+      ) {
+        throw new Error('插件版本元数据无效')
       }
-    } catch (error) {
-      setOperationMessage(`安装失败：${plugin.script_name}：${readError(error).message}`)
-      notifyOperationError('下载团队插件', error)
-    } finally {
-      setLoading(false)
-    }
+      const onlineBaseUrl = await getOnlineBaseUrl()
+      assertOperationPermission(operationTeamId, 'plugin.read')
+      const categoryName = plugin.category_name || categories.find((item) => item.id === plugin.category_id)?.name
+      const groupNames =
+        plugin.group_names ||
+        plugin.group_ids?.map((id) => groups.find((item) => item.id === id)?.name || `#${id}`) ||
+        []
+      const result = await installTeamPluginDownload(
+        {
+          id: plugin.id,
+          teamId: operationTeamId,
+          scriptName: plugin.script_name,
+          type: plugin.type,
+          uuid: plugin.uuid,
+          description: plugin.description,
+          fileHash: selectedVersion.file_hash,
+          version: selectedVersion.version,
+          revision: plugin.revision,
+          visibility: plugin.visibility,
+          categoryId: plugin.category_id,
+          categoryName,
+          groupIds: plugin.group_ids,
+          groupNames,
+          tags: plugin.tags,
+        },
+        {
+          onlineBaseUrl,
+          findLocalPlugin: async (scriptName) => {
+            assertOperationPermission(operationTeamId, 'plugin.read')
+            return findLocalPlugin(scriptName)
+          },
+          resolveLocalConflict: resolveInstallConflict,
+          download: async (version) => {
+            assertOperationPermission(operationTeamId, 'plugin.read')
+            const content = (await service.downloadTeamPluginVersion(
+              operationTeamId,
+              plugin.id,
+              version,
+            )) as TeamPluginDownloadContent
+            assertOperationPermission(operationTeamId, 'plugin.read')
+            return content
+          },
+          savePlugin: (input) => {
+            assertOperationPermission(operationTeamId, 'plugin.read')
+            return ipcRenderer.invoke('SaveYakScript', input)
+          },
+          saveGroups: async (scriptName, saveGroups) => {
+            assertOperationPermission(operationTeamId, 'plugin.read')
+            await apiFetchSaveYakScriptGroupLocal({
+              Filter: {
+                IncludedScriptNames: [scriptName],
+                Pagination: { Page: 1, Limit: 1, OrderBy: 'updated_at', Order: 'desc' },
+              },
+              SaveGroup: saveGroups,
+              RemoveGroup: [],
+            })
+          },
+          saveMapping: (mapping) => {
+            assertOperationPermission(operationTeamId, 'plugin.read')
+            return saveTeamPluginMapping(mapping)
+          },
+        },
+      )
+      return result
+    },
+  )
+
+  const downloadPlugin = useMemoizedFn(
+    async (plugin: TeamPluginRecord, selectedVersion: teamCollaboration.TeamPluginVersion, operationTeamId: number) => {
+      if (!hasTeamPermission(operationTeamId, 'plugin.read') || activeTeamIdRef.current !== operationTeamId) return
+      setLoading(true)
+      setOperationMessage(`正在下载并校验：${plugin.script_name}`)
+      try {
+        const result = await installPlugin(plugin, selectedVersion, operationTeamId)
+        if (!hasTeamPermission(operationTeamId, 'plugin.read') || activeTeamIdRef.current !== operationTeamId) return
+        if ('skipped' in result) {
+          setOperationMessage(`已跳过本地同名插件：${plugin.script_name}`)
+          success(`已跳过本地同名插件“${plugin.script_name}”`)
+        } else {
+          setOperationMessage(`摘要校验通过并已安装：${plugin.script_name}`)
+          notifyInstalledPlugin(result.mapping)
+          success(`插件“${plugin.script_name}”已安装到本地`)
+        }
+      } catch (error) {
+        if (activeTeamIdRef.current === operationTeamId && hasTeamPermission(operationTeamId, 'plugin.read')) {
+          setOperationMessage(`安装失败：${plugin.script_name}：${readError(error).message}`)
+          notifyOperationError('下载团队插件', error)
+        }
+      } finally {
+        if (activeTeamIdRef.current === operationTeamId) setLoading(false)
+      }
+    },
+  )
+
+  const confirmVersionInstall = useMemoizedFn(async () => {
+    const picker = pluginVersionPicker
+    if (!picker || activeTeamIdRef.current !== picker.teamId || !hasTeamPermission(picker.teamId, 'plugin.read')) return
+    const selectedVersion = picker.versions.find((item) => item.version === picker.selectedVersion)
+    if (!selectedVersion) return
+    setPluginVersionPicker(undefined)
+    await downloadPlugin(picker.plugin, selectedVersion, picker.teamId)
   })
 
   const downloadSelectedPlugins = useMemoizedFn(async () => {
+    if (!hasActiveTeamPermission('plugin.read')) return
+    const operationTeamId = activeTeamIdRef.current
+    if (!operationTeamId) return
     const selected = plugins.filter((plugin) => selectedPluginIds.includes(plugin.id))
     if (!selected.length) {
       yakitFailed('请选择团队插件')
@@ -537,7 +875,11 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       const plugin = selected[index]
       setOperationMessage(`批量安装 ${index + 1}/${selected.length}：${plugin.script_name}`)
       try {
-        const result = await installPlugin(plugin)
+        assertOperationPermission(operationTeamId, 'plugin.read')
+        const versions = await loadPluginVersions(plugin)
+        if (!versions) throw new Error('插件版本请求已失效')
+        const selectedVersion = versions.find((item) => item.version === plugin.version) || versions[0]
+        const result = await installPlugin(plugin, selectedVersion, operationTeamId)
         if ('skipped' in result) skipped += 1
         else {
           installed += 1
@@ -548,6 +890,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         failures.push(`${plugin.script_name}：${readError(error).message}`)
       }
     }
+    if (activeTeamIdRef.current !== operationTeamId) return
     setLoading(false)
     setSelectedPluginIds([])
     if (lastInstalledMapping) notifyInstalledPlugin(lastInstalledMapping)
@@ -558,7 +901,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const openCreatePlugin = useMemoizedFn(() => {
-    if (!teamId) {
+    if (!teamId || !hasActiveTeamPermission('plugin.manage')) {
       yakitFailed('请选择团队')
       return
     }
@@ -567,6 +910,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const openEditPlugin = useMemoizedFn((plugin: TeamPluginRecord) => {
+    if (!hasActiveTeamPermission('plugin.manage')) return
     setPluginDraft({
       scriptName: plugin.script_name,
       type: plugin.type || 'yak',
@@ -583,7 +927,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const savePlugin = useMemoizedFn(async () => {
-    if (!teamId || !pluginEditor) return
+    if (!teamId || !pluginEditor || !hasActiveTeamPermission('plugin.manage')) return
     const operationTeamId = teamId
     const scriptName = pluginDraft.scriptName.trim()
     const type = pluginDraft.type.trim()
@@ -601,13 +945,14 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         .map((tag) => tag.trim())
         .filter(Boolean),
       enabled: pluginDraft.enabled,
+      visibility: pluginDraft.visibility,
       category_id: pluginDraft.categoryId || 0,
       group_ids: pluginDraft.groupIds,
-      visibility: pluginDraft.visibility,
     }
     const action = pluginEditor.mode === 'create' ? '创建远端插件' : '更新远端插件'
     setLoading(true)
     try {
+      assertOperationPermission(operationTeamId, 'plugin.manage')
       if (pluginEditor.mode === 'create') {
         await service.createTeamPlugin(operationTeamId, data)
       } else if (pluginEditor.plugin) {
@@ -617,7 +962,9 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
           revision: pluginEditor.plugin.revision,
         })
       }
-      if (activeTeamIdRef.current !== operationTeamId) return
+      if (activeTeamIdRef.current !== operationTeamId || !hasTeamPermission(operationTeamId, 'plugin.manage')) {
+        return
+      }
       setPluginEditor(undefined)
       setOperationMessage(`${action}已提交，正在刷新插件列表`)
       const refreshed = await loadPlugins(operationTeamId, { ...queryRef.current }, action)
@@ -635,14 +982,17 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const deletePlugin = useMemoizedFn(async () => {
-    if (!teamId || !pluginToDelete) return
+    if (!teamId || !pluginToDelete || !hasActiveTeamPermission('plugin.manage')) return
     const operationTeamId = teamId
     setLoading(true)
     try {
       const deletedPluginId = pluginToDelete.id
       setOperationMessage('正在删除远端插件并清空分组引用')
+      assertOperationPermission(operationTeamId, 'plugin.manage')
       await service.deleteTeamPlugin(operationTeamId, deletedPluginId, { cascade: true })
-      if (activeTeamIdRef.current !== operationTeamId) return
+      if (activeTeamIdRef.current !== operationTeamId || !hasTeamPermission(operationTeamId, 'plugin.manage')) {
+        return
+      }
       setPluginToDelete(undefined)
       setSelectedPluginIds((current) => current.filter((id) => id !== deletedPluginId))
       setPlugins((current) => current.filter((plugin) => plugin.id !== deletedPluginId))
@@ -666,6 +1016,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const openFilterEditor = useMemoizedFn((kind: ManagedFilterKind, item?: ManagedFilterRecord) => {
+    if (!hasActiveTeamPermission(getManagedFilterPermission(kind))) return
     setFilterDraft({
       name: item?.name || '',
       description: item?.description || '',
@@ -676,7 +1027,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const openFilterManager = useMemoizedFn(async () => {
-    if (!teamId) {
+    if (!teamId || (!hasActiveTeamPermission('plugin.manage') && !hasActiveTeamPermission('plugin_group.manage'))) {
       yakitFailed('请选择团队')
       return
     }
@@ -687,6 +1038,8 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   const saveFilter = useMemoizedFn(async () => {
     if (!teamId || !filterEditor) return
     const operationTeamId = teamId
+    const permissionCode = getManagedFilterPermission(filterEditor.kind)
+    if (!hasActiveTeamPermission(permissionCode)) return
     const name = filterDraft.name.trim()
     if (!name) {
       yakitFailed(`${filterEditor.kind === 'category' ? '分类' : '分组'}名称为必填项`)
@@ -702,6 +1055,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
     const action = `${filterEditor.item ? '更新' : '创建'}${label}`
     setLoading(true)
     try {
+      assertOperationPermission(operationTeamId, permissionCode)
       if (filterEditor.kind === 'category') {
         if (filterEditor.item) await service.updatePluginCategory(operationTeamId, filterEditor.item.id, data)
         else await service.createPluginCategory(operationTeamId, data)
@@ -710,7 +1064,9 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       } else {
         await service.createPluginGroup(operationTeamId, data)
       }
-      if (activeTeamIdRef.current !== operationTeamId) return
+      if (activeTeamIdRef.current !== operationTeamId || !hasTeamPermission(operationTeamId, permissionCode)) {
+        return
+      }
       setFilterEditor(undefined)
       setOperationMessage(`${action}已提交，正在刷新分类与分组`)
       const refreshed = await loadFilters(operationTeamId, action)
@@ -730,34 +1086,51 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   const deleteFilter = useMemoizedFn(async () => {
     if (!teamId || !filterToDelete) return
     const operationTeamId = teamId
+    const permissionCode = getManagedFilterPermission(filterToDelete.kind)
+    if (!hasActiveTeamPermission(permissionCode)) return
     const label = filterToDelete.kind === 'category' ? '分类' : '分组'
     const action = `删除${label}`
     setLoading(true)
     try {
       const deletedFilter = filterToDelete
-      setOperationMessage(`正在清空${label}引用`)
-      const referencedPlugins = await listReferencedPlugins(
-        deletedFilter.kind === 'category'
-          ? { category_id: deletedFilter.item.id }
-          : { group_id: deletedFilter.item.id },
-      )
+      assertOperationPermission(operationTeamId, permissionCode)
+      setOperationMessage(`正在删除${label}并清空引用`)
       if (deletedFilter.kind === 'category') {
-        for (const plugin of referencedPlugins) {
-          await service.updateTeamPlugin(operationTeamId, plugin.id, { category_id: 0, revision: plugin.revision })
-        }
         await service.deletePluginCategory(operationTeamId, deletedFilter.item.id, { cascade: true })
       } else {
-        for (const plugin of referencedPlugins) {
-          await service.unbindPluginGroup(operationTeamId, plugin.id, deletedFilter.item.id)
-        }
         await service.deletePluginGroup(operationTeamId, deletedFilter.item.id, { cascade: true })
       }
-      if (activeTeamIdRef.current !== operationTeamId) return
+      if (activeTeamIdRef.current !== operationTeamId || !hasTeamPermission(operationTeamId, permissionCode)) {
+        return
+      }
       setFilterToDelete(undefined)
       if (deletedFilter.kind === 'category') {
         setCategories((current) => current.filter((item) => item.id !== deletedFilter.item.id))
+        setPlugins((current) =>
+          current.map((plugin) =>
+            plugin.category_id === deletedFilter.item.id
+              ? {
+                  ...plugin,
+                  category_id: undefined,
+                  category_name: undefined,
+                  revision: plugin.revision + 1,
+                }
+              : plugin,
+          ),
+        )
       } else {
         setGroups((current) => current.filter((item) => item.id !== deletedFilter.item.id))
+        setPlugins((current) =>
+          current.map((plugin) =>
+            plugin.group_ids?.includes(deletedFilter.item.id)
+              ? {
+                  ...plugin,
+                  group_ids: plugin.group_ids.filter((id) => id !== deletedFilter.item.id),
+                  group_names: plugin.group_names?.filter((name) => name !== deletedFilter.item.name),
+                }
+              : plugin,
+          ),
+        )
       }
       const currentQuery = queryRef.current
       const clearsCategory = deletedFilter.kind === 'category' && currentQuery.categoryId === deletedFilter.item.id
@@ -771,17 +1144,8 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         queryRef.current = nextQuery
         setQuery(nextQuery)
       }
-      setOperationMessage(`删除${label}已提交，正在刷新页面数据`)
-      const [filtersRefreshed, pluginsRefreshed] = await Promise.all([
-        loadFilters(operationTeamId, action),
-        loadPlugins(operationTeamId, nextQuery, action),
-      ])
-      if (filtersRefreshed === true && pluginsRefreshed === true) {
-        setOperationMessage('')
-        success(`删除${label}成功`)
-      } else {
-        setOperationMessage('')
-      }
+      setOperationMessage('')
+      success(`删除${label}成功`)
     } catch (error) {
       if (activeTeamIdRef.current === operationTeamId) {
         setOperationMessage('')
@@ -793,13 +1157,16 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const updateVisibility = useMemoizedFn(async (plugin: TeamPluginRecord, visibility: TeamPluginVisibility) => {
-    if (!teamId || plugin.visibility === visibility) return
+    if (!teamId || plugin.visibility === visibility || !hasActiveTeamPermission('plugin.manage')) return
     const operationTeamId = teamId
     setLoading(true)
     setOperationMessage('正在读取本地插件')
     try {
+      assertOperationPermission(operationTeamId, 'plugin.manage')
       await service.setPluginVisibility(operationTeamId, plugin.id, visibility, plugin.revision)
-      if (activeTeamIdRef.current !== operationTeamId) return
+      if (activeTeamIdRef.current !== operationTeamId || !hasTeamPermission(operationTeamId, 'plugin.manage')) {
+        return
+      }
       if (await loadPlugins(operationTeamId, { ...queryRef.current })) {
         success(`插件可见范围已设为${visibility === 'team' ? '团队' : '私有'}`)
       }
@@ -811,18 +1178,21 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const openLocalUpload = useMemoizedFn(async () => {
-    if (!teamId) {
+    if (!teamId || !hasActiveTeamPermission('plugin.import')) {
       yakitFailed('请选择团队')
       return
     }
     const operationTeamId = teamId
     setLoading(true)
     try {
+      assertOperationPermission(operationTeamId, 'plugin.import')
       const response = await apiQueryYakScriptBase({
         Pagination: { Page: 1, Limit: 1000, OrderBy: 'updated_at', Order: 'desc' },
         IsHistory: false,
       })
-      if (activeTeamIdRef.current !== operationTeamId) return
+      if (activeTeamIdRef.current !== operationTeamId || !hasTeamPermission(operationTeamId, 'plugin.import')) {
+        return
+      }
       const candidates = (response.Data || []).filter((plugin) => !plugin.IsHistory)
       if (!candidates.length) throw new Error('本地插件库为空')
       setLocalPlugins(candidates)
@@ -841,24 +1211,36 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const uploadLocalPlugins = useMemoizedFn(async () => {
-    if (!teamId) return
+    if (!teamId || !hasActiveTeamPermission('plugin.import')) return
     const operationTeamId = teamId
+    const requiresManagePermission = uploadOverwrite
+    if (requiresManagePermission && !hasActiveTeamPermission('plugin.manage')) return
     const selected = localPlugins.filter((plugin) => selectedLocalPluginIds.includes(plugin.Id))
     const options: TeamPluginUploadOptions = {
       visibility: uploadVisibility,
+      overwrite: uploadOverwrite,
       categoryId: uploadCategoryId,
       groupIds: uploadGroupIds,
-      overwrite: uploadOverwrite,
     }
     setLoading(true)
     try {
+      assertOperationPermission(operationTeamId, 'plugin.import')
+      if (requiresManagePermission) assertOperationPermission(operationTeamId, 'plugin.manage')
       setOperationMessage(`正在计算 ${selected.length} 个本地插件的 SHA-256`)
       const entries = await buildTeamPluginUploadEntries(selected, options)
-      if (activeTeamIdRef.current === operationTeamId) {
+      if (activeTeamIdRef.current === operationTeamId && hasTeamPermission(operationTeamId, 'plugin.import')) {
         setOperationMessage(`正在上传 ${entries.length} 个本地插件`)
       }
+      assertOperationPermission(operationTeamId, 'plugin.import')
+      if (requiresManagePermission) assertOperationPermission(operationTeamId, 'plugin.manage')
       const response = await service.importTeamPlugins(operationTeamId, { plugins: entries })
-      if (activeTeamIdRef.current !== operationTeamId) return
+      if (
+        activeTeamIdRef.current !== operationTeamId ||
+        !hasTeamPermission(operationTeamId, 'plugin.import') ||
+        (requiresManagePermission && !hasTeamPermission(operationTeamId, 'plugin.manage'))
+      ) {
+        return
+      }
       const results = unwrapItems<TeamPluginImportResult>(response, ['results'])
       setImportResults(results)
       setUploadVisible(false)
@@ -866,7 +1248,11 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       if (activeTeamIdRef.current !== operationTeamId) return
       const summary = summarizeTeamPluginImportResults(results)
       setOperationMessage(`上传完成：成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
-      success(`已提交 ${entries.length} 个本地插件`)
+      if (summary.failed) {
+        yakitFailed(`上传完成：成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
+      } else {
+        success(`已提交 ${entries.length} 个本地插件`)
+      }
     } catch (error) {
       if (activeTeamIdRef.current === operationTeamId) notifyOperationError('上传本地插件', error)
     } finally {
@@ -875,32 +1261,49 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   })
 
   const importFile = useMemoizedFn(async (file: File) => {
-    if (!teamId) {
+    if (!teamId || !hasActiveTeamPermission('plugin.import')) {
       yakitFailed('请选择团队')
       return false
     }
     const operationTeamId = teamId
     setLoading(true)
     try {
+      assertOperationPermission(operationTeamId, 'plugin.import')
       const text = await file.text()
+      assertOperationPermission(operationTeamId, 'plugin.import')
       const parsed = JSON.parse(text)
       const items = Array.isArray(parsed) ? parsed : parsed.plugins
       if (!Array.isArray(items) || !items.length) throw new Error('文件中没有插件数组')
+      const requiresManagePermission = items.some((item) => item?.overwrite === true)
+      if (requiresManagePermission) assertOperationPermission(operationTeamId, 'plugin.manage')
       const plugins = items.map((item, index) => ({
         ...item,
         source_name: item.source_name || `${file.name}#${index + 1}`,
       }))
-      if (activeTeamIdRef.current === operationTeamId) {
+      if (activeTeamIdRef.current === operationTeamId && hasTeamPermission(operationTeamId, 'plugin.import')) {
         setOperationMessage(`正在导入 ${plugins.length} 个插件条目`)
       }
+      assertOperationPermission(operationTeamId, 'plugin.import')
+      if (requiresManagePermission) assertOperationPermission(operationTeamId, 'plugin.manage')
       const response = await service.importTeamPlugins(operationTeamId, { plugins })
-      if (activeTeamIdRef.current !== operationTeamId) return false
+      if (
+        activeTeamIdRef.current !== operationTeamId ||
+        !hasTeamPermission(operationTeamId, 'plugin.import') ||
+        (requiresManagePermission && !hasTeamPermission(operationTeamId, 'plugin.manage'))
+      ) {
+        return false
+      }
       const results = unwrapItems<TeamPluginImportResult>(response, ['results'])
       setImportResults(results)
       await loadPlugins(operationTeamId, { ...queryRef.current })
       if (activeTeamIdRef.current !== operationTeamId) return false
       const summary = summarizeTeamPluginImportResults(results)
       setOperationMessage(`导入完成：成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
+      if (summary.failed) {
+        yakitFailed(`导入完成：成功 ${summary.succeeded}，跳过 ${summary.skipped}，失败 ${summary.failed}`)
+      } else {
+        success(`导入完成：成功 ${summary.succeeded}，跳过 ${summary.skipped}`)
+      }
     } catch (error) {
       if (activeTeamIdRef.current === operationTeamId) notifyOperationError('批量导入团队插件', error)
     } finally {
@@ -941,18 +1344,24 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
     {
       title: '可见范围',
       key: 'visibility',
-      render: (_: unknown, record: TeamPluginRecord) => (
-        <Select
-          size="small"
-          value={record.visibility}
-          options={[
-            { value: 'team', label: '团队' },
-            { value: 'private', label: '私有' },
-          ]}
-          onChange={(value) => updateVisibility(record, value)}
-        />
-      ),
+      render: (_: unknown, record: TeamPluginRecord) =>
+        canManagePlugins ? (
+          <Select
+            size="small"
+            value={record.visibility}
+            options={[
+              { value: 'team', label: '团队' },
+              { value: 'private', label: '私有' },
+            ]}
+            onChange={(value) => updateVisibility(record, value)}
+          />
+        ) : record.visibility === 'team' ? (
+          '团队'
+        ) : (
+          '私有'
+        ),
     },
+    { title: '版本', dataIndex: 'version', key: 'version', width: 76 },
     { title: '修订', dataIndex: 'revision', key: 'revision', width: 76 },
     {
       title: '操作',
@@ -960,19 +1369,31 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       width: 260,
       render: (_: unknown, record: TeamPluginRecord) => (
         <div className={styles.actionGroup}>
-          <YakitButton type="outline1" onClick={() => downloadPlugin(record)}>
-            下载到本地
-          </YakitButton>
-          <YakitButton type="text" aria-label={`编辑插件 ${record.script_name}`} onClick={() => openEditPlugin(record)}>
-            编辑
-          </YakitButton>
-          <YakitButton
-            type="text"
-            aria-label={`删除插件 ${record.script_name}`}
-            onClick={() => setPluginToDelete(record)}
-          >
-            删除
-          </YakitButton>
+          {canReadPlugins ? (
+            <YakitButton type="outline1" onClick={() => openPluginVersions(record)}>
+              下载到本地
+            </YakitButton>
+          ) : null}
+          {canManagePlugins ? (
+            <>
+              <YakitButton
+                type="text"
+                aria-label={`编辑插件 ${record.script_name}`}
+                onClick={() => openEditPlugin(record)}
+              >
+                编辑
+              </YakitButton>
+              <YakitButton
+                type="text"
+                aria-label={`删除插件 ${record.script_name}`}
+                onClick={() => {
+                  if (hasActiveTeamPermission('plugin.manage')) setPluginToDelete(record)
+                }}
+              >
+                删除
+              </YakitButton>
+            </>
+          ) : null}
         </div>
       ),
     },
@@ -998,20 +1419,24 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
           }}
           onSearch={() => updateQuery({ keyword: query.keyword })}
         />
-        <Select
-          allowClear
-          value={query.categoryId}
-          placeholder="全部分类"
-          options={categories.map((item) => ({ value: item.id, label: item.name }))}
-          onChange={(value) => updateQuery({ categoryId: value })}
-        />
-        <Select
-          allowClear
-          value={query.groupId}
-          placeholder="全部分组"
-          options={groups.map((item) => ({ value: item.id, label: item.name }))}
-          onChange={(value) => updateQuery({ groupId: value })}
-        />
+        {canReadPlugins ? (
+          <Select
+            allowClear
+            value={query.categoryId}
+            placeholder="全部分类"
+            options={categories.map((item) => ({ value: item.id, label: item.name }))}
+            onChange={(value) => updateQuery({ categoryId: value })}
+          />
+        ) : null}
+        {canReadPluginGroups ? (
+          <Select
+            allowClear
+            value={query.groupId}
+            placeholder="全部分组"
+            options={groups.map((item) => ({ value: item.id, label: item.name }))}
+            onChange={(value) => updateQuery({ groupId: value })}
+          />
+        ) : null}
         <Select
           allowClear
           value={query.visibility}
@@ -1022,21 +1447,33 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
           ]}
           onChange={(value) => updateQuery({ visibility: value })}
         />
-        <YakitButton type="primary" onClick={openLocalUpload}>
-          上传本地插件
-        </YakitButton>
-        <YakitButton type="outline1" onClick={openCreatePlugin}>
-          新建远端插件
-        </YakitButton>
-        <YakitButton type="outline1" onClick={openFilterManager}>
-          管理分类与分组
-        </YakitButton>
-        <YakitButton type="outline1" disabled={!selectedPluginIds.length} onClick={downloadSelectedPlugins}>
-          批量安装
-        </YakitButton>
-        <Upload accept=".json,application/json" showUploadList={false} beforeUpload={importFile}>
-          <YakitButton type="outline1">导入插件清单</YakitButton>
-        </Upload>
+        {canImportPlugins ? (
+          <YakitButton type="primary" onClick={openLocalUpload}>
+            上传本地插件
+          </YakitButton>
+        ) : null}
+        {canManagePlugins ? (
+          <YakitButton type="outline1" onClick={openCreatePlugin}>
+            新建远端插件
+          </YakitButton>
+        ) : null}
+        {canManagePlugins || canManagePluginGroups ? (
+          <YakitButton type="outline1" onClick={openFilterManager}>
+            管理分类与分组
+          </YakitButton>
+        ) : null}
+        {canReadPlugins ? (
+          <YakitButton type="outline1" disabled={!selectedPluginIds.length} onClick={downloadSelectedPlugins}>
+            批量安装
+          </YakitButton>
+        ) : null}
+        {canImportPlugins ? (
+          <Upload accept=".json,application/json" showUploadList={false} beforeUpload={importFile}>
+            <YakitButton data-testid="team-plugin-import" type="outline1">
+              导入插件清单
+            </YakitButton>
+          </Upload>
+        ) : null}
         <YakitButton type="outline1" onClick={() => loadPlugins()}>
           刷新
         </YakitButton>
@@ -1069,10 +1506,19 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         loading={loading}
         columns={columns}
         dataSource={plugins}
-        rowSelection={{
-          selectedRowKeys: selectedPluginIds,
-          onChange: (keys) => setSelectedPluginIds(keys.map((key) => Number(key))),
-        }}
+        onRow={(record) =>
+          ({
+            'data-testid': `team-plugin-row-${record.id}`,
+          }) as React.HTMLAttributes<HTMLTableRowElement> & { 'data-testid': string }
+        }
+        rowSelection={
+          canReadPlugins
+            ? {
+                selectedRowKeys: selectedPluginIds,
+                onChange: (keys) => setSelectedPluginIds(keys.map((key) => Number(key))),
+              }
+            : undefined
+        }
         pagination={{
           current: query.page,
           pageSize: query.limit,
@@ -1082,6 +1528,37 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         }}
         locale={{ emptyText: '当前团队暂无插件' }}
       />
+
+      <YakitModal
+        visible={Boolean(pluginVersionPicker)}
+        title="选择插件版本"
+        width={560}
+        okText="安装选中版本"
+        cancelText="取消"
+        confirmLoading={loading}
+        onOk={confirmVersionInstall}
+        onCancel={() => {
+          versionRequestId.current += 1
+          setPluginVersionPicker(undefined)
+        }}
+      >
+        <div className={styles.editorForm}>
+          <label>
+            <span>历史版本</span>
+            <Select
+              aria-label="插件历史版本"
+              value={pluginVersionPicker?.selectedVersion}
+              options={(pluginVersionPicker?.versions || []).map((item) => ({
+                value: item.version,
+                label: `v${item.version}${item.change_note ? ` · ${item.change_note}` : ''}`,
+              }))}
+              onChange={(selectedVersion) =>
+                setPluginVersionPicker((current) => (current ? { ...current, selectedVersion } : current))
+              }
+            />
+          </label>
+        </div>
+      </YakitModal>
 
       <YakitModal
         visible={Boolean(pluginEditor)}
@@ -1141,6 +1618,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
             <Select
               aria-label="插件分类"
               allowClear
+              disabled={!canReadPlugins}
               value={pluginDraft.categoryId}
               placeholder="不设置分类"
               options={categories.map((item) => ({ value: item.id, label: item.name }))}
@@ -1151,6 +1629,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
             <span>分组</span>
             <Select
               aria-label="插件分组"
+              disabled={!canReadPluginGroups}
               mode="multiple"
               value={pluginDraft.groupIds}
               placeholder="不设置分组"
@@ -1206,48 +1685,66 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       >
         <div className={styles.filterManager}>
           {[
-            { kind: 'category' as const, title: '分类', items: categories },
-            { kind: 'group' as const, title: '分组', items: groups },
-          ].map(({ kind, title, items }) => (
-            <section key={kind}>
-              <div className={styles.managerHeader}>
-                <strong>{title}</strong>
-                <YakitButton type="outline1" onClick={() => openFilterEditor(kind)}>
-                  新建{title}
-                </YakitButton>
-              </div>
-              <div className={styles.managerList}>
-                {items.length ? (
-                  items.map((item) => (
-                    <div className={styles.managerRow} key={item.id}>
-                      <div>
-                        <strong>{item.name}</strong>
-                        <span>{item.description || '暂无描述'}</span>
+            {
+              kind: 'category' as const,
+              title: '分类',
+              items: categories,
+              canRead: canReadPlugins,
+              canManage: canManagePlugins,
+            },
+            {
+              kind: 'group' as const,
+              title: '分组',
+              items: groups,
+              canRead: canReadPluginGroups,
+              canManage: canManagePluginGroups,
+            },
+          ]
+            .filter(({ canManage, canRead }) => canManage || canRead)
+            .map(({ canManage, kind, title, items }) => (
+              <section key={kind}>
+                <div className={styles.managerHeader}>
+                  <strong>{title}</strong>
+                  {canManage ? (
+                    <YakitButton type="outline1" onClick={() => openFilterEditor(kind)}>
+                      新建{title}
+                    </YakitButton>
+                  ) : null}
+                </div>
+                <div className={styles.managerList}>
+                  {items.length ? (
+                    items.map((item) => (
+                      <div className={styles.managerRow} key={item.id}>
+                        <div>
+                          <strong>{item.name}</strong>
+                          <span>{item.description || '暂无描述'}</span>
+                        </div>
+                        {canManage ? (
+                          <div className={styles.actionGroup}>
+                            <YakitButton
+                              type="text"
+                              aria-label={`编辑${title} ${item.name}`}
+                              onClick={() => openFilterEditor(kind, item)}
+                            >
+                              编辑
+                            </YakitButton>
+                            <YakitButton
+                              type="text"
+                              aria-label={`删除${title} ${item.name}`}
+                              onClick={() => setFilterToDelete({ kind, item })}
+                            >
+                              删除
+                            </YakitButton>
+                          </div>
+                        ) : null}
                       </div>
-                      <div className={styles.actionGroup}>
-                        <YakitButton
-                          type="text"
-                          aria-label={`编辑${title} ${item.name}`}
-                          onClick={() => openFilterEditor(kind, item)}
-                        >
-                          编辑
-                        </YakitButton>
-                        <YakitButton
-                          type="text"
-                          aria-label={`删除${title} ${item.name}`}
-                          onClick={() => setFilterToDelete({ kind, item })}
-                        >
-                          删除
-                        </YakitButton>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <span>暂无{title}</span>
-                )}
-              </div>
-            </section>
-          ))}
+                    ))
+                  ) : (
+                    <span>暂无{title}</span>
+                  )}
+                </div>
+              </section>
+            ))}
         </div>
       </YakitModal>
 
@@ -1337,6 +1834,9 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         okText="上传"
         cancelText="取消"
         confirmLoading={loading}
+        okButtonProps={{
+          disabled: !selectedLocalPluginIds.length || (uploadOverwrite && !canManagePlugins),
+        }}
         onOk={uploadLocalPlugins}
         onCancel={() => setUploadVisible(false)}
       >
@@ -1367,6 +1867,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
             <span>分类</span>
             <Select
               allowClear
+              disabled={!canReadPlugins}
               value={uploadCategoryId}
               placeholder="不设置分类"
               options={categories.map((item) => ({ value: item.id, label: item.name }))}
@@ -1376,6 +1877,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
           <label>
             <span>分组</span>
             <Select
+              disabled={!canReadPluginGroups}
               mode="multiple"
               value={uploadGroupIds}
               placeholder="不设置分组"
@@ -1386,12 +1888,16 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
           <label>
             <span>同名处理</span>
             <Select
+              disabled={!canManagePlugins}
               value={uploadOverwrite ? 'overwrite' : 'skip'}
               options={[
                 { value: 'skip', label: '跳过重复项' },
                 { value: 'overwrite', label: '覆盖为新版本' },
               ]}
-              onChange={(value) => setUploadOverwrite(value === 'overwrite')}
+              onChange={(value) => {
+                if (!canManagePlugins) return
+                setUploadOverwrite(value === 'overwrite')
+              }}
             />
           </label>
         </div>

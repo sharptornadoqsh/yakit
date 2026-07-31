@@ -3,6 +3,8 @@ const { validateHeaderValue } = require('http')
 const os = require('os')
 
 const CLIENT_ID_CONFIG_KEY = 'collaborationClientId'
+const COLLABORATION_CLIENT_ID_CHANNEL = 'GetCollaborationClientID'
+const COLLABORATION_CLIENT_ID_HEADER = 'X-Yakit-Client-ID'
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 const MAX_HEADER_VALUE_LENGTH = 255
 const SAFE_ASCII_HEADER_VALUE_PATTERN = /^[\x20-\x7e]+$/
@@ -28,12 +30,15 @@ const createCollaborationClientHeaders = ({
   const config = getConfig()
   let clientId = String(config?.[CLIENT_ID_CONFIG_KEY] || '')
   if (!CLIENT_ID_PATTERN.test(clientId)) {
-    clientId = createId()
-    setConfig(CLIENT_ID_CONFIG_KEY, clientId)
+    clientId = String(createId() || '')
+    if (!CLIENT_ID_PATTERN.test(clientId)) throw new Error('invalid_collaboration_client_id')
+    if (setConfig(CLIENT_ID_CONFIG_KEY, clientId) !== true) {
+      throw new Error('collaboration_client_id_persist_failed')
+    }
   }
   const host = normalizeHeaderValue(hostname())
   const headers = {
-    'X-Yakit-Client-ID': clientId,
+    [COLLABORATION_CLIENT_ID_HEADER]: clientId,
     'X-Yakit-Device-Name': host,
     'X-Yakit-Hostname': host,
     'X-Yakit-OS': normalizeHeaderValue(`${platform}/${arch}`),
@@ -51,7 +56,26 @@ const applyCollaborationClientHeaders = (headers, identity) => {
   return target
 }
 
+const registerCollaborationClientIdentityIPC = ({ ipcMain, assertTrustedAppSender, getCollaborationClientID }) => {
+  ipcMain.handle(COLLABORATION_CLIENT_ID_CHANNEL, async (event) => {
+    assertTrustedAppSender(event, COLLABORATION_CLIENT_ID_CHANNEL)
+    return getCollaborationClientID()
+  })
+}
+
+const sanitizeRendererConfig = (config) =>
+  Object.fromEntries(Object.entries(config || {}).filter(([key]) => key !== CLIENT_ID_CONFIG_KEY))
+
+const setRendererConfig = (setConfig, key, value) => {
+  if (key === CLIENT_ID_CONFIG_KEY) return { success: false }
+  return { success: setConfig(key, value) }
+}
+
 module.exports = {
+  COLLABORATION_CLIENT_ID_HEADER,
   applyCollaborationClientHeaders,
   createCollaborationClientHeaders,
+  registerCollaborationClientIdentityIPC,
+  sanitizeRendererConfig,
+  setRendererConfig,
 }

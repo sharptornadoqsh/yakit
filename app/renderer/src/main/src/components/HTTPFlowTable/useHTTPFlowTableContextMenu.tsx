@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import classNames from 'classnames'
 import { useMemoizedFn } from 'ahooks'
 import { IconSolidAIIcon, IconSolidAIWhiteIcon } from '@/assets/icon/colors'
@@ -37,13 +37,25 @@ import type { HistoryMenuData, HTTPFlow } from './HTTPFlowTable.constants'
 import { isHTTPFlowFavorite } from './HTTPFlowTable.utils'
 import style from './HTTPFlowTable.module.scss'
 import { PLUGIN_PREFIX } from '../yakitUI/YakitEditor/YakitEditor'
+import { getMe } from '@/services/teamCollaboration'
+import {
+  subscribeTeamAuthenticationInvalidation,
+  subscribeTeamPermissionInvalidation,
+} from '@/pages/teamCollaboration/teamPermissionContext'
+import {
+  PreparedTeamShare,
+  getCollaborationClientID,
+  prepareSharedHTTPFlow,
+  readFullHTTPFlowBytes,
+} from '@/pages/teamCollaboration/sharedRecordAdapters'
+import { getShareTargetCapabilities } from '@/pages/teamCollaboration/ShareToTeamProjectModal'
 
 const { ipcRenderer } = window.require('electron')
 
 export interface UseHTTPFlowTableContextMenuOptions {
   t: TFunction
   i18n: I18nInstance
-  userInfo: { isLogin: boolean }
+  userInfo: { isLogin: boolean; user_id?: number | null; token?: string }
   data: HTTPFlow[]
   setData: React.Dispatch<React.SetStateAction<HTTPFlow[]>>
   onlyFavorite: boolean
@@ -79,6 +91,274 @@ export interface UseHTTPFlowTableContextMenuOptions {
   onShieldDomain: (flow: HTTPFlow) => void
   onBatch: (f: (element: HTTPFlow) => void, number: number, all?: boolean) => void
   onViewAttachmentDataRefresh: (id: number) => void
+}
+
+type TeamShareKind = 'http-flow' | 'risk'
+
+interface TeamShareAccessState {
+  authenticationSessionKey: string
+  available: boolean
+  invalidationSequence: number
+  operationSequence: number
+  targetTeamIds: number[]
+}
+
+export interface TeamShareOperation {
+  isCurrent: () => boolean
+}
+
+const isPositiveSafeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+
+const getAuthenticationSessionKey = (userInfo: UseHTTPFlowTableContextMenuOptions['userInfo']): string =>
+  `${userInfo.isLogin ? '1' : '0'}\u0000${String(userInfo.user_id ?? '')}\u0000${userInfo.token || ''}`
+
+export const useTeamShareAccess = (userInfo: UseHTTPFlowTableContextMenuOptions['userInfo'], kind: TeamShareKind) => {
+  const authenticationSessionKey = getAuthenticationSessionKey(userInfo)
+  const [permissionRefreshSequence, setPermissionRefreshSequence] = useState(0)
+  const [, setStateVersion] = useState(0)
+  const accessRef = useRef<TeamShareAccessState>({
+    authenticationSessionKey,
+    available: false,
+    invalidationSequence: 0,
+    operationSequence: 0,
+    targetTeamIds: [],
+  })
+
+  if (accessRef.current.authenticationSessionKey !== authenticationSessionKey) {
+    accessRef.current.authenticationSessionKey = authenticationSessionKey
+    accessRef.current.available = false
+    accessRef.current.invalidationSequence += 1
+    accessRef.current.operationSequence += 1
+    accessRef.current.targetTeamIds = []
+  }
+
+  const disableAccess = useCallback(() => {
+    accessRef.current.available = false
+    accessRef.current.invalidationSequence += 1
+    accessRef.current.operationSequence += 1
+    accessRef.current.targetTeamIds = []
+    setStateVersion((value) => value + 1)
+  }, [])
+
+  const refreshPermissionAccess = useCallback((teamId: number) => {
+    const current = accessRef.current
+    if (current.available && current.targetTeamIds.length > 0 && !current.targetTeamIds.includes(teamId)) return
+    current.available = false
+    current.invalidationSequence += 1
+    current.operationSequence += 1
+    current.targetTeamIds = []
+    setStateVersion((value) => value + 1)
+    setPermissionRefreshSequence((value) => value + 1)
+  }, [])
+
+  useEffect(() => {
+    const access = accessRef.current
+    const unsubscribePermission = subscribeTeamPermissionInvalidation(refreshPermissionAccess)
+    const unsubscribeAuthentication = subscribeTeamAuthenticationInvalidation(disableAccess)
+    return () => {
+      unsubscribePermission()
+      unsubscribeAuthentication()
+      access.available = false
+      access.invalidationSequence += 1
+      access.operationSequence += 1
+      access.targetTeamIds = []
+    }
+  }, [disableAccess, refreshPermissionAccess])
+
+  useEffect(() => {
+    const userId = userInfo.user_id
+    if (!userInfo.isLogin || !isPositiveSafeInteger(userId) || !userInfo.token) {
+      disableAccess()
+      return
+    }
+
+    const invalidationSequence = accessRef.current.invalidationSequence
+    let cancelled = false
+    getMe()
+      .then((response) => {
+        if (
+          cancelled ||
+          accessRef.current.authenticationSessionKey !== authenticationSessionKey ||
+          accessRef.current.invalidationSequence !== invalidationSequence ||
+          response.data.user.id !== userId
+        ) {
+          return
+        }
+        const capabilities = getShareTargetCapabilities(response.data)
+        const targetTeamIds = capabilities.teams
+          .filter((team) =>
+            kind === 'risk'
+              ? capabilities.canShareRisk && team.canShareRisk && team.projects.length > 0
+              : capabilities.canShareHTTPFlow && team.canShareHTTPFlow && team.projects.length > 0,
+          )
+          .map((team) => team.id)
+          .filter(isPositiveSafeInteger)
+        accessRef.current.available = targetTeamIds.length > 0
+        accessRef.current.targetTeamIds = targetTeamIds
+        setStateVersion((value) => value + 1)
+      })
+      .catch(() => {
+        if (
+          !cancelled &&
+          accessRef.current.authenticationSessionKey === authenticationSessionKey &&
+          accessRef.current.invalidationSequence === invalidationSequence
+        ) {
+          disableAccess()
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    authenticationSessionKey,
+    disableAccess,
+    kind,
+    permissionRefreshSequence,
+    userInfo.isLogin,
+    userInfo.token,
+    userInfo.user_id,
+  ])
+
+  const accessGeneration = accessRef.current.invalidationSequence
+  const begin = useCallback(async (): Promise<TeamShareOperation | undefined> => {
+    const userId = userInfo.user_id
+    const current = accessRef.current
+    if (
+      !current.available ||
+      current.authenticationSessionKey !== authenticationSessionKey ||
+      current.invalidationSequence !== accessGeneration ||
+      !userInfo.isLogin ||
+      !isPositiveSafeInteger(userId) ||
+      !userInfo.token
+    ) {
+      return undefined
+    }
+
+    const invalidationSequence = current.invalidationSequence
+    const operationSequence = current.operationSequence + 1
+    current.operationSequence = operationSequence
+    const isCurrent = () => {
+      const latest = accessRef.current
+      return (
+        latest.available &&
+        latest.authenticationSessionKey === authenticationSessionKey &&
+        latest.invalidationSequence === invalidationSequence &&
+        latest.operationSequence === operationSequence
+      )
+    }
+
+    try {
+      const response = await getMe()
+      if (!isCurrent() || response.data.user.id !== userId) return undefined
+      const capabilities = getShareTargetCapabilities(response.data)
+      const targetTeamIds = capabilities.teams
+        .filter((team) =>
+          kind === 'risk'
+            ? capabilities.canShareRisk && team.canShareRisk && team.projects.length > 0
+            : capabilities.canShareHTTPFlow && team.canShareHTTPFlow && team.projects.length > 0,
+        )
+        .map((team) => team.id)
+        .filter(isPositiveSafeInteger)
+      if (!isCurrent()) return undefined
+      if (targetTeamIds.length === 0) {
+        disableAccess()
+        return undefined
+      }
+      accessRef.current.targetTeamIds = targetTeamIds
+      return { isCurrent }
+    } catch {
+      if (isCurrent()) disableAccess()
+      return undefined
+    }
+  }, [
+    accessGeneration,
+    authenticationSessionKey,
+    disableAccess,
+    kind,
+    userInfo.isLogin,
+    userInfo.token,
+    userInfo.user_id,
+  ])
+
+  return {
+    available: accessRef.current.authenticationSessionKey === authenticationSessionKey && accessRef.current.available,
+    begin,
+  }
+}
+
+interface FreshHTTPFlowSummary {
+  id: number
+  capturedAt: string
+  method: string
+  url: string
+  host: string
+  statusCode: number
+}
+
+const readFreshHTTPFlowSummary = async (flowId: number): Promise<FreshHTTPFlowSummary> => {
+  const value: unknown = await ipcRenderer.invoke('GetHTTPFlowById', { Id: flowId })
+  if (!value || typeof value !== 'object') throw new Error('HTTP Flow 数据无效')
+  const id = Reflect.get(value, 'Id')
+  const method = Reflect.get(value, 'Method')
+  const url = Reflect.get(value, 'Url')
+  const host = Reflect.get(value, 'HostPort')
+  const statusCode = Reflect.get(value, 'StatusCode')
+  const createdAt = Reflect.get(value, 'CreatedAt')
+  if (
+    id !== flowId ||
+    typeof method !== 'string' ||
+    !method ||
+    typeof url !== 'string' ||
+    !url ||
+    (host !== undefined && typeof host !== 'string') ||
+    typeof statusCode !== 'number' ||
+    !Number.isSafeInteger(statusCode) ||
+    statusCode < 0 ||
+    statusCode > 999 ||
+    typeof createdAt !== 'number' ||
+    !Number.isSafeInteger(createdAt) ||
+    createdAt <= 0
+  ) {
+    throw new Error('HTTP Flow 数据无效')
+  }
+  return {
+    id,
+    capturedAt: new Date(createdAt * 1000).toISOString(),
+    method,
+    url,
+    host: host || '',
+    statusCode,
+  }
+}
+
+export const prepareHTTPFlowForTeamShare = async (
+  flowId: number,
+  isCurrent: () => boolean,
+): Promise<PreparedTeamShare | undefined> => {
+  if (!isCurrent() || !isPositiveSafeInteger(flowId)) return undefined
+  const summary = await readFreshHTTPFlowSummary(flowId)
+  if (!isCurrent()) return undefined
+  const bytes = await readFullHTTPFlowBytes(flowId)
+  if (!isCurrent()) return undefined
+  const clientId = await getCollaborationClientID()
+  if (!isCurrent()) return undefined
+  const http = await prepareSharedHTTPFlow({
+    clientId,
+    localFlowId: String(summary.id),
+    capturedAt: summary.capturedAt,
+    request: bytes.request,
+    response: bytes.response,
+    summary: {
+      method: summary.method,
+      url: summary.url,
+      host: summary.host,
+      status_code: summary.statusCode,
+    },
+  })
+  if (!isCurrent()) return undefined
+  return { kind: 'http-flow', http }
 }
 
 export const useHTTPFlowTableContextMenu = (options: UseHTTPFlowTableContextMenuOptions) => {
@@ -122,6 +402,11 @@ export const useHTTPFlowTableContextMenu = (options: UseHTTPFlowTableContextMenu
     onBatch,
     onViewAttachmentDataRefresh,
   } = options
+  const [preparedTeamShare, setPreparedTeamShare] = useState<PreparedTeamShare>()
+  const teamShareAccess = useTeamShareAccess(userInfo, 'http-flow')
+  useEffect(() => {
+    if (!teamShareAccess.available) setPreparedTeamShare(undefined)
+  }, [teamShareAccess.available])
 
   const menuData = useMemo(() => {
     let menu: HistoryMenuData[] = [
@@ -548,6 +833,27 @@ export const useHTTPFlowTableContextMenu = (options: UseHTTPFlowTableContextMenu
         },
       })
     }
+    if (teamShareAccess.available && selectedRowKeys.length === 0 && !isAllSelect) {
+      menu.push({
+        key: 'share-http-flow',
+        label: '分享到团队项目',
+        testId: 'share-http-flow',
+        default: true,
+        webSocket: false,
+        onClickSingle: async (flow) => {
+          const operation = await teamShareAccess.begin()
+          if (!operation) return
+          try {
+            const prepared = await prepareHTTPFlowForTeamShare(flow.Id, operation.isCurrent)
+            if (prepared && operation.isCurrent()) setPreparedTeamShare(prepared)
+          } catch (error) {
+            if (operation.isCurrent()) {
+              yakitNotify('error', error instanceof Error ? error.message : '准备团队分享失败')
+            }
+          }
+        },
+      })
+    }
     return menu
   }, [
     userInfo.isLogin,
@@ -559,6 +865,10 @@ export const useHTTPFlowTableContextMenu = (options: UseHTTPFlowTableContextMenu
     onlyFavorite,
     getUrlWithoutQuery,
     total,
+    teamShareAccess.available,
+    teamShareAccess.begin,
+    selectedRowKeys.length,
+    isAllSelect,
   ])
 
   // 插件扩展处理
@@ -687,11 +997,17 @@ export const useHTTPFlowTableContextMenu = (options: UseHTTPFlowTableContextMenu
       .map((ele) => {
         const isFavoriteMenu = ele.key === 'favorite'
         return {
-          label: isFavoriteMenu
-            ? isHTTPFlowFavorite(rowData)
-              ? t('HTTPFlowTable.RowContextMenu.cancelFavorite')
-              : t('HTTPFlowTable.RowContextMenu.favorite')
-            : ele.label,
+          label: isFavoriteMenu ? (
+            isHTTPFlowFavorite(rowData) ? (
+              t('HTTPFlowTable.RowContextMenu.cancelFavorite')
+            ) : (
+              t('HTTPFlowTable.RowContextMenu.favorite')
+            )
+          ) : ele.testId ? (
+            <span data-testid={ele.testId}>{ele.label}</span>
+          ) : (
+            ele.label
+          ),
           key: ele.key,
           children: ele.children || [],
         }
@@ -1024,5 +1340,7 @@ export const useHTTPFlowTableContextMenu = (options: UseHTTPFlowTableContextMenu
     getBatchContextMenu,
     onMultipleClick,
     onRowContextMenu,
+    preparedTeamShare,
+    clearPreparedTeamShare: () => setPreparedTeamShare(undefined),
   }
 }

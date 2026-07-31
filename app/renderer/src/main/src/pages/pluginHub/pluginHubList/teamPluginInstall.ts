@@ -5,7 +5,8 @@ export interface TeamPluginInstallRecord {
   type?: string
   uuid?: string
   description?: string
-  fileHash?: string
+  fileHash: string
+  version: number
   revision: number
   visibility?: 'private' | 'team'
   categoryId?: number
@@ -23,6 +24,7 @@ export interface TeamPluginLocalMapping {
   localPluginId?: number
   localPluginUUID?: string
   localScriptName: string
+  version: number
   revision: number
   fileHash: string
   categoryId?: number
@@ -41,7 +43,7 @@ export type TeamPluginLocalConflictResolution =
   | { action: 'overwrite' }
   | { action: 'copy'; scriptName: string }
 
-export type TeamPluginDownloadContent = Blob | ArrayBuffer | Uint8Array | string | { type: 'Buffer'; data: number[] }
+export type TeamPluginDownloadContent = ArrayBuffer | Uint8Array
 
 interface TeamPluginInstallDependencies {
   onlineBaseUrl?: string
@@ -50,7 +52,7 @@ interface TeamPluginInstallDependencies {
     plugin: TeamPluginInstallRecord
     existing: LocalPluginRecord
   }) => Promise<TeamPluginLocalConflictResolution>
-  download: () => Promise<TeamPluginDownloadContent>
+  download: (version: number) => Promise<TeamPluginDownloadContent>
   digest?: (content: ArrayBuffer) => Promise<string>
   savePlugin: (input: Record<string, unknown>) => Promise<LocalPluginRecord>
   saveGroups?: (scriptName: string, groupNames: string[]) => Promise<void>
@@ -68,48 +70,23 @@ export const sha256ArrayBuffer = async (content: ArrayBuffer) => {
 const uniqueNames = (values: Array<string | undefined>) =>
   Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))))
 
-const copyBytes = (view: Uint8Array): ArrayBuffer => view.slice().buffer as ArrayBuffer
-
-const isSerializedBuffer = (content: TeamPluginDownloadContent): content is { type: 'Buffer'; data: number[] } =>
-  Boolean(
-    content &&
-    typeof content === 'object' &&
-    'type' in content &&
-    content.type === 'Buffer' &&
-    'data' in content &&
-    Array.isArray(content.data),
-  )
-
-const readDownloadArrayBuffer = (content: TeamPluginDownloadContent): Promise<ArrayBuffer> => {
-  if (typeof content === 'string') return Promise.resolve(copyBytes(new TextEncoder().encode(content)))
-  if (content instanceof ArrayBuffer) return Promise.resolve(content.slice(0))
-  if (ArrayBuffer.isView(content)) {
-    return Promise.resolve(copyBytes(new Uint8Array(content.buffer, content.byteOffset, content.byteLength)))
-  }
-  if (isSerializedBuffer(content)) {
-    if (!content.data.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
-      return Promise.reject(new Error('团队插件字节响应无效'))
-    }
-    return Promise.resolve(copyBytes(Uint8Array.from(content.data)))
-  }
-  if (content && typeof (content as Blob).arrayBuffer === 'function') {
-    return (content as Blob).arrayBuffer()
-  }
-  if (typeof FileReader !== 'undefined' && typeof Blob !== 'undefined' && content instanceof Blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as ArrayBuffer)
-      reader.onerror = () => reject(reader.error || new Error('读取团队插件正文失败'))
-      reader.readAsArrayBuffer(content)
-    })
-  }
-  return Promise.reject(new Error('团队插件下载响应格式无效'))
+export const normalizeDownloadedPluginBytes = (value: ArrayBuffer | Uint8Array): ArrayBuffer => {
+  if (value instanceof ArrayBuffer) return value.slice(0)
+  return Uint8Array.from(value).buffer as ArrayBuffer
 }
 
 export const installTeamPluginDownload = async (
   plugin: TeamPluginInstallRecord,
   dependencies: TeamPluginInstallDependencies,
 ) => {
+  if (!Number.isSafeInteger(plugin.version) || plugin.version <= 0) {
+    throw new Error('插件版本无效')
+  }
+  const expectedHash = plugin.fileHash.trim()
+  if (!/^[0-9a-f]{64}$/.test(expectedHash)) {
+    throw new Error('插件版本缺少有效正文摘要')
+  }
+
   let targetScriptName = plugin.scriptName
   let targetPluginId: number | undefined
   let targetPluginUUID = plugin.uuid || ''
@@ -138,14 +115,27 @@ export const installTeamPluginDownload = async (
     }
   }
 
-  const downloadContent = await dependencies.download()
-  const bytes = await readDownloadArrayBuffer(downloadContent)
+  const downloadContent = await dependencies.download(plugin.version)
+  const bytes = normalizeDownloadedPluginBytes(downloadContent)
   if (bytes.byteLength === 0) throw new Error('团队插件正文为空')
-  const actualHash = (await (dependencies.digest || sha256ArrayBuffer)(bytes)).toLowerCase()
-  const expectedHash = plugin.fileHash?.trim().toLowerCase()
-  if (expectedHash && actualHash !== expectedHash) throw new Error('插件正文摘要校验失败')
+  const actualHash = await (dependencies.digest || sha256ArrayBuffer)(bytes)
+  if (!/^[0-9a-f]{64}$/.test(actualHash)) throw new Error('插件正文摘要格式无效')
+  if (actualHash !== expectedHash) throw new Error('插件正文摘要校验失败')
 
-  const content = new TextDecoder().decode(bytes)
+  let content: string
+  try {
+    content = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
+  } catch {
+    throw new Error('插件正文不是有效 UTF-8')
+  }
+  const originalBytes = new Uint8Array(bytes)
+  const roundTripBytes = new TextEncoder().encode(content)
+  if (
+    roundTripBytes.byteLength !== originalBytes.byteLength ||
+    roundTripBytes.some((byte, index) => byte !== originalBytes[index])
+  ) {
+    throw new Error('插件正文 UTF-8 重编码校验失败')
+  }
   if (!content.trim()) throw new Error('团队插件正文为空')
 
   const groupNames = uniqueNames([plugin.categoryName, ...(plugin.groupNames || [])])
@@ -177,6 +167,7 @@ export const installTeamPluginDownload = async (
     localPluginId: localPlugin.Id,
     localPluginUUID: localPlugin.UUID,
     localScriptName,
+    version: plugin.version,
     revision: plugin.revision,
     fileHash: actualHash,
     categoryId: plugin.categoryId,
