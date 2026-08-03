@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  RUIYAN_UI_POLICY,
   getRuiYanMitmDefaultExcludeColumns,
   resolveRuiYanPluginLogUserName,
   resolveRuiYanPluginAuthor,
@@ -19,6 +20,10 @@ describe('睿眼界面策略', () => {
 
   it('交互代理排除快捷操作列', () => {
     expect(getRuiYanMitmDefaultExcludeColumns()).toEqual(['action'])
+  })
+
+  it('交互代理显示免配置启动入口', () => {
+    expect(RUIYAN_UI_POLICY.mitm.showNoConfigStart).toBe(true)
   })
 
   it('旧按组状态归一为关键字方式', () => {

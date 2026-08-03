@@ -131,7 +131,7 @@ module.exports = (win, getClient) => {
   })
 
   ipcMain.handle('LaunchChromeWithParams', async (e, params) => {
-    const { port, host, chromePath, userDataDir, username, password, disableCACertPage, chromeFlags } = params
+    const { port, host, chromePath, userDataDir, username, password, chromeFlags } = params
     const portInt = parseInt(`${port}`)
     const hostRaw = `${host}`
     if (hostRaw === 'undefined' || hostRaw.includes('/') || hostRaw.split(':').length > 1) {
@@ -143,7 +143,7 @@ module.exports = (win, getClient) => {
     //   --no-system-proxy-config-service ⊗	Do not use system proxy configuration service.
     //   --no-proxy-server ⊗	Don't use a proxy server, always make direct connections. Overrides any other proxy server flags that are passed. ↪
     let launchOpt = {
-      startingUrl: disableCACertPage === false ? 'http://mitm' : 'chrome://newtab', // 确保在启动时打开 chrome://newtab 页面。
+      startingUrl: 'chrome://newtab', // 免配置启动只打开空白新标签页，不跳转证书引导地址。
       logLevel: 'verbose',
       ignoreDefaultFlags: true,
       chromeFlags: [

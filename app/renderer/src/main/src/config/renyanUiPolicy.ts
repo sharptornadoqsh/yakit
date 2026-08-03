@@ -3,7 +3,7 @@ export const RUIYAN_UI_POLICY = {
     showRulePluginPanel: false,
     showContentRules: false,
     showDownstreamProxy: false,
-    showNoConfigStart: false,
+    showNoConfigStart: true,
     showAdvancedFilter: false,
     showProcessFilter: false,
     showRowQuickActions: false,
