@@ -29,9 +29,16 @@ afterEach(() => {
 })
 
 describe('睿眼多平台安装文件工作流', () => {
-  it('只公开目标任务所需的六项输入和五个原生任务', () => {
+  it('保留五个原生构建任务并增加受控 Release 发布任务', () => {
     const source = fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8')
     const workflow = parseYaml(source)
+    const buildJobNames = [
+      'build-macos-x64',
+      'build-macos-arm64',
+      'build-windows-x64',
+      'build-linux-x64',
+      'build-linux-arm64',
+    ]
 
     expect(workflow.name).toBe('RuiYan Multi-Platform Package')
     expect(Object.keys(workflow.on.workflow_dispatch.inputs)).toEqual([
@@ -41,17 +48,28 @@ describe('睿眼多平台安装文件工作流', () => {
       'engine_version',
       'sign_installers',
       'retention_days',
+      'publish_release',
+      'release_draft',
+      'release_prerelease',
+      'overwrite_release_assets',
+      'release_tag',
     ])
     expect([...new Set([...source.matchAll(/inputs\.([a-z_]+)/g)].map((match) => match[1]))].sort()).toEqual(
-      ['target', 'edition', 'include_engine', 'engine_version', 'sign_installers', 'retention_days'].sort(),
+      [
+        'target',
+        'edition',
+        'include_engine',
+        'engine_version',
+        'sign_installers',
+        'retention_days',
+        'publish_release',
+        'release_draft',
+        'release_prerelease',
+        'overwrite_release_assets',
+        'release_tag',
+      ].sort(),
     )
-    expect(Object.keys(workflow.jobs)).toEqual([
-      'build-macos-x64',
-      'build-macos-arm64',
-      'build-windows-x64',
-      'build-linux-x64',
-      'build-linux-arm64',
-    ])
+    expect(Object.keys(workflow.jobs)).toEqual([...buildJobNames, 'publish-github-release'])
     expect(workflow.jobs['build-macos-x64']['runs-on']).toBe('macos-15-intel')
     expect(workflow.jobs['build-macos-arm64']['runs-on']).toBe('macos-15')
     expect(workflow.jobs['build-windows-x64']['runs-on']).toBe('windows-2022')
@@ -86,6 +104,27 @@ describe('睿眼多平台安装文件工作流', () => {
       type: 'boolean',
       default: false,
     })
+    expect(workflow.on.workflow_dispatch.inputs.publish_release).toMatchObject({
+      type: 'boolean',
+      default: false,
+    })
+    expect(workflow.on.workflow_dispatch.inputs.release_draft).toMatchObject({
+      type: 'boolean',
+      default: false,
+    })
+    expect(workflow.on.workflow_dispatch.inputs.release_prerelease).toMatchObject({
+      type: 'boolean',
+      default: false,
+    })
+    expect(workflow.on.workflow_dispatch.inputs.overwrite_release_assets).toMatchObject({
+      type: 'boolean',
+      default: false,
+    })
+    expect(workflow.on.workflow_dispatch.inputs.release_tag).toMatchObject({
+      type: 'string',
+      required: false,
+      default: '',
+    })
     expect(workflow.jobs['build-macos-x64'].if).toContain("inputs.target == 'macos-both'")
     expect(workflow.jobs['build-macos-arm64'].if).toContain("inputs.target == 'macos-both'")
     expect(workflow.jobs['build-windows-x64'].if).not.toContain('macos-both')
@@ -99,28 +138,30 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(linuxArm64Job).toContain('pack-renyan-linux-arm64-enterprise-no-license-unsigned')
     expect(linuxArm64Job).toContain('PACKAGE_TARGET":"linux-arm64')
 
-    Object.values(workflow.jobs).forEach((job) => {
-      const setupNode = job.steps.find((step) => step.uses === 'actions/setup-node@v6')
-      const uploadArtifact = job.steps.find((step) => step.uses === 'actions/upload-artifact@v7')
-      const verifyChromeExtension = job.steps.find((step) => step.name === '校验仓库内置浏览器扩展')
-      expect(job.steps.some((step) => step.uses === 'actions/checkout@v7')).toBe(true)
-      expect(setupNode.with['node-version']).toBe('22.12.0')
-      expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/src/main/yarn.lock')
-      expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/engine-link-startup/yarn.lock')
-      expect(uploadArtifact.with['if-no-files-found']).toBe('error')
-      expect(uploadArtifact.with['retention-days']).toBe('${{ inputs.retention_days }}')
-      expect(uploadArtifact.with.path).toBe('${{ steps.metadata.outputs.artifact_path }}')
-      expect(uploadArtifact.with.archive).toBe(false)
-      expect(uploadArtifact.with).not.toHaveProperty('name')
-      expect(verifyChromeExtension.run).toContain('bins/scripts/google-chrome-plugin.zip')
-      expect(verifyChromeExtension.run).toContain('RUIYAN_CHROME_EXTENSION_SHA256')
-      expect(verifyChromeExtension.run).not.toContain('curl')
-      expect(verifyChromeExtension.run).not.toContain('RUIYAN_CHROME_EXTENSION_URL')
+    buildJobNames
+      .map((name) => workflow.jobs[name])
+      .forEach((job) => {
+        const setupNode = job.steps.find((step) => step.uses === 'actions/setup-node@v6')
+        const uploadArtifact = job.steps.find((step) => step.uses === 'actions/upload-artifact@v7')
+        const verifyChromeExtension = job.steps.find((step) => step.name === '校验仓库内置浏览器扩展')
+        expect(job.steps.some((step) => step.uses === 'actions/checkout@v7')).toBe(true)
+        expect(setupNode.with['node-version']).toBe('22.12.0')
+        expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/src/main/yarn.lock')
+        expect(setupNode.with['cache-dependency-path']).toContain('app/renderer/engine-link-startup/yarn.lock')
+        expect(uploadArtifact.with['if-no-files-found']).toBe('error')
+        expect(uploadArtifact.with['retention-days']).toBe('${{ inputs.retention_days }}')
+        expect(uploadArtifact.with.path).toBe('${{ steps.metadata.outputs.artifact_path }}')
+        expect(uploadArtifact.with.archive).toBe(false)
+        expect(uploadArtifact.with).not.toHaveProperty('name')
+        expect(verifyChromeExtension.run).toContain('bins/scripts/google-chrome-plugin.zip')
+        expect(verifyChromeExtension.run).toContain('RUIYAN_CHROME_EXTENSION_SHA256')
+        expect(verifyChromeExtension.run).not.toContain('curl')
+        expect(verifyChromeExtension.run).not.toContain('RUIYAN_CHROME_EXTENSION_URL')
 
-      job.steps
-        .filter((step) => JSON.stringify(step).includes('${{ secrets.'))
-        .forEach((step) => expect(step.if).toContain('inputs.sign_installers'))
-    })
+        job.steps
+          .filter((step) => JSON.stringify(step).includes('${{ secrets.'))
+          .forEach((step) => expect(step.if).toContain('inputs.sign_installers'))
+      })
 
     expect(source.match(/^\s+yarn build-renders-enterprise$/gm)).toHaveLength(5)
     expect(source.match(/^\s+yarn build-renders-enterprise-no-license$/gm)).toHaveLength(5)
@@ -132,7 +173,38 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(source).not.toContain('http://')
     expect(source).not.toContain('yakit-chrome-extension')
     expect(source).not.toContain('git push')
-    expect(source).not.toContain('gh release')
+
+    const releaseJob = workflow.jobs['publish-github-release']
+    expect(releaseJob.needs).toEqual(buildJobNames)
+    expect(releaseJob.if).toBe('${{ always() && inputs.publish_release }}')
+    expect(releaseJob['runs-on']).toBe('ubuntu-22.04')
+    expect(releaseJob.permissions).toEqual({ contents: 'write' })
+    expect(releaseJob.concurrency).toEqual({
+      group: 'renyan-github-release-${{ github.repository }}-qsh',
+      'cancel-in-progress': false,
+    })
+    expect(workflow.concurrency['cancel-in-progress']).toBe('${{ !inputs.publish_release }}')
+
+    const checkout = releaseJob.steps.find((step) => step.uses === 'actions/checkout@v7')
+    const downloadArtifact = releaseJob.steps.find((step) => step.uses === 'actions/download-artifact@v7')
+    const preflight = releaseJob.steps.find((step) => step.name === '校验 Release 发布上下文')
+    const prepare = releaseJob.steps.find((step) => step.name === '校验并准备 Release 附件')
+    const publish = releaseJob.steps.find((step) => step.name === '创建或更新 GitHub Release')
+    expect(checkout.with).toMatchObject({ ref: '${{ github.sha }}', 'persist-credentials': false })
+    expect(downloadArtifact.with).toEqual({ path: 'downloaded-artifacts', 'merge-multiple': true })
+    expect(downloadArtifact.with).not.toHaveProperty('run-id')
+    expect(downloadArtifact.with).not.toHaveProperty('repository')
+    expect(downloadArtifact.with).not.toHaveProperty('github-token')
+    expect(preflight.shell).toBe('bash')
+    expect(preflight.run).toContain('set -euo pipefail')
+    expect(preflight.run).toContain('node packageScript/script/publish-renyan-release.js validate-context')
+    expect(prepare.shell).toBe('bash')
+    expect(prepare.run).toContain('set -euo pipefail')
+    expect(prepare.run).toContain('node packageScript/script/publish-renyan-release.js prepare')
+    expect(publish.shell).toBe('bash')
+    expect(publish.run).toContain('set -euo pipefail')
+    expect(publish.run).toContain('node packageScript/script/publish-renyan-release.js publish')
+    expect(publish.env.GH_TOKEN).toBe('${{ github.token }}')
   })
 
   it('仓库内置浏览器扩展仅包含睿眼可见身份', () => {

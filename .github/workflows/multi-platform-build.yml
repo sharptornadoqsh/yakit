@@ -48,6 +48,31 @@ on:
           - '7'
           - '14'
           - '30'
+      publish_release:
+        description: 是否将本次构建产物发布到 GitHub Release
+        required: false
+        type: boolean
+        default: false
+      release_draft:
+        description: 是否创建为 Draft Release；仅在发布 Release 时生效
+        required: false
+        type: boolean
+        default: false
+      release_prerelease:
+        description: 是否标记为 Pre-release
+        required: false
+        type: boolean
+        default: false
+      overwrite_release_assets:
+        description: 同名 Release 附件已存在时是否允许替换
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: 自定义 Release Tag；留空时根据 package.json version 生成
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -57,7 +82,7 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.target }}-${{ inputs.edition }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !inputs.publish_release }}
 
 jobs:
   build-macos-x64:
@@ -686,3 +711,73 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: ${{ inputs.retention_days }}
+
+  publish-github-release:
+    name: RuiYan GitHub Release
+    needs:
+      - build-macos-x64
+      - build-macos-arm64
+      - build-windows-x64
+      - build-linux-x64
+      - build-linux-arm64
+    if: ${{ always() && inputs.publish_release }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    concurrency:
+      group: renyan-github-release-${{ github.repository }}-qsh
+      cancel-in-progress: false
+    env:
+      PACKAGE_EDITION: ${{ inputs.edition }}
+      REQUESTED_TARGET: ${{ inputs.target }}
+      INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      REQUESTED_ENGINE_VERSION: ${{ inputs.engine_version }}
+      SIGN_INSTALLERS: ${{ inputs.sign_installers }}
+      RELEASE_DRAFT: ${{ inputs.release_draft }}
+      RELEASE_PRERELEASE: ${{ inputs.release_prerelease }}
+      OVERWRITE_RELEASE_ASSETS: ${{ inputs.overwrite_release_assets }}
+      RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+      BUILD_RESULTS_JSON: ${{ toJSON(needs) }}
+      DOWNLOADED_ARTIFACTS_DIRECTORY: downloaded-artifacts
+      RELEASE_ASSETS_DIRECTORY: release-assets
+      RELEASE_WORK_DIRECTORY: release-work
+      RELEASE_PLAN_PATH: release-work/release-plan.json
+    steps:
+      - name: 检出本次构建提交
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.12.0
+
+      - name: 校验 Release 发布上下文
+        shell: bash
+        run: |
+          set -euo pipefail
+          node packageScript/script/publish-renyan-release.js validate-context
+
+      - name: 下载本次运行的安装文件 Artifact
+        uses: actions/download-artifact@v7
+        with:
+          path: downloaded-artifacts
+          merge-multiple: true
+
+      - name: 校验并准备 Release 附件
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          node packageScript/script/publish-renyan-release.js prepare
+
+      - name: 创建或更新 GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node packageScript/script/publish-renyan-release.js publish

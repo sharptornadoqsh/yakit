@@ -19,6 +19,16 @@ const editionLabels = {
   enterprise: 'Enterprise',
   'enterprise-no-license': 'Enterprise-No-License',
 }
+const requestedTargetDefinitions = {
+  'macos-x64': ['macos-x64'],
+  'macos-arm64': ['macos-arm64'],
+  'macos-both': ['macos-x64', 'macos-arm64'],
+  'windows-x64': ['windows-x64'],
+  'linux-x64': ['linux-x64'],
+  'linux-arm64': ['linux-arm64'],
+  all: Object.keys(targetDefinitions),
+}
+const artifactVersionPattern = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/
 
 const parseBoolean = (value) => {
   if (`${value}`.toLowerCase() === 'true') return true
@@ -37,17 +47,44 @@ const calculateSha256 = async (filePath) => {
   return hash.digest('hex')
 }
 
-const createArtifactIdentity = ({ edition, target }) => {
+const resolveRequestedTargets = (requestedTarget) => {
+  const targets = requestedTargetDefinitions[requestedTarget]
+  if (!targets) throw new Error(`不支持的构建目标：${requestedTarget}`)
+  return [...targets]
+}
+
+const createArtifactIdentity = ({ edition, target, version = packageJson.version }) => {
   const definition = targetDefinitions[target]
   const editionLabel = editionLabels[edition]
   if (!definition) throw new Error(`不支持的安装目标：${target}`)
   if (!editionLabel) throw new Error(`不支持的客户端类别：${edition}`)
+  if (!artifactVersionPattern.test(`${version || ''}`)) throw new Error(`不支持的安装文件版本：${version}`)
 
   return {
     definition,
     editionLabel,
-    artifactName: `${productConfig.artifactPrefix}-${editionLabel}-${packageJson.version}-${definition.platform}-${definition.architecture}.${definition.extension}`,
+    artifactName: `${productConfig.artifactPrefix}-${editionLabel}-${version}-${definition.platform}-${definition.architecture}.${definition.extension}`,
   }
+}
+
+const parseArtifactIdentity = (fileName) => {
+  if (typeof fileName !== 'string' || !fileName || /[\\/\0]/.test(fileName)) return null
+
+  const editions = Object.entries(editionLabels).sort((left, right) => right[1].length - left[1].length)
+  for (const [edition, editionLabel] of editions) {
+    const prefix = `${productConfig.artifactPrefix}-${editionLabel}-`
+    if (!fileName.startsWith(prefix)) continue
+
+    for (const [target, definition] of Object.entries(targetDefinitions)) {
+      const suffix = `-${definition.platform}-${definition.architecture}.${definition.extension}`
+      if (!fileName.endsWith(suffix)) continue
+
+      const version = fileName.slice(prefix.length, fileName.length - suffix.length)
+      if (!artifactVersionPattern.test(version)) return null
+      return { edition, editionLabel, target, definition, version, artifactName: fileName }
+    }
+  }
+  return null
 }
 
 const createBuildMetadata = async ({
@@ -122,7 +159,10 @@ const createBuildMetadata = async ({
 
 const writeWorkflowValue = (filePath, name, value) => {
   if (!filePath) return
-  fs.appendFileSync(filePath, `${name}=${value}\n`, 'utf8')
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new Error(`工作流输出名称无效：${name}`)
+  const normalizedValue = `${value}`
+  if (/[\r\n]/.test(normalizedValue)) throw new Error(`工作流输出值不能包含换行：${name}`)
+  fs.appendFileSync(filePath, `${name}=${normalizedValue}\n`, 'utf8')
 }
 
 const run = async () => {
@@ -165,6 +205,10 @@ module.exports = {
   calculateSha256,
   createArtifactIdentity,
   createBuildMetadata,
+  editionLabels,
+  parseArtifactIdentity,
   parseBoolean,
+  resolveRequestedTargets,
   targetDefinitions,
+  writeWorkflowValue,
 }
