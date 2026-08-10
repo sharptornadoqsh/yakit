@@ -30,6 +30,8 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { loadAdvancedConfig } from './MITMAdvancedConfig'
 import { Trans } from 'react-i18next'
 import { defHost, defPort } from './MITMServerStartForm/MITMServerStartForm'
+import { migrateLegacyChromeProfileRemoteCache } from './chromeProfileMigration'
+import { onGetRemoteValuesBase } from '@/components/yakitUI/utils'
 
 /**
  * @param {boolean} isStartMITM 是否开启mitm服务，已开启mitm服务，显示switch。 未开启显示按钮
@@ -64,6 +66,7 @@ const MITMChromeLauncher: React.FC<MITMChromeLauncherProp> = (props) => {
     ...defYakitAutoCompleteRef,
   })
   const [defUserDataDir, setDefUserDataDir] = useState<string>('')
+  const [isUserDataDirReady, setUserDataDirReady] = useState<boolean>(false)
   const [isSaveUserData, setSaveUserData] = useState<boolean>(false)
   const [userDataDir, setUserDataDir] = useState<string>('')
 
@@ -109,9 +112,18 @@ const MITMChromeLauncher: React.FC<MITMChromeLauncherProp> = (props) => {
     }
     document.addEventListener('mousedown', handleClickOutside)
 
-    ipcRenderer.invoke('getDefaultUserDataDir').then((e: string) => {
-      setDefUserDataDir(e)
-    })
+    ipcRenderer
+      .invoke('getDefaultUserDataDir')
+      .then(async (defaultUserDataDir: string) => {
+        const productChromeProfilePath = defaultUserDataDir || ''
+        setDefUserDataDir(productChromeProfilePath)
+        await migrateLegacyChromeProfileRemoteCache(productChromeProfilePath, {
+          read: onGetRemoteValuesBase,
+          write: setRemoteValue,
+        })
+      })
+      .catch(() => {})
+      .finally(() => setUserDataDirReady(true))
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
@@ -216,7 +228,7 @@ const MITMChromeLauncher: React.FC<MITMChromeLauncherProp> = (props) => {
           {t('MITMChromeLauncher.save_user_data')}
         </YakitCheckbox>
       </Form.Item>
-      {isSaveUserData && (
+      {isSaveUserData && isUserDataDirReady && (
         <Form.Item label={' '} colon={false} help={t('MITMChromeLauncher.save_user_data_help')}>
           <YakitAutoComplete
             ref={userDataDirRef}

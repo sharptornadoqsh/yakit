@@ -2,9 +2,13 @@ const { ipcMain } = require('electron')
 const { launch, killAll, getChromePath } = require('chrome-launcher')
 const fs = require('fs')
 const path = require('path')
-const { getYakitHome } = require('../filePath')
+const { getAppConfigDir, getYakitHome } = require('../filePath')
 const { productConfig } = require('../product')
-const getMyUserDataDir = () => path.join(getYakitHome(), 'chrome-profile')
+const getMyUserDataDir = () => {
+  const userDataDir = path.join(getAppConfigDir(), 'projects', 'chrome-profile')
+  fs.mkdirSync(userDataDir, { recursive: true })
+  return userDataDir
+}
 
 const disableExtensionsExceptStr = (host, port, username, password) => `
 var config = {
