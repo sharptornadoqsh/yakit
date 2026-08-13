@@ -31,6 +31,28 @@ const getCollaborationClientHeaders = () => {
 
 const getCollaborationClientID = () => getCollaborationClientHeaders()[COLLABORATION_CLIENT_ID_HEADER]
 
+const getResponseHeader = (headers, name) => {
+  if (!headers) return undefined
+  if (typeof headers.get === 'function') return headers.get(name) || headers.get(name.toLowerCase())
+  return headers[name] || headers[name.toLowerCase()]
+}
+
+const getPluginDownloadHeaders = (headers) => {
+  const contentSHA256 = getResponseHeader(headers, 'X-Content-SHA256')
+  const pluginVersion = getResponseHeader(headers, 'X-Plugin-Version')
+  const result = {}
+  if (contentSHA256) result['x-content-sha256'] = `${contentSHA256}`
+  if (pluginVersion) result['x-plugin-version'] = `${pluginVersion}`
+  return result
+}
+
+const snapshotRequestUserInfo = (config) => {
+  const authorization = getResponseHeader(config.headers, 'Authorization')
+  if (!authorization) return undefined
+  if (authorization === USER_INFO.token) return { ...USER_INFO }
+  return { token: `${authorization}` }
+}
+
 // 软件启动后判断是 CE 版本还是 EE 版本
 ipcMain.handle('is-enpritrace-to-domain', (event, flag) => {
   assertTrustedAppSender(event, 'is-enpritrace-to-domain')
@@ -108,7 +130,11 @@ service.interceptors.request.use(
     const baseUrl = normalizeHttpBaseUrl(config.diyHome || HttpSetting.httpBaseURL)
     config.baseURL = buildApiBaseUrl(baseUrl)
     config.headers = config.headers || {}
-    if (USER_INFO.isLogin && USER_INFO.token) config.headers['Authorization'] = USER_INFO.token
+    const explicitAuthorization = getResponseHeader(config.headers, 'Authorization')
+    if (!explicitAuthorization && USER_INFO.isLogin && USER_INFO.token) {
+      config.headers['Authorization'] = USER_INFO.token
+    }
+    config.requestUserInfo = snapshotRequestUserInfo(config)
     config.headers = applyCollaborationClientHeaders(config.headers, getCollaborationClientHeaders())
     // console.log('request-config',config);
     return config
@@ -130,15 +156,14 @@ service.interceptors.response.use(
       Number.isFinite(responseCode) &&
       Object.prototype.hasOwnProperty.call(responseData, 'data')
     if (isServiceEnvelope) {
-      return {
-        ...responseData,
-        code: responseCode,
-        ...(responseCode === 401 ? { userInfo: USER_INFO } : {}),
-      }
+      const result = { ...responseData, code: responseCode }
+      if (responseCode === 401 && response.config?.requestUserInfo) result.userInfo = response.config.requestUserInfo
+      return result
     }
     const res = {
       code: response.status,
       data: responseData,
+      ...(response.config?.includeResponseHeaders ? { headers: getPluginDownloadHeaders(response.headers) } : {}),
     }
     // console.log("response__1", response)
     return res
@@ -150,7 +175,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data.message,
-        userInfo: USER_INFO,
+        ...(error.config?.requestUserInfo ? { userInfo: error.config.requestUserInfo } : {}),
       }
       return Promise.resolve(res)
     }
@@ -158,7 +183,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data?.message || error.response.data.reason,
-        userInfo: USER_INFO,
+        ...(error.config?.requestUserInfo ? { userInfo: error.config.requestUserInfo } : {}),
       }
       return Promise.resolve(res)
     }
@@ -166,7 +191,7 @@ service.interceptors.response.use(
       const res = {
         code: 401,
         message: error.response.data.message,
-        userInfo: USER_INFO,
+        ...(error.config?.requestUserInfo ? { userInfo: error.config.requestUserInfo } : {}),
       }
       return Promise.resolve(res)
     }

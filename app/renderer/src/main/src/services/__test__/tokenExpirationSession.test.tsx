@@ -66,28 +66,73 @@ const companyUser = {
   companyHeadImg: null,
   role: 'admin',
   user_id: 7,
-  token: '',
+  token: 'company-token',
 }
 
 let handleAxios: typeof import('../fetch').handleAxios
 let tokenOverdue: typeof import('../fetch').tokenOverdue
 let isTokenExpirationError: typeof import('../fetch').isTokenExpirationError
+let resetTokenExpirationState: typeof import('../fetch').resetTokenExpirationState
 
 describe('token expiration session', () => {
   beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
-    ;({ handleAxios, tokenOverdue, isTokenExpirationError } = await import('../fetch'))
+    ;({ handleAxios, tokenOverdue, isTokenExpirationError, resetTokenExpirationState } = await import('../fetch'))
   })
 
-  it('retains a community session without showing an expiration notice', () => {
+  it('社区版当前令牌过期时只退出并提示一次', () => {
     mocks.isCommunityEdition.mockReturnValue(true)
+    resetTokenExpirationState(companyUser.token)
     tokenOverdue({ userInfo: companyUser })
+    tokenOverdue({ userInfo: companyUser })
+
+    expect(mocks.notifyError).toHaveBeenCalledTimes(1)
+    expect(mocks.loginOutLocal).toHaveBeenCalledWith(companyUser)
+    expect(mocks.logoutDynamicControl).toHaveBeenCalledWith({ loginOut: false })
+    expect(mocks.globalUserLogout).toHaveBeenCalledTimes(1)
+  })
+
+  it('旧令牌的 401 不会清除已切换到的新会话', () => {
+    mocks.isCommunityEdition.mockReturnValue(true)
+    resetTokenExpirationState('new-token')
+
+    tokenOverdue({ userInfo: { ...companyUser, token: 'old-token' } })
 
     expect(mocks.notifyError).not.toHaveBeenCalled()
     expect(mocks.loginOutLocal).not.toHaveBeenCalled()
     expect(mocks.logoutDynamicControl).not.toHaveBeenCalled()
     expect(mocks.globalUserLogout).not.toHaveBeenCalled()
+  })
+
+  it('缺少请求身份的迟到 401 不会清除当前会话', () => {
+    resetTokenExpirationState(companyUser.token)
+
+    tokenOverdue({ code: 401, message: 'token过期' })
+
+    expect(mocks.loginOutLocal).not.toHaveBeenCalled()
+    expect(mocks.logoutDynamicControl).not.toHaveBeenCalled()
+    expect(mocks.globalUserLogout).not.toHaveBeenCalled()
+  })
+
+  it('主进程附带当前会话的 401 在服务端正文缺少用户信息时仍退出', () => {
+    mocks.isCommunityEdition.mockReturnValue(true)
+    resetTokenExpirationState(companyUser.token)
+
+    handleAxios({ code: 401, message: 'token过期', userInfo: companyUser } as never, vi.fn(), vi.fn())
+
+    expect(mocks.loginOutLocal).toHaveBeenCalledWith(companyUser)
+    expect(mocks.globalUserLogout).toHaveBeenCalledTimes(1)
+  })
+
+  it('未登录时缺少请求身份的 401 保留原有退出处理', () => {
+    resetTokenExpirationState()
+
+    tokenOverdue({ code: 401, message: 'token过期' })
+
+    expect(mocks.loginOutLocal).not.toHaveBeenCalled()
+    expect(mocks.logoutDynamicControl).toHaveBeenCalledWith({ loginOut: false })
+    expect(mocks.globalUserLogout).toHaveBeenCalledTimes(1)
   })
 
   it('preserves the existing sign-out behavior for an expired company session', () => {

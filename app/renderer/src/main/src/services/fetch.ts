@@ -1,5 +1,5 @@
 import { UserInfoProps } from '@/store'
-import { isCommunityEdition, globalUserLogout } from '@/utils/envfile'
+import { globalUserLogout } from '@/utils/envfile'
 import { loginOutLocal } from '@/utils/login'
 import { failed } from '@/utils/notification'
 import { AxiosRequestConfig, AxiosResponse } from './axios'
@@ -8,6 +8,7 @@ import i18n from '@/i18n/i18n'
 const tOriginal = i18n.getFixedT(null, 'utils')
 
 let tokenExpirationHandled = false
+let tokenExpirationSessionToken = ''
 
 export const isTokenExpirationError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error || '')
@@ -40,6 +41,7 @@ export type AxiosResponseProps<T = any, D = any> = Merge<
 
 export interface requestConfig<T = any> extends AxiosRequestConfig<T> {
   params?: T
+  includeResponseHeaders?: boolean
   /** @name 自定义接口域名 */
   diyHome?: string
 }
@@ -86,7 +88,7 @@ export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, res
     return
   }
   if (code >= 200 && code < 300) {
-    resolve(data)
+    resolve((res as any).headers ? { body: data, headers: (res as any).headers } : data)
     return
   }
   switch (code) {
@@ -104,17 +106,18 @@ export const handleAxios = (res: AxiosResponseProps<AxiosResponseInfoProps>, res
 }
 
 export const tokenOverdue = (res?: TokenOverdueResponse) => {
-  if (isCommunityEdition()) return
   if (tokenExpirationHandled) return
+  const userInfo = res?.userInfo || res?.data?.userInfo
+  if (tokenExpirationSessionToken && userInfo?.token !== tokenExpirationSessionToken) return
   tokenExpirationHandled = true
 
-  const userInfo = res?.userInfo || res?.data?.userInfo
   if (userInfo) loginOutLocal(userInfo)
   yakitNetwork.logoutDynamicControl({ loginOut: false })
   void globalUserLogout()
   failed(tOriginal('servicesFetch.loginExpired'))
 }
 
-export const resetTokenExpirationState = (_token?: string) => {
+export const resetTokenExpirationState = (token?: string) => {
   tokenExpirationHandled = false
+  tokenExpirationSessionToken = token || ''
 }

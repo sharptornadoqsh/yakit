@@ -367,6 +367,35 @@ export interface TeamPluginVersion {
   created_at: string
 }
 
+export interface OfflinePluginManifestItem {
+  id: number
+  team_id: number
+  script_name: string
+  type: string
+  version: number
+  size_bytes: number
+  file_hash: string
+  hash_algorithm: 'sha256'
+  dependencies: string[]
+  engine_min_version: string
+  engine_max_version: string
+  download_url: string
+  updated_at: string
+}
+
+export interface TeamPluginDownloadSummary {
+  body: ArrayBuffer
+  sha256: string
+  version: number
+}
+
+const sha256ArrayBuffer = async (content: ArrayBuffer) => {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', content)
+  return Array.from(new Uint8Array(digest))
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')
+}
+
 export interface CreateTeamPluginInput {
   category_id?: number
   source_name?: string
@@ -779,6 +808,9 @@ export const listAuditLogs = (teamId: V2Identifier, params: V2ListQuery = {}) =>
 export const listTeamPlugins = (teamId: V2Identifier, params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<TeamPlugin[]>>(`v2/teams/${teamId}/plugins`, params)
 
+export const listOfflinePluginManifest = (teamId: V2Identifier, params: V2ListQuery = {}) =>
+  getV2<V2ListQuery, V2Response<OfflinePluginManifestItem[]>>(`v2/teams/${teamId}/plugins/offline-manifest`, params)
+
 export const getTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier) =>
   getV2<Record<string, never>, V2Response<TeamPlugin>>(`v2/teams/${teamId}/plugins/${pluginId}`, {})
 
@@ -871,13 +903,34 @@ export const downloadTeamPluginVersion = (
   pluginId: V2Identifier,
   version: number,
 ): Promise<ArrayBuffer> => {
+  return downloadTeamPluginVersionWithSummary(teamId, pluginId, version).then(({ body }) => body)
+}
+
+export const downloadTeamPluginVersionWithSummary = async (
+  teamId: V2Identifier,
+  pluginId: V2Identifier,
+  version: number,
+): Promise<TeamPluginDownloadSummary> => {
   const url = `v2/teams/${teamId}/plugins/${pluginId}/versions/${version}/download`
-  return NetWorkApi<Record<string, never>, ArrayBuffer>({
+  const response = await NetWorkApi<Record<string, never>, { body: ArrayBuffer; headers?: Record<string, string> }>({
     method: 'get',
     url,
     params: {},
     responseType: 'arraybuffer',
+    includeResponseHeaders: true,
   }).catch((error) => rethrowV2Error(url, error))
+  const sha256 = `${response.headers?.['x-content-sha256'] || ''}`.trim().toLowerCase()
+  const responseVersion = Number(response.headers?.['x-plugin-version'])
+  if (
+    !(response.body instanceof ArrayBuffer) ||
+    !/^[a-f0-9]{64}$/.test(sha256) ||
+    !Number.isSafeInteger(responseVersion) ||
+    responseVersion !== version
+  ) {
+    throw new Error('团队插件下载摘要或版本无效')
+  }
+  if ((await sha256ArrayBuffer(response.body)) !== sha256) throw new Error('插件正文摘要校验失败')
+  return { body: response.body, sha256, version: responseVersion }
 }
 
 export const setPluginVisibility = (

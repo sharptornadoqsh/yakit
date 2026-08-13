@@ -5,7 +5,7 @@ export type EngineUpdateStatus = 'not-checked' | 'checking' | 'current' | 'avail
 export const shouldCheckEngineUpdate = (engineLink: boolean, engineMode?: YaklangEngineMode) =>
   engineLink && engineMode === 'local'
 
-const compareEngineVersions = (left: string, right: string) => {
+export const compareEngineVersions = (left: string, right: string) => {
   const splitVersion = (version: string) => {
     const normalized = version.trim().replace(/^v/i, '').split('+')[0]
     const separatorIndex = normalized.indexOf('-')

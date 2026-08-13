@@ -49,6 +49,7 @@ import {
   uploadProjectShareBundleChunk,
   unbindPluginGroup,
 } from '../teamCollaboration'
+import { createHash } from 'crypto'
 import {
   subscribeTeamAuthenticationInvalidation,
   subscribeTeamPermissionInvalidation,
@@ -57,6 +58,8 @@ import {
 const mocks = vi.hoisted(() => ({
   NetWorkApi: vi.fn(),
 }))
+
+const sha256 = (value: ArrayBuffer) => createHash('sha256').update(new Uint8Array(value)).digest('hex')
 
 vi.mock('../fetch', () => ({
   NetWorkApi: mocks.NetWorkApi,
@@ -518,7 +521,10 @@ describe('team collaboration service', () => {
     const downloadTeamPluginVersion = (api as any).downloadTeamPluginVersion
     expect(typeof downloadTeamPluginVersion).toBe('function')
     const bytes = new Uint8Array([0, 1, 2, 255]).buffer
-    mocks.NetWorkApi.mockResolvedValueOnce(bytes)
+    mocks.NetWorkApi.mockResolvedValueOnce({
+      body: bytes,
+      headers: { 'x-content-sha256': sha256(bytes), 'x-plugin-version': '2' },
+    })
 
     await expect(downloadTeamPluginVersion(3, 5, 2)).resolves.toBe(bytes)
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
@@ -526,6 +532,7 @@ describe('team collaboration service', () => {
       url: 'v2/teams/3/plugins/5/versions/2/download',
       params: {},
       responseType: 'arraybuffer',
+      includeResponseHeaders: true,
     })
 
     await downloadTeamPlugin(3, 5)
@@ -535,6 +542,78 @@ describe('team collaboration service', () => {
       params: {},
       responseType: 'arraybuffer',
     })
+  })
+
+  it('按后端离线清单契约读取不可变下载地址和兼容性信息', async () => {
+    const api = await import('../teamCollaboration')
+    const listOfflinePluginManifest = (api as any).listOfflinePluginManifest
+    expect(typeof listOfflinePluginManifest).toBe('function')
+    const response = {
+      ok: true,
+      data: [
+        {
+          id: 5,
+          team_id: 3,
+          script_name: 'offline-plugin',
+          type: 'yak',
+          version: 2,
+          size_bytes: 12,
+          file_hash: 'a'.repeat(64),
+          hash_algorithm: 'sha256',
+          dependencies: ['base'],
+          engine_min_version: '1.0.0',
+          engine_max_version: '2.0.0',
+          download_url: '/api/v2/teams/3/plugins/5/versions/2/download',
+          updated_at: '2026-08-13T00:00:00Z',
+        },
+      ],
+      paging: { page: 1, limit: 20, total: 1, total_pages: 1 },
+    }
+    mocks.NetWorkApi.mockResolvedValueOnce(response)
+
+    await expect(listOfflinePluginManifest(3, { limit: 20 })).resolves.toBe(response)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'get',
+      url: 'v2/teams/3/plugins/offline-manifest',
+      params: { limit: 20 },
+    })
+  })
+
+  it('版本下载保留正文、SHA-256 摘要和不可变版本号', async () => {
+    const api = await import('../teamCollaboration')
+    const downloadTeamPluginVersionWithSummary = (api as any).downloadTeamPluginVersionWithSummary
+    expect(typeof downloadTeamPluginVersionWithSummary).toBe('function')
+    const body = new Uint8Array([1, 2, 3]).buffer
+    const contentSha256 = sha256(body)
+    mocks.NetWorkApi.mockResolvedValueOnce({
+      body,
+      headers: { 'x-content-sha256': contentSha256, 'x-plugin-version': '2' },
+    })
+
+    await expect(downloadTeamPluginVersionWithSummary(3, 5, 2)).resolves.toEqual({
+      body,
+      sha256: contentSha256,
+      version: 2,
+    })
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      method: 'get',
+      url: 'v2/teams/3/plugins/5/versions/2/download',
+      params: {},
+      responseType: 'arraybuffer',
+      includeResponseHeaders: true,
+    })
+  })
+
+  it('正文与响应头摘要不匹配时拒绝版本下载', async () => {
+    const api = await import('../teamCollaboration')
+    const downloadTeamPluginVersionWithSummary = (api as any).downloadTeamPluginVersionWithSummary
+    const body = new Uint8Array([1, 2, 3]).buffer
+    mocks.NetWorkApi.mockResolvedValueOnce({
+      body,
+      headers: { 'x-content-sha256': 'f'.repeat(64), 'x-plugin-version': '2' },
+    })
+
+    await expect(downloadTeamPluginVersionWithSummary(3, 5, 2)).rejects.toThrow('插件正文摘要校验失败')
   })
 
   it('reads one team plugin from its resource endpoint', async () => {

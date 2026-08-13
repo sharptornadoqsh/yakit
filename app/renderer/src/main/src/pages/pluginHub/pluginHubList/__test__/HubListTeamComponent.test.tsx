@@ -21,10 +21,12 @@ const mocks = vi.hoisted(() => ({
   deleteTeamPlugin: vi.fn(),
   downloadTeamPlugin: vi.fn(),
   downloadTeamPluginVersion: vi.fn(),
+  getCurrentYak: vi.fn(),
   getMe: vi.fn(),
   getTeamPlugin: vi.fn(),
   importTeamPlugins: vi.fn(),
   ipcInvoke: vi.fn(),
+  listOfflinePluginManifest: vi.fn(),
   listPluginCategories: vi.fn(),
   listPluginGroups: vi.fn(),
   listTeamPluginVersions: vi.fn(),
@@ -120,6 +122,7 @@ vi.mock('@/services/teamCollaboration', () => ({
   getMe: mocks.getMe,
   getTeamPlugin: mocks.getTeamPlugin,
   importTeamPlugins: mocks.importTeamPlugins,
+  listOfflinePluginManifest: mocks.listOfflinePluginManifest,
   listPluginCategories: mocks.listPluginCategories,
   listPluginGroups: mocks.listPluginGroups,
   listTeamPluginVersions: mocks.listTeamPluginVersions,
@@ -130,6 +133,10 @@ vi.mock('@/services/teamCollaboration', () => ({
   updatePluginGroup: mocks.updatePluginGroup,
   updateTeamPlugin: mocks.updateTeamPlugin,
   unbindPluginGroup: mocks.unbindPluginGroup,
+}))
+
+vi.mock('@/services/electronBridge', () => ({
+  yakitEngine: { getCurrentYak: mocks.getCurrentYak },
 }))
 
 vi.mock('../HubListTeam.module.scss', () => ({
@@ -323,6 +330,7 @@ describe('团队插件仓库管理', () => {
       value: () => ({ ipcRenderer: { invoke: mocks.ipcInvoke } }),
     })
     mocks.listTeams.mockResolvedValue({ data: [{ id: 3, name: '研发团队' }] })
+    mocks.getCurrentYak.mockResolvedValue('1.4.8')
     mocks.getMe.mockResolvedValue({
       data: {
         user: { id: 7, name: '测试用户', status: 'active' },
@@ -363,6 +371,27 @@ describe('团队插件仓库管理', () => {
           created_at: '2026-07-29T12:00:00Z',
         },
       ],
+    })
+    mocks.listOfflinePluginManifest.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 5,
+          team_id: 3,
+          script_name: 'Plugin A',
+          type: 'yak',
+          version: 2,
+          size_bytes: pluginBodyBytes.byteLength,
+          file_hash: '2'.repeat(64),
+          hash_algorithm: 'sha256',
+          dependencies: [],
+          engine_min_version: '',
+          engine_max_version: '',
+          download_url: '/api/v2/teams/3/plugins/5/versions/2/download',
+          updated_at: '2026-08-13T00:00:00Z',
+        },
+      ],
+      paging: { page: 1, limit: 200, total: 1, total_pages: 1 },
     })
     mocks.downloadTeamPluginVersion.mockResolvedValue(pluginBodyBytes)
     mocks.apiQueryYakScriptBase.mockResolvedValue({
@@ -1466,8 +1495,152 @@ describe('团队插件仓库管理', () => {
     fireEvent.click(within(versionDialog).getByRole('button', { name: '安装选中版本' }))
 
     await waitFor(() => expect(mocks.downloadTeamPluginVersion).toHaveBeenCalledWith(3, 5, 1))
+    expect(mocks.listOfflinePluginManifest).not.toHaveBeenCalled()
     expect(mocks.downloadTeamPlugin).not.toHaveBeenCalled()
     expect(mocks.ipcInvoke).toHaveBeenCalledWith('SaveYakScript', expect.objectContaining({ Content: pluginBody }))
+  }, 15000)
+
+  it('离线清单与选中版本不一致时拒绝下载和本地写入', async () => {
+    mocks.listOfflinePluginManifest.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 5,
+          team_id: 3,
+          script_name: 'Plugin A',
+          type: 'yak',
+          version: 2,
+          size_bytes: pluginBodyBytes.byteLength,
+          file_hash: 'f'.repeat(64),
+          hash_algorithm: 'sha256',
+          dependencies: [],
+          engine_min_version: '',
+          engine_max_version: '',
+          download_url: '/api/v2/teams/3/plugins/5/versions/2/download',
+          updated_at: '2026-08-13T00:00:00Z',
+        },
+      ],
+      paging: { page: 1, limit: 200, total: 1, total_pages: 1 },
+    })
+    await renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: '下载到本地' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '选择插件版本' })
+    fireEvent.click(within(versionDialog).getByRole('button', { name: '安装选中版本' }))
+
+    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith(expect.stringContaining('离线插件清单')))
+    expect(mocks.downloadTeamPluginVersion).not.toHaveBeenCalled()
+    expect(mocks.ipcInvoke).not.toHaveBeenCalledWith('SaveYakScript', expect.anything())
+  }, 15000)
+
+  it('当前版本安装先消费离线清单再下载并写入本地', async () => {
+    const currentBody = new TextEncoder().encode('println("current")')
+    const currentHash = createHash('sha256').update(currentBody).digest('hex')
+    mocks.listTeamPlugins.mockResolvedValue(createPluginListResponse({ file_hash: currentHash, version: 2 }))
+    mocks.listTeamPluginVersions.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 52,
+          team_id: 3,
+          plugin_id: 5,
+          version: 2,
+          file_hash: currentHash,
+          change_note: '当前版本',
+          created_by: 7,
+          created_at: '2026-08-13T00:00:00Z',
+        },
+      ],
+    })
+    mocks.listOfflinePluginManifest.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 5,
+          team_id: 3,
+          script_name: 'Plugin A',
+          type: 'yak',
+          version: 2,
+          size_bytes: currentBody.byteLength,
+          file_hash: currentHash,
+          hash_algorithm: 'sha256',
+          dependencies: [],
+          engine_min_version: '',
+          engine_max_version: '',
+          download_url: '/api/v2/teams/3/plugins/5/versions/2/download',
+          updated_at: '2026-08-13T00:00:00Z',
+        },
+      ],
+      paging: { page: 1, limit: 200, total: 1, total_pages: 1 },
+    })
+    mocks.downloadTeamPluginVersion.mockResolvedValue(currentBody)
+    await renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: '下载到本地' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '选择插件版本' })
+    fireEvent.click(within(versionDialog).getByRole('button', { name: '安装选中版本' }))
+
+    await waitFor(() => expect(mocks.downloadTeamPluginVersion).toHaveBeenCalledWith(3, 5, 2))
+    expect(mocks.listOfflinePluginManifest).toHaveBeenCalledWith(3, { page: 1, limit: 200, keyword: 'Plugin A' })
+    expect(mocks.listOfflinePluginManifest.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.downloadTeamPluginVersion.mock.invocationCallOrder[0],
+    )
+    expect(mocks.ipcInvoke).toHaveBeenCalledWith(
+      'SaveYakScript',
+      expect.objectContaining({ Content: 'println("current")' }),
+    )
+  }, 15000)
+
+  it('当前引擎低于离线清单要求时拒绝下载和本地写入', async () => {
+    const currentBody = new TextEncoder().encode('println("current")')
+    const currentHash = createHash('sha256').update(currentBody).digest('hex')
+    mocks.listTeamPlugins.mockResolvedValue(createPluginListResponse({ file_hash: currentHash, version: 2 }))
+    mocks.listTeamPluginVersions.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 52,
+          team_id: 3,
+          plugin_id: 5,
+          version: 2,
+          file_hash: currentHash,
+          change_note: '当前版本',
+          created_by: 7,
+          created_at: '2026-08-13T00:00:00Z',
+        },
+      ],
+    })
+    mocks.listOfflinePluginManifest.mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 5,
+          team_id: 3,
+          script_name: 'Plugin A',
+          type: 'yak',
+          version: 2,
+          size_bytes: currentBody.byteLength,
+          file_hash: currentHash,
+          hash_algorithm: 'sha256',
+          dependencies: ['yaklib/http'],
+          engine_min_version: '9.0.0',
+          engine_max_version: '',
+          download_url: '/api/v2/teams/3/plugins/5/versions/2/download',
+          updated_at: '2026-08-13T00:00:00Z',
+        },
+      ],
+      paging: { page: 1, limit: 200, total: 1, total_pages: 1 },
+    })
+    await renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: '下载到本地' }))
+    const versionDialog = await screen.findByRole('dialog', { name: '选择插件版本' })
+    fireEvent.click(within(versionDialog).getByRole('button', { name: '安装选中版本' }))
+
+    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith(expect.stringContaining('引擎版本')))
+    expect(mocks.getCurrentYak).toHaveBeenCalled()
+    expect(mocks.downloadTeamPluginVersion).not.toHaveBeenCalled()
+    expect(mocks.ipcInvoke).not.toHaveBeenCalledWith('SaveYakScript', expect.anything())
   }, 15000)
 
   it('版本请求迟到时切换团队会丢弃旧响应且不打开旧弹窗', async () => {

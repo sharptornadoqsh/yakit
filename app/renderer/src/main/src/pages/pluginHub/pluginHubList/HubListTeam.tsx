@@ -10,6 +10,8 @@ import * as teamCollaboration from '@/services/teamCollaboration'
 import { apiFetchSaveYakScriptGroupLocal, apiQueryYakScriptBase } from '@/pages/plugins/utils'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { getRemoteHttpSettingGV } from '@/utils/envfile'
+import { yakitEngine } from '@/services/electronBridge'
+import { compareEngineVersions } from '@/components/layout/engineUpdate'
 import {
   acceptTeamPermissionMemberVersion,
   buildTeamPermissionSnapshots,
@@ -111,6 +113,20 @@ interface PluginVersionPicker {
 
 const service = teamCollaboration
 const sha256Pattern = /^[0-9a-f]{64}$/
+const buildVersionDownloadURL = (teamId: number, pluginId: number, version: number) =>
+  `/api/v2/teams/${teamId}/plugins/${pluginId}/versions/${version}/download`
+
+const assertManifestEngineCompatibility = async (manifest: teamCollaboration.OfflinePluginManifestItem) => {
+  if (!manifest.engine_min_version && !manifest.engine_max_version) return
+  const currentVersion = await yakitEngine.getCurrentYak()
+  if (
+    !currentVersion ||
+    (manifest.engine_min_version && compareEngineVersions(currentVersion, manifest.engine_min_version) < 0) ||
+    (manifest.engine_max_version && compareEngineVersions(currentVersion, manifest.engine_max_version) > 0)
+  ) {
+    throw new Error('当前引擎版本不满足离线插件兼容范围')
+  }
+}
 
 const unwrapData = <T,>(response: any): T => (response?.data?.data ?? response?.data ?? response) as T
 
@@ -753,6 +769,31 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       ) {
         throw new Error('插件版本元数据无效')
       }
+      let expectedFileHash = selectedVersion.file_hash
+      if (selectedVersion.version === plugin.version) {
+        const manifestResponse = await service.listOfflinePluginManifest(operationTeamId, {
+          page: 1,
+          limit: 200,
+          keyword: plugin.script_name,
+        })
+        assertOperationPermission(operationTeamId, 'plugin.read')
+        const manifest = unwrapItems<teamCollaboration.OfflinePluginManifestItem>(manifestResponse).find(
+          (item) => item.id === plugin.id && item.version === selectedVersion.version,
+        )
+        if (
+          !manifest ||
+          manifest.team_id !== operationTeamId ||
+          manifest.script_name !== plugin.script_name ||
+          manifest.hash_algorithm !== 'sha256' ||
+          manifest.file_hash !== selectedVersion.file_hash ||
+          manifest.download_url !== buildVersionDownloadURL(operationTeamId, plugin.id, selectedVersion.version)
+        ) {
+          throw new Error('离线插件清单与选中版本不一致')
+        }
+        await assertManifestEngineCompatibility(manifest)
+        assertOperationPermission(operationTeamId, 'plugin.read')
+        expectedFileHash = manifest.file_hash
+      }
       const onlineBaseUrl = await getOnlineBaseUrl()
       assertOperationPermission(operationTeamId, 'plugin.read')
       const categoryName = plugin.category_name || categories.find((item) => item.id === plugin.category_id)?.name
@@ -768,7 +809,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
           type: plugin.type,
           uuid: plugin.uuid,
           description: plugin.description,
-          fileHash: selectedVersion.file_hash,
+          fileHash: expectedFileHash,
           version: selectedVersion.version,
           revision: plugin.revision,
           visibility: plugin.visibility,

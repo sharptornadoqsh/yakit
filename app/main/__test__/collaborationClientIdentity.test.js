@@ -333,3 +333,101 @@ describe('团队协作客户端标识 IPC 边界', () => {
     expect(setConfig).toHaveBeenCalledWith('YAKIT_HOME', 'other-projects')
   })
 })
+
+describe('团队插件下载响应', () => {
+  it('请求要求时向渲染端透传插件摘要与版本响应头', () => {
+    const localRequire = createRequire(import.meta.url)
+    const httpServerPath = localRequire.resolve('../httpServer')
+    const originalLoad = Module._load
+    Module._load = function (request, parent, isMain) {
+      if (request === 'electron') {
+        return {
+          app: { getVersion: () => '1.4.0' },
+          ipcMain: { handle: vi.fn(), on: vi.fn() },
+        }
+      }
+      if (request === './filePath') {
+        return { getConfig: () => ({ collaborationClientId: 'client-id' }), setConfig: vi.fn() }
+      }
+      return originalLoad.call(this, request, parent, isMain)
+    }
+    delete localRequire.cache[httpServerPath]
+
+    try {
+      const httpServer = localRequire(httpServerPath)
+      const responseInterceptor = httpServer.service.interceptors.response.handlers[0].fulfilled
+      const result = responseInterceptor({
+        status: 200,
+        data: new Uint8Array([1, 2, 3]).buffer,
+        config: { includeResponseHeaders: true },
+        headers: {
+          get: (name) => ({ 'X-Content-SHA256': 'a'.repeat(64), 'X-Plugin-Version': '2' })[name],
+          'x-unrelated-header': 'must-not-cross-ipc',
+        },
+      })
+
+      expect(result).toMatchObject({
+        code: 200,
+        data: expect.any(ArrayBuffer),
+        headers: { 'x-content-sha256': 'a'.repeat(64), 'x-plugin-version': '2' },
+      })
+    } finally {
+      Module._load = originalLoad
+      delete localRequire.cache[httpServerPath]
+    }
+  })
+})
+
+describe('在线请求会话归属', () => {
+  it('请求发出时锁定登录会话且保留显式 Authorization', async () => {
+    const localRequire = createRequire(import.meta.url)
+    const httpServerPath = localRequire.resolve('../httpServer')
+    const statePath = localRequire.resolve('../state')
+    const originalLoad = Module._load
+    Module._load = function (request, parent, isMain) {
+      if (request === 'electron') {
+        return {
+          app: { getVersion: () => '1.4.0' },
+          ipcMain: { handle: vi.fn(), on: vi.fn() },
+        }
+      }
+      if (request === './filePath') {
+        return { getConfig: () => ({ collaborationClientId: 'client-id' }), setConfig: vi.fn() }
+      }
+      return originalLoad.call(this, request, parent, isMain)
+    }
+    delete localRequire.cache[httpServerPath]
+
+    try {
+      const state = localRequire(statePath)
+      Object.assign(state.USER_INFO, { isLogin: true, token: 'old-token', user_id: 7 })
+      const httpServer = localRequire(httpServerPath)
+      const requestInterceptor = httpServer.service.interceptors.request.handlers[0].fulfilled
+      const responseInterceptor = httpServer.service.interceptors.response.handlers[0].fulfilled
+      const rejectedInterceptor = httpServer.service.interceptors.response.handlers[0].rejected
+
+      const oldRequest = requestInterceptor({ headers: {} })
+      const explicitRequest = requestInterceptor({ headers: { Authorization: 'explicit-token' } })
+      Object.assign(state.USER_INFO, { isLogin: true, token: 'new-token', user_id: 8 })
+
+      expect(oldRequest.headers.Authorization).toBe('old-token')
+      expect(explicitRequest.headers.Authorization).toBe('explicit-token')
+      expect(
+        responseInterceptor({
+          status: 200,
+          data: { code: 401, data: null, message: 'token过期' },
+          config: oldRequest,
+        }),
+      ).toMatchObject({ userInfo: { token: 'old-token', user_id: 7 } })
+      await expect(
+        rejectedInterceptor({
+          response: { status: 401, data: { message: 'token过期' } },
+          config: explicitRequest,
+        }),
+      ).resolves.toMatchObject({ userInfo: { token: 'explicit-token' } })
+    } finally {
+      Module._load = originalLoad
+      delete localRequire.cache[httpServerPath]
+    }
+  })
+})
