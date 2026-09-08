@@ -70,6 +70,68 @@ const calculateSha256 = async (filePath) => {
   return hash.digest('hex')
 }
 
+const verifyEngineBinary = (filePath, asset) => {
+  const expected = supportedAssets[asset]
+  if (!expected) throw new Error(`Unsupported engine asset: ${asset}`)
+  const fd = fs.openSync(filePath, 'r')
+  const header = Buffer.alloc(64)
+  let platform
+  let architecture
+  try {
+    if (fs.readSync(fd, header, 0, header.length, 0) !== header.length) {
+      throw new Error(`Truncated engine executable: ${asset}`)
+    }
+    if (header.readUInt32LE(0) === 0xfeedfacf) {
+      platform = 'darwin'
+      architecture = { 0x01000007: 'x64', 0x0100000c: 'arm64' }[header.readUInt32LE(4)]
+    } else if (header.subarray(0, 6).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1]))) {
+      platform = 'linux'
+      architecture = { 62: 'x64', 183: 'arm64' }[header.readUInt16LE(18)]
+    } else if (header.toString('ascii', 0, 2) === 'MZ') {
+      const pe = Buffer.alloc(6)
+      const offset = header.readUInt32LE(60)
+      if (offset >= 64 && fs.readSync(fd, pe, 0, pe.length, offset) === pe.length && pe.readUInt32LE(0) === 0x4550) {
+        platform = 'win32'
+        architecture = { 0x8664: 'x64', 0xaa64: 'arm64' }[pe.readUInt16LE(4)]
+      }
+    }
+  } finally {
+    fs.closeSync(fd)
+  }
+  if (platform !== expected.platform || architecture !== expected.architecture) {
+    throw new Error(
+      `Engine architecture mismatch: expected ${expected.platform}/${expected.architecture}, got ${platform || 'unknown'}/${architecture || 'unknown'}`,
+    )
+  }
+  return { platform, architecture }
+}
+
+const updatePackagedCompatibility = (root, verification) => {
+  const manifestPath = path.join(root, 'product', 'engine-compatibility.json')
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+  const client = manifest.clientVersions.find((item) => item.clientVersion === packageJson.version)
+  const artifact = client?.artifacts.find(
+    (item) => item.platform === verification.platform && item.architecture === verification.architecture,
+  )
+  if (
+    !artifact ||
+    normalizePath(artifact.sourceArchive) !== verification.archivePath ||
+    artifact.archiveEntry !== `bins/${verification.asset}`
+  ) {
+    throw new Error(`Engine compatibility entry mismatch: ${verification.asset}`)
+  }
+  client.recommendedEngineVersion = verification.engineVersion
+  Object.assign(artifact, {
+    archiveSha256: verification.archiveSha256,
+    engineSha256: verification.packagedEngineSha256,
+    verifiedAt: verification.verifiedAt,
+    status: 'verified-build-artifact',
+  })
+  const temporaryPath = `${manifestPath}.tmp`
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  fs.renameSync(temporaryPath, manifestPath)
+}
+
 const downloadFile = async (url, destination, fetcher = global.fetch) => {
   const response = await fetcher(url)
   if (!response.ok || !response.body) throw new Error(`下载失败：${url}，状态码 ${response.status}`)
@@ -86,6 +148,7 @@ const archiveEngine = async ({ asset, engineVersion, root = repositoryRoot }) =>
   const paths = getEnginePaths(asset, root)
   if (!fs.existsSync(paths.rawPath)) throw new Error(`待归档引擎不存在：${paths.rawPath}`)
   if (!fs.existsSync(paths.sidecarPath)) throw new Error(`引擎摘要文件不存在：${paths.sidecarPath}`)
+  verifyEngineBinary(paths.rawPath, asset)
 
   const upstreamEngineSha256 = parseSha256(fs.readFileSync(paths.sidecarPath, 'utf8'))
   const packagedEngineSha256 = await calculateSha256(paths.rawPath)
@@ -107,6 +170,7 @@ const archiveEngine = async ({ asset, engineVersion, root = repositoryRoot }) =>
     verifiedAt: new Date().toISOString(),
   }
   fs.writeFileSync(paths.verificationPath, `${JSON.stringify(verification, null, 2)}\n`, 'utf8')
+  updatePackagedCompatibility(root, verification)
   fs.rmSync(paths.rawPath, { force: true })
   return { ...paths, verification }
 }
@@ -138,6 +202,7 @@ const prepareEngine = async ({
     const expectedSha256 = parseSha256(fs.readFileSync(sidecarDownloadPath, 'utf8'))
     const actualSha256 = await calculateSha256(rawDownloadPath)
     if (actualSha256 !== expectedSha256) throw new Error(`引擎摘要不匹配：${asset}`)
+    verifyEngineBinary(rawDownloadPath, asset)
 
     fs.renameSync(rawDownloadPath, paths.rawPath)
     fs.renameSync(sidecarDownloadPath, paths.sidecarPath)
@@ -200,4 +265,5 @@ module.exports = {
   prepareEngine,
   resolveEngineVersion,
   supportedAssets,
+  verifyEngineBinary,
 }

@@ -4,7 +4,9 @@ import crypto from 'crypto'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { execFileSync } from 'child_process'
 import AdmZip from 'adm-zip'
+import asar from '@electron/asar'
 import { afterEach, describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import electronBuilderConfig from '../../../packageScript/electron-builder.config'
@@ -16,7 +18,11 @@ import {
   getEnginePaths,
   parseSha256,
   resolveEngineVersion,
+  prepareEngine,
 } from '../../../packageScript/script/prepare-renyan-engine'
+import { extractAndVerifyEngineArchive, normalizeSha256 } from '../engineLifecycle'
+import compatibilityManifest from '../../../product/engine-compatibility.json'
+import { verifyPackage } from '../../../packageScript/script/verify-renyan-package'
 import packageJson from '../../../package.json'
 
 const originalEnvironment = { ...process.env }
@@ -71,7 +77,7 @@ describe('睿眼多平台安装文件工作流', () => {
     )
     expect(Object.keys(workflow.jobs)).toEqual([...buildJobNames, 'publish-github-release'])
     expect(workflow.jobs['build-macos-x64']['runs-on']).toBe('macos-15-intel')
-    expect(workflow.jobs['build-macos-arm64']['runs-on']).toBe('macos-15')
+    expect(workflow.jobs['build-macos-arm64']['runs-on']).toBe('macos-26')
     expect(workflow.jobs['build-windows-x64']['runs-on']).toBe('windows-2022')
     expect(workflow.jobs['build-linux-x64']['runs-on']).toBe('ubuntu-22.04')
     expect(workflow.jobs['build-linux-arm64']['runs-on']).toBe('ubuntu-22.04-arm')
@@ -98,7 +104,7 @@ describe('睿眼多平台安装文件工作流', () => {
     })
     expect(workflow.on.workflow_dispatch.inputs.include_engine).toMatchObject({
       type: 'boolean',
-      default: false,
+      default: true,
     })
     expect(workflow.on.workflow_dispatch.inputs.sign_installers).toMatchObject({
       type: 'boolean',
@@ -349,6 +355,237 @@ describe('睿眼多平台安装文件工作流', () => {
   })
 })
 
+const engineCases = [
+  ['yak_darwin_amd64', 'darwin', 'x64'],
+  ['yak_darwin_arm64', 'darwin', 'arm64'],
+  ['yak_windows_amd64.exe', 'win32', 'x64'],
+  ['yak_linux_amd64', 'linux', 'x64'],
+  ['yak_linux_arm64', 'linux', 'arm64'],
+]
+
+const engineFixture = (platform, architecture) => {
+  const bytes = Buffer.alloc(512)
+  if (platform === 'darwin') {
+    bytes.writeUInt32LE(0xfeedfacf, 0)
+    bytes.writeUInt32LE(architecture === 'arm64' ? 0x0100000c : 0x01000007, 4)
+    bytes.writeUInt32LE(2, 12)
+  } else if (platform === 'linux') {
+    bytes.set([0x7f, 0x45, 0x4c, 0x46, 2, 1])
+    bytes.writeUInt16LE(2, 16)
+    bytes.writeUInt16LE(architecture === 'arm64' ? 183 : 62, 18)
+  } else {
+    bytes.write('MZ')
+    bytes.writeUInt32LE(128, 60)
+    bytes.write('PE\0\0', 128)
+    bytes.writeUInt16LE(0x8664, 132)
+  }
+  return bytes
+}
+
+const createEngineRoot = () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-engine-regression-'))
+  fs.mkdirSync(path.join(root, 'product'), { recursive: true })
+  fs.writeFileSync(path.join(root, 'product/engine-compatibility.json'), JSON.stringify(compatibilityManifest))
+  return root
+}
+
+describe('Cross-platform package regression', () => {
+  it.each(engineCases)(
+    'makes the packaged %s engine acceptable to the runtime',
+    async (asset, platform, architecture) => {
+      const root = createEngineRoot()
+      try {
+        const bytes = engineFixture(platform, architecture)
+        const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+        await prepareEngine({
+          asset,
+          requestedVersion: '1.4.8-beta3',
+          root,
+          fetcher: async (url) => new Response(url.endsWith('.txt') ? sha256 : bytes),
+        })
+        const manifest = JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))
+        const client = manifest.clientVersions.find((item) => item.clientVersion === packageJson.version)
+        const artifact = client.artifacts.find(
+          (item) => item.platform === platform && item.architecture === architecture,
+        )
+        expect(normalizeSha256(artifact.engineSha256)).toBe(sha256)
+        const result = await extractAndVerifyEngineArchive({
+          archivePath: path.join(root, artifact.sourceArchive),
+          archiveSha256: artifact.archiveSha256,
+          entryName: artifact.archiveEntry,
+          destination: path.join(root, 'installed-engine'),
+          engineSha256: artifact.engineSha256,
+        })
+        expect(result.archiveVerified).toBe(true)
+        expect(result.engineVerification.valid).toBe(true)
+        expect(fs.readFileSync(path.join(root, 'installed-engine'))).toEqual(bytes)
+        expect(client.artifacts.filter((item) => item !== artifact)).toEqual(
+          compatibilityManifest.clientVersions[0].artifacts.filter(
+            (item) => item.platform !== platform || item.architecture !== architecture,
+          ),
+        )
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it('rejects a wrong architecture even when the upstream checksum matches', async () => {
+    const root = createEngineRoot()
+    try {
+      const bytes = engineFixture('darwin', 'x64')
+      const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+      await expect(
+        prepareEngine({
+          asset: 'yak_darwin_arm64',
+          root,
+          fetcher: async (url) => new Response(url.endsWith('.txt') ? sha256 : bytes),
+        }),
+      ).rejects.toThrow(/architecture|架构/)
+      expect(fs.existsSync(getEnginePaths('yak_darwin_arm64', root).archivePath)).toBe(false)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('records the post-signing bytes and selected version, not the upstream bytes', async () => {
+    const root = createEngineRoot()
+    try {
+      const asset = 'yak_darwin_arm64'
+      const bytes = engineFixture('darwin', 'arm64')
+      const upstreamSha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+      const paths = await prepareEngine({
+        asset,
+        root,
+        requestedVersion: '1.4.8-beta4',
+        deferArchive: true,
+        fetcher: async (url) => new Response(url.endsWith('.txt') ? upstreamSha256 : bytes),
+      })
+      fs.appendFileSync(paths.rawPath, 'signature-fixture')
+      const result = await archiveEngine({ asset, root, engineVersion: '1.4.8-beta4' })
+      const manifest = JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))
+      const client = manifest.clientVersions[0]
+      expect(client.recommendedEngineVersion).toBe('1.4.8-beta4')
+      const artifact = client.artifacts.find((item) => item.platform === 'darwin' && item.architecture === 'arm64')
+      expect(artifact.engineSha256).toBe(result.verification.packagedEngineSha256)
+      expect(artifact.engineSha256).not.toBe(upstreamSha256)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('ad-hoc signs certificate-free macOS packages without changing the signed path or branding', () => {
+    const readConfig = (discovery) =>
+      JSON.parse(
+        execFileSync(
+          process.execPath,
+          ['-e', 'console.log(JSON.stringify(require("./packageScript/electron-builder.config.js")))'],
+          { encoding: 'utf8', env: { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: discovery } },
+        ),
+      )
+    const unsigned = readConfig('false')
+    const signed = readConfig('true')
+    expect(unsigned.mac.identity).toBe('-')
+    expect(unsigned.mac.hardenedRuntime).toBe(false)
+    expect(signed.mac.identity).toBeUndefined()
+    expect(signed.mac.hardenedRuntime).toBe(true)
+    expect(unsigned.productName).toBe(signed.productName)
+    expect(unsigned.mac.executableName).toBe(unsigned.win.executableName)
+    expect(unsigned.mac.icon).toBe('app/assets/renyan-icon.icns')
+    expect(unsigned.files).toContain('!.Codex/**/*')
+  })
+
+  it('checks the packaged runtime before uploading on all five targets', () => {
+    const workflow = parseYaml(fs.readFileSync('.github/workflows/multi-platform-build.yml', 'utf8'))
+    expect(workflow.on.workflow_dispatch.inputs.include_engine.default).toBe(true)
+    for (const [name, job] of Object.entries(workflow.jobs).filter(([name]) => name.startsWith('build-'))) {
+      const verifyIndex = job.steps.findIndex((step) => step.run?.includes('verify-renyan-package.js'))
+      const metadataIndex = job.steps.findIndex((step) => step.id === 'metadata')
+      expect(verifyIndex, name).toBeGreaterThan(0)
+      expect(verifyIndex, name).toBeLessThan(metadataIndex)
+      expect(job.steps[verifyIndex].env.PACKAGE_TARGET).toBe(name.replace('build-', ''))
+    }
+  })
+
+  it.each(engineCases)(
+    'inspects the actual packaged manifest and archive for %s',
+    async (asset, platform, architecture) => {
+      const root = createEngineRoot()
+      try {
+        const bytes = engineFixture(platform, architecture)
+        const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+        await prepareEngine({
+          asset,
+          root,
+          fetcher: async (url) => new Response(url.endsWith('.txt') ? sha256 : bytes),
+        })
+        const target = `${{ darwin: 'macos', win32: 'windows', linux: 'linux' }[platform]}-${architecture}`
+        const directory =
+          platform === 'darwin'
+            ? `mac${architecture === 'arm64' ? '-arm64' : ''}`
+            : platform === 'win32'
+              ? 'win-unpacked'
+              : `linux${architecture === 'arm64' ? '-arm64' : ''}-unpacked`
+        const product = JSON.parse(fs.readFileSync('product/renyan.json', 'utf8'))
+        const contents = path.join(
+          root,
+          'release',
+          directory,
+          ...(platform === 'darwin' ? [`${product.displayName}.app`, 'Contents'] : []),
+        )
+        const resources = path.join(contents, platform === 'darwin' ? 'Resources' : 'resources')
+        fs.mkdirSync(resources, { recursive: true })
+        fs.mkdirSync(path.join(contents, 'bins'), { recursive: true })
+        const executable =
+          platform === 'darwin'
+            ? path.join(contents, 'MacOS', product.executableName)
+            : path.join(contents, platform === 'win32' ? `${product.executableName}.exe` : product.linuxExecutableName)
+        fs.mkdirSync(path.dirname(executable), { recursive: true })
+        fs.writeFileSync(executable, bytes)
+        fs.copyFileSync(getEnginePaths(asset, root).archivePath, path.join(contents, 'bins/yak.zip'))
+        const source = path.join(root, 'asar-source')
+        fs.mkdirSync(path.join(source, 'product'), { recursive: true })
+        fs.copyFileSync(
+          path.join(root, 'product/engine-compatibility.json'),
+          path.join(source, 'product/engine-compatibility.json'),
+        )
+        fs.writeFileSync(path.join(source, 'product/renyan.json'), JSON.stringify(product))
+        fs.writeFileSync(path.join(source, 'package.json'), JSON.stringify({ version: packageJson.version }))
+        await asar.createPackage(source, path.join(resources, 'app.asar'))
+        await expect(verifyPackage({ root, target, includeEngine: true, native: false })).resolves.toMatchObject({
+          target,
+          native: false,
+        })
+
+        fs.appendFileSync(path.join(contents, 'bins/yak.zip'), 'corrupted-container')
+        await expect(verifyPackage({ root, target, includeEngine: true, native: false })).rejects.toThrow(/checksum/)
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true })
+      }
+    },
+  )
+
+  it('preserves the compatibility manifest when downloading an invalid checksum', async () => {
+    const root = createEngineRoot()
+    try {
+      const manifestPath = path.join(root, 'product/engine-compatibility.json')
+      const original = fs.readFileSync(manifestPath)
+      await expect(
+        prepareEngine({
+          asset: 'yak_darwin_arm64',
+          root,
+          fetcher: async (url) =>
+            new Response(url.endsWith('.txt') ? '0'.repeat(64) : engineFixture('darwin', 'arm64')),
+        }),
+      ).rejects.toThrow('引擎摘要不匹配')
+      expect(fs.readFileSync(manifestPath)).toEqual(original)
+      expect(fs.readdirSync(path.join(root, 'bins'))).toEqual([])
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('睿眼预置引擎准备', () => {
   it('优先使用固定任务声明的目标架构', () => {
     expect(beforePack.resolveBuildArchitecture(1)).toBe('x64')
@@ -378,11 +615,11 @@ describe('睿眼预置引擎准备', () => {
   })
 
   it('归档已校验引擎并生成可复验记录', async () => {
-    const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'renyan-engine-package-'))
+    const temporaryRoot = createEngineRoot()
     try {
       const paths = getEnginePaths('yak_linux_amd64', temporaryRoot)
       fs.mkdirSync(path.dirname(paths.rawPath), { recursive: true })
-      fs.writeFileSync(paths.rawPath, 'engine')
+      fs.writeFileSync(paths.rawPath, engineFixture('linux', 'x64'))
       const upstreamSha256 = await calculateEngineSha256(paths.rawPath)
       fs.writeFileSync(paths.sidecarPath, `${upstreamSha256}\n`)
 

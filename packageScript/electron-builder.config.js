@@ -5,6 +5,7 @@ const platform = process.env.PLATFORM
 const buildSha = resolveBuildSha()
 const edition = resolveEdition(platform)
 const includeEngine = process.env.INCLUDE_ENGINE !== 'false'
+const adHocMacSigning = process.env.CSC_IDENTITY_AUTO_DISCOVERY === 'false'
 
 const configOption = {
   appId: productConfig.appId,
@@ -59,6 +60,7 @@ const configOption = {
     '!bins/**/*',
     '!.github/**/*',
     '!.claude/**/*',
+    '!.Codex/**/*',
     '!.codegraph/**/*',
     '!multibuilder/**/*',
     '!scripts/**/*',
@@ -84,7 +86,8 @@ const configOption = {
   ],
   asar: true,
   mac: {
-    hardenedRuntime: true,
+    ...(adHocMacSigning ? { identity: '-' } : {}),
+    hardenedRuntime: !adHocMacSigning,
     gatekeeperAssess: false,
     entitlements: 'packageScript/plist/entitlements.mac.plist',
     entitlementsInherit: 'packageScript/plist/entitlements.mac.plist',

@@ -29,7 +29,7 @@ on:
         description: 是否在安装文件中预置对应平台和架构的 Yak 引擎
         required: false
         type: boolean
-        default: false
+        default: true
       engine_version:
         description: 预置引擎版本；留空时读取项目兼容清单中的推荐版本
         required: false
@@ -214,6 +214,13 @@ jobs:
             yarn pack-renyan-mac-x64-signed
           fi
 
+      - name: 验证成品引擎、签名与应用启动
+        shell: bash
+        env:
+          PACKAGE_TARGET: macos-x64
+          PACKAGE_SIGNED: ${{ inputs.sign_installers }}
+        run: node packageScript/script/verify-renyan-package.js
+
       - name: 生成 RuiYan 构建清单与摘要
         id: metadata
         shell: bash
@@ -242,7 +249,7 @@ jobs:
   build-macos-arm64:
     name: RuiYan macOS arm64 Package
     if: ${{ inputs.target == 'macos-arm64' || inputs.target == 'macos-both' || inputs.target == 'all' }}
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     env:
       CI: ''
@@ -368,6 +375,13 @@ jobs:
             yarn pack-renyan-mac-arm64-signed
           fi
 
+      - name: 验证成品引擎、签名与应用启动
+        shell: bash
+        env:
+          PACKAGE_TARGET: macos-arm64
+          PACKAGE_SIGNED: ${{ inputs.sign_installers }}
+        run: node packageScript/script/verify-renyan-package.js
+
       - name: 生成 RuiYan 构建清单与摘要
         id: metadata
         shell: bash
@@ -486,6 +500,13 @@ jobs:
           key-vault-certificate: ${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME }}
           timestamp-url: ${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL }}
 
+      - name: 验证成品引擎、签名与应用启动
+        shell: bash
+        env:
+          PACKAGE_TARGET: windows-x64
+          PACKAGE_SIGNED: ${{ inputs.sign_installers }}
+        run: node packageScript/script/verify-renyan-package.js
+
       - name: 生成 RuiYan 构建清单与摘要
         id: metadata
         shell: bash
@@ -590,6 +611,16 @@ jobs:
             yarn pack-renyan-linux-x64-unsigned
           fi
 
+      - name: 验证成品引擎、签名与应用启动
+        shell: bash
+        env:
+          PACKAGE_TARGET: linux-x64
+          PACKAGE_SIGNED: ${{ inputs.sign_installers }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth libnss3 libgtk-3-0 libgbm1 libasound2 libatk-bridge2.0-0
+          xvfb-run -a node packageScript/script/verify-renyan-package.js
+
       - name: 生成 RuiYan 构建清单与摘要
         id: metadata
         shell: bash
@@ -693,6 +724,16 @@ jobs:
           else
             yarn pack-renyan-linux-arm64-unsigned
           fi
+
+      - name: 验证成品引擎、签名与应用启动
+        shell: bash
+        env:
+          PACKAGE_TARGET: linux-arm64
+          PACKAGE_SIGNED: ${{ inputs.sign_installers }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth libnss3 libgtk-3-0 libgbm1 libasound2 libatk-bridge2.0-0
+          xvfb-run -a node packageScript/script/verify-renyan-package.js
 
       - name: 生成 RuiYan 构建清单与摘要
         id: metadata
