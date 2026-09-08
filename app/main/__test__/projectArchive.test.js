@@ -20,6 +20,12 @@ afterEach(() => {
 })
 
 describe('团队项目归档文件', () => {
+  it('为加密项目保留完整复合扩展名', async () => {
+    const store = createProjectArchiveStore(createTemporaryDirectory())
+    const created = await store.createArchive({ fileName: 'project-default.ruiyanproject.enc' })
+    expect(created.fileName).toMatch(/^project-default-[0-9a-f-]+\.ruiyanproject\.enc$/)
+  })
+
   it('按字节分块读取并计算完整文件摘要', async () => {
     const directory = createTemporaryDirectory()
     const sourcePath = path.join(directory, 'source.yakitproject')

@@ -18,6 +18,15 @@ const testState = vi.hoisted(() => ({
 const emit = vi.hoisted(() => vi.fn())
 const apiFetchQueryMessage = vi.hoisted(() => vi.fn())
 
+vi.mock('@/pages/mitm/MITMPage', () => ({
+  ImportLocalPlugin: ({ visible, setVisible, loadPluginMode, sendPluginLocal }: any) =>
+    visible ? (
+      <div role="dialog" aria-label="导入本地插件" data-source={loadPluginMode} data-open-local={sendPluginLocal}>
+        <button onClick={() => setVisible(false)}>取消导入</button>
+      </div>
+    ) : null,
+}))
+
 vi.mock('@/store/pageInfo', () => ({
   usePageInfo: (selector: (state: { currentPageTabRouteKey: YakitRoute | string }) => unknown) =>
     selector({ currentPageTabRouteKey: testState.currentRoute }),
@@ -51,6 +60,22 @@ vi.mock('@/utils/eventBus/eventBus', () => ({
 }))
 
 describe('睿眼顶部导航', () => {
+  it('批量导入打开本地导入组件并配置导入后刷新本地列表，取消不导航', async () => {
+    const onMenuSelect = vi.fn()
+    render(<RenyanNavigation defaultExpand={true} onMenuSelect={onMenuSelect} setRouteToLabel={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '插件中心' }))
+    onMenuSelect.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '批量导入' }))
+    await vi.dynamicImportSettled()
+    const dialog = await screen.findByRole('dialog', { name: '导入本地插件' })
+    expect(dialog).toHaveAttribute('data-source', 'local')
+    expect(dialog).toHaveAttribute('data-open-local', 'true')
+    expect(onMenuSelect).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '取消导入' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onMenuSelect).not.toHaveBeenCalled()
+  })
+
   beforeEach(() => {
     testState.currentRoute = YakitRoute.NewHome
     testState.isLogin = false

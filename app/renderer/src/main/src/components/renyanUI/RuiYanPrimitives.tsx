@@ -727,7 +727,7 @@ export const showRuiYanModal = (options: ShowRuiYanModalOptions): RuiYanModalHan
   return { destroy }
 }
 
-export type RuiYanDrawerWidth = 480 | 640
+export type RuiYanDrawerWidth = 480 | 640 | 1280
 
 export interface RuiYanDrawerProps extends Omit<RuiYanOverlayProps, 'kind' | 'width'> {
   width?: RuiYanDrawerWidth

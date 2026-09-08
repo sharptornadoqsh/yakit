@@ -79,8 +79,9 @@ const createProjectArchiveStore = (rootDirectory = getDefaultRootDirectory()) =>
   const createArchive = async ({ fileName } = {}) => {
     await ensureRoot()
     const normalizedName = normalizeFileName(fileName)
-    const extension = path.extname(normalizedName) || '.yakitproject'
-    const stem = path.basename(normalizedName, path.extname(normalizedName)) || 'team-project'
+    const extension =
+      /\.(?:ruiyan|yakit)project\.enc$/i.exec(normalizedName)?.[0] || path.extname(normalizedName) || '.yakitproject'
+    const stem = path.basename(normalizedName, extension) || 'team-project'
     const filePath = path.join(rootPath, `${stem}-${crypto.randomUUID()}${extension}`)
     const handle = await fs.promises.open(filePath, 'wx')
     await handle.close()

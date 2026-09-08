@@ -21,7 +21,13 @@ export type RenyanFeatureFlag =
   | 'pluginPipeline'
   | 'managedClientOverview'
 
-export type RenyanShellAction = 'changeProject' | 'serviceConnection' | 'engineUpdate' | 'diagnostics' | 'about'
+export type RenyanShellAction =
+  | 'changeProject'
+  | 'serviceConnection'
+  | 'engineUpdate'
+  | 'diagnostics'
+  | 'about'
+  | 'importPlugins'
 
 export type RenyanSettingsSection =
   | 'network-dns'
@@ -252,8 +258,7 @@ export const RENYAN_MENU_MODEL: readonly RenyanMenuItem[] = [
           title: '插件仓库',
           route: YakitRoute.Plugin_Hub,
         },
-        { key: 'plugin-batch-import', title: '批量导入', route: YakitRoute.Plugin_Audit },
-        { key: 'plugin-installed', title: '已安装插件', route: YakitRoute.Plugin_Audit },
+        { key: 'plugin-batch-import', title: '批量导入', action: 'importPlugins' },
         { key: 'plugin-local', title: '本地插件', route: YakitRoute.Plugin_Hub },
         {
           key: 'plugin-development',
@@ -262,7 +267,6 @@ export const RENYAN_MENU_MODEL: readonly RenyanMenuItem[] = [
           children: [{ key: 'plugin-debug', title: '调试控制台', route: YakitRoute.AddYakitScript }],
         },
         { key: 'plugin-run-log', title: '插件日志', route: YakitRoute.AddYakitScript },
-        { key: 'plugin-config', title: '插件配置', route: YakitRoute.Plugin_Audit },
         {
           key: 'plugin-pipeline',
           title: '插件链路编排',

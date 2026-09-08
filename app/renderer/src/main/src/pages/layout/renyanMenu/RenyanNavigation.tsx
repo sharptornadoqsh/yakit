@@ -17,6 +17,10 @@ import {
 import { RuiYanPrimaryNav, RuiYanSecondaryNav, RuiYanTopCommandBar, type RuiYanCommand } from '@/components/renyanUI'
 import { apiFetchQueryMessage } from '@/components/MessageCenter/utils'
 
+const ImportLocalPlugin = React.lazy(() =>
+  import('@/pages/mitm/MITMPage').then((module) => ({ default: module.ImportLocalPlugin })),
+)
+
 interface RenyanRouteSelection {
   route: YakitRoute
 }
@@ -38,7 +42,11 @@ const useMenuTitle = () => {
   )
 }
 
-const activateMenuItem = (item: RenyanMenuItem, onMenuSelect: (route: RenyanRouteSelection) => void) => {
+const activateMenuItem = (
+  item: RenyanMenuItem,
+  onMenuSelect: (route: RenyanRouteSelection) => void,
+  onImportPlugins: () => void,
+) => {
   if (!isRenyanMenuItemNavigable(item)) return
   if (item.route) {
     if (item.settingsSection) {
@@ -56,6 +64,9 @@ const activateMenuItem = (item: RenyanMenuItem, onMenuSelect: (route: RenyanRout
   }
 
   switch (item.action) {
+    case 'importPlugins':
+      onImportPlugins()
+      return
     case 'changeProject':
       emiter.emit('onUIOpSettingMenuSelect', 'changeProject')
       return
@@ -87,6 +98,8 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
   const [activeGroupKey, setActiveGroupKey] = useState(currentPath[0]?.key || menu[0]?.key || '')
   const [activeSecondaryKey, setActiveSecondaryKey] = useState(currentPath[currentPath.length - 1]?.key || '')
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
+  const [importPluginsVisible, setImportPluginsVisible] = useState(false)
+  const openPluginImport = () => setImportPluginsVisible(true)
 
   useEffect(() => {
     if (currentRoute === YakitRoute.Beta_ConfigNetwork) {
@@ -163,13 +176,13 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
     const target = flattenRenyanMenu([item]).find(isRenyanMenuItemNavigable)
     if (target) {
       setActiveSecondaryKey(target.key)
-      activateMenuItem(target, onMenuSelect)
+      activateMenuItem(target, onMenuSelect, openPluginImport)
     }
   }
 
   const selectItem = (item: RenyanMenuItem) => {
     setActiveSecondaryKey(item.key)
-    activateMenuItem(item, onMenuSelect)
+    activateMenuItem(item, onMenuSelect, openPluginImport)
   }
   const userName = userInfo.githubName || userInfo.wechatName || userInfo.qqName || userInfo.companyName || '本地用户'
   const teamName = userInfo.companyName || '本地工作区'
@@ -202,7 +215,7 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
           if (item) {
             setActiveGroupKey(item.group)
             setActiveSecondaryKey(item.key)
-            activateMenuItem(item, onMenuSelect)
+            activateMenuItem(item, onMenuSelect, openPluginImport)
           }
         }}
         commands={commands}
@@ -214,6 +227,16 @@ export const RenyanNavigation: React.FC<RenyanNavigationProps> = React.memo((pro
       />
       <RuiYanPrimaryNav groups={menu} activeGroupKey={activeGroup.key} onSelect={selectGroup} />
       <RuiYanSecondaryNav group={activeGroup} activeKeys={activeKeys} onSelect={selectItem} />
+      {importPluginsVisible && (
+        <React.Suspense fallback={<div role="status">正在打开插件导入…</div>}>
+          <ImportLocalPlugin
+            visible={importPluginsVisible}
+            setVisible={setImportPluginsVisible}
+            loadPluginMode="local"
+            sendPluginLocal={true}
+          />
+        </React.Suspense>
+      )}
     </div>
   )
 })

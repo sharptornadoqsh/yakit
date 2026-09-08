@@ -10,6 +10,13 @@ import {
 } from '../renyanMenu'
 
 describe('睿眼菜单模型', () => {
+  it('批量导入触发插件导入而非服务端审核列表', () => {
+    const item = flattenRenyanMenu(buildRenyanMenu()).find((entry) => entry.key === 'plugin-batch-import')!
+    expect(item.route).toBeNull()
+    expect(item.action).toBe('importPlugins')
+    expect(isRenyanMenuItemNavigable(item)).toBe(true)
+  })
+
   it('为每个菜单节点提供完整配置字段', () => {
     flattenRenyanMenu(RENYAN_MENU_MODEL).forEach((item) => {
       expect(item).toHaveProperty('key')

@@ -8,6 +8,14 @@ vi.mock('../ModifyYakitPlugin.module.scss', () => ({
   default: new Proxy({}, { get: (_, key) => String(key) }),
 }))
 
+vi.mock('@/components/renyanUI/RuiYanUI.module.scss', () => ({
+  default: new Proxy({}, { get: (_, key) => String(key) }),
+}))
+
+vi.mock('@/components/renyanUI/RuiYanPage.module.scss', () => ({
+  default: new Proxy({}, { get: (_, key) => String(key) }),
+}))
+
 vi.mock('ahooks', async () => {
   const actual = await vi.importActual<typeof import('ahooks')>('ahooks')
   return {
@@ -32,12 +40,7 @@ vi.mock('../../pluginEditor/PluginEditor', async () => {
 })
 
 vi.mock('@/components/renyanUI', async () => {
-  const react = await vi.importActual<typeof import('react')>('react')
-  return {
-    RuiYanDrawer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    RuiYanModal: () => null,
-    RuiYanButton: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button>,
-  }
+  return vi.importActual<typeof import('@/components/renyanUI')>('@/components/renyanUI')
 })
 
 vi.mock('@ant-design/icons', () => ({
@@ -71,5 +74,6 @@ describe('ModifyYakitPlugin', () => {
     render(<ModifyYakitPlugin plugin={plugin} visible={true} onCallback={vi.fn()} />)
 
     expect(screen.getByTestId('plugin-editor')).toHaveAttribute('data-page-close-subscribe', 'false')
+    expect(screen.getByRole('dialog', { name: '编辑插件' })).toHaveStyle({ width: '1280px' })
   })
 })

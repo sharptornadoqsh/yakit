@@ -1,11 +1,15 @@
 const { ipcMain } = require('electron')
+const path = require('path')
+const { getAppConfigDir } = require('../filePath')
 const { createProjectArchiveStore } = require('../projectArchive')
 const { createProjectShareBundleStore } = require('../projectShareBundle')
 const { registerProjectShareIPC } = require('../projectShareIPC')
 const { createProjectShareRecoveryStore } = require('../projectShareRecoveryStore')
+const { registerProjectExportHandler } = require('../projectExport')
 
 module.exports = (win, getClient) => {
   const projectArchiveStore = createProjectArchiveStore()
+  const exportArchiveStore = createProjectArchiveStore(path.join(getAppConfigDir(), 'project-exports'))
   const projectShareRecoveryStore = createProjectShareRecoveryStore()
   const projectShareBundleStore = createProjectShareBundleStore({
     isHandleReferenced: projectShareRecoveryStore.isHandleReferenced,
@@ -206,8 +210,9 @@ module.exports = (win, getClient) => {
   const streamExportProjectMap = new Map()
   ipcMain.handle('cancel-ExportProject', handlerHelper.cancelHandler(streamExportProjectMap))
   ipcMain.handle('ExportProject', (e, params, token) => {
-    let stream = getClient().ExportProject(params)
-    handlerHelper.registerHandler(win, stream, streamExportProjectMap, token)
+    const client = getClient()
+    const stream = client.ExportProject(params)
+    registerProjectExportHandler(win, stream, streamExportProjectMap, token, client, exportArchiveStore)
   })
 
   const streamImportProjectMap = new Map()

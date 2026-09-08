@@ -97,9 +97,10 @@ export const ModifyYakitPlugin: React.FC<ModifyYakitPluginProps> = memo((props) 
     <>
       <RuiYanDrawer
         open={visible}
-        width={640}
+        width={1280}
         title="编辑插件"
         description={plugin.ScriptName}
+        bodyClassName={styles['editor-drawer-body']}
         closeOnBackdrop={false}
         onClose={onCancel}
       >

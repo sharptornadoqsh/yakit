@@ -1,5 +1,6 @@
 /* ---------- EditorCode ----------*/
 .editor-code {
+  container: plugin-code / inline-size;
   width: 100%;
   height: 100%;
   display: flex;
@@ -64,7 +65,7 @@
 .editor-code-container {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .editor-code-tab-body {
@@ -242,5 +243,25 @@
     padding-top: 8px;
     display: flex;
     flex-direction: column;
+  }
+}
+
+@container plugin-code (max-width: 640px) {
+  .editor-code-tab-body {
+    height: auto;
+    min-height: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(320px, 55vh) minmax(240px, auto) 224px;
+
+    .editor-params {
+      grid-column: 1;
+      grid-row: 2;
+      border-left: 0;
+      border-top: 1px solid var(--Colors-Use-Neutral-Border);
+    }
+  }
+
+  .execution-workspace {
+    grid-row: 3;
   }
 }
