@@ -998,7 +998,8 @@ const MITMHijackedContent: React.FC<MITMHijackedContentProps> = React.memo((prop
         <div style={{ display: autoForward === 'log' ? 'block' : 'none', height: `calc(100% - ${height}px)` }}>
           <HTTPFlowRealTimeTableAndEditor
             pageType="MITM"
-            detailMode="aside"
+            detailMode="split"
+            showFlod={false}
             noTableTitle={true}
             defaultExcludeColumnsKey={getRuiYanMitmDefaultExcludeColumns()}
             downstreamProxyStr={downstreamProxyStr}

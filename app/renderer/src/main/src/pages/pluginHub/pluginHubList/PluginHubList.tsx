@@ -103,15 +103,15 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
     trigger: 'setActive',
   })
   const activeRef = useRef<PluginSourceType>(active)
-  const [show, setShow] = useState<boolean>(true)
+  const [show, setShow] = useState<boolean>(false)
   // 无详情页的列表tab类型
   const noDetailTabs = useRef<PluginSourceType[]>(['recycle', 'setting'])
   // 控制各个列表的初始渲染变量，存在列表对应类型，则代表列表UI已经被渲染
   const rendered = useRef<Set<string>>(new Set())
-  const [activeHidden, setActiveHidden] = useState<boolean>(false)
+  const [activeHidden, setActiveHidden] = useState<boolean>(true)
   const onSetActive = useMemoizedFn((type: PluginSourceType, openFlag = false) => {
     if (noDetailTabs.current.includes(active) || openFlag || (!isLogin && type === 'own')) {
-      setShow(true)
+      setShow(false)
     }
 
     if (type !== active) {
@@ -142,9 +142,6 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
   /** ---------- 进入插件详情逻辑 Start ---------- */
   const [hiddenDetail, setHiddenDetail] = useState<boolean>(false)
   const onClickPlugin = useMemoizedFn((info: PluginToDetailInfo) => {
-    if (!isDetail) {
-      setShow(true)
-    }
     toPluginDetail(info)
   })
   /** ---------- 进入插件详情逻辑 End ---------- */
@@ -186,7 +183,7 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
   })
   const onNavigationChange = useMemoizedFn((type: PluginSourceType) => {
     setSearchParams(undefined)
-    if (type !== active) setShow(true)
+    if (type !== active) setShow(false)
     onSetActive(type)
   })
 
@@ -229,6 +226,7 @@ export const PluginHubList: React.FC<PluginHubListProps> = memo((props) => {
           <button
             type="button"
             className={classNames(styles['filter-toggle'], { [styles['filter-toggle-active']]: show })}
+            aria-expanded={show}
             onClick={() => setShow((value) => !value)}
           >
             {show ? t('PluginHubList.collapseAdvancedFilter') : t('PluginHubList.expandAdvancedFilter')}

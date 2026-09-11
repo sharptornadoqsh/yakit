@@ -293,7 +293,8 @@ const HTTPHistoryInner: React.FC<HTTPHistoryProp> = (props) => {
             高级条件
           </RuiYanButton>
         }
-        detailMode="drawer"
+        detailMode="split"
+        showFlod={false}
         showHistoryAnalysisBtn
         {...historyProps}
       />
