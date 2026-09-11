@@ -977,43 +977,45 @@ export const YakitRiskTable: React.FC<YakitRiskTableProps> = React.memo((props) 
   const onExportHTML = useMemoizedFn(async () => {
     if (+response.Total === 0) return
     setRiskLoading(true)
-    let risks: Risk[] = []
-    if (allCheck || selectList.length === 0) {
-      const exportQuery: QueryRisksRequest = {
-        ...getQuery(),
-        Pagination: {
-          ...query.Pagination,
-          Page: 1,
-          Limit: allTotal,
-        },
+    try {
+      let risks: Risk[] = []
+      if (allCheck || selectList.length === 0) {
+        const exportQuery: QueryRisksRequest = {
+          ...getQuery(),
+          Pagination: {
+            ...query.Pagination,
+            Page: 1,
+            Limit: allTotal,
+          },
+        }
+        const res = await apiQueryRisks(exportQuery)
+        risks = [...res.Data]
+      } else {
+        risks = [...selectList]
       }
-      const res = await apiQueryRisks(exportQuery)
-      risks = [...res.Data]
-    } else {
-      risks = [...selectList]
-    }
-    const newRisks = risks.map((ele) => ({
-      ...ele,
-      RequestString: Buffer.from(ele.Request || new Uint8Array()).toString('utf8'),
-      ResponseString: Buffer.from(ele.Response || new Uint8Array()).toString('utf8'),
-    }))
-    const htmlContent =
-      i18n.language === 'zh'
-        ? getHtmlTemplate()
-        : i18n.language === 'zh-TW'
-          ? getHtmlZhTWTemplate()
-          : getHtmlEnTemplate()
-    const params: ExportHtmlProps = {
-      htmlContent,
-      fileName: `RuiYan-Risks-${moment().valueOf()}`,
-      data: newRisks,
-    }
-    apiExportHtml(params).catch((error) => {
+      const newRisks = risks.map((ele) => ({
+        ...ele,
+        RequestString: Buffer.from(ele.Request || new Uint8Array()).toString('utf8'),
+        ResponseString: Buffer.from(ele.Response || new Uint8Array()).toString('utf8'),
+      }))
+      const htmlContent =
+        i18n.language === 'zh'
+          ? getHtmlTemplate()
+          : i18n.language === 'zh-TW'
+            ? getHtmlZhTWTemplate()
+            : getHtmlEnTemplate()
+      const params: ExportHtmlProps = {
+        htmlContent,
+        fileName: `RuiYan-Risks-${moment().valueOf()}`,
+        data: newRisks,
+        language: i18n.language === 'zh' ? 'zh' : i18n.language === 'zh-TW' ? 'zh-TW' : 'en',
+      }
+      await apiExportHtml(params)
+    } catch (error) {
       yakitNotify('error', `${t('YakitRiskTable.export_html_failed')}${error}`)
-    })
-    setTimeout(() => {
+    } finally {
       setRiskLoading(false)
-    }, 200)
+    }
   })
   const onRefreshMenuSelect = useMemoizedFn((key: string) => {
     switch (key) {

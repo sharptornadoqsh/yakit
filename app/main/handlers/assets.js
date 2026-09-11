@@ -1,10 +1,10 @@
 const { ipcMain, BrowserWindow } = require('electron')
 const isDev = require('electron-is-dev')
 const { getHtmlTemplateDir } = require('../filePath')
-const compressing = require('compressing')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const { createOfflineReportHtml, writeReportFile } = require('../reportExport')
 
 module.exports = (win, getClient) => {
   // asyncQueryPorts wrapper
@@ -373,19 +373,6 @@ module.exports = (win, getClient) => {
     return await asyncQueryReport(params)
   })
 
-  // 文件复制
-  const copyFileByDir = (src1, src2) => {
-    return new Promise((resolve, reject) => {
-      fs.readFile(src1, (err, data) => {
-        if (err) return reject(err)
-        fs.writeFile(src2, data, (err) => {
-          if (err) return reject(err)
-          resolve('复制文件成功')
-        })
-      })
-    })
-  }
-
   // 删除文件夹下所有文件
   const delDir = (path) => {
     let files = []
@@ -401,25 +388,6 @@ module.exports = (win, getClient) => {
       })
       fs.rmdirSync(path)
     }
-  }
-
-  const findReportTemplateEntryHtml = (reportDir) => {
-    const indexPath = path.join(reportDir, 'index.html')
-    if (fs.existsSync(indexPath)) {
-      return indexPath
-    }
-    let entries = []
-    try {
-      entries = fs.readdirSync(reportDir, { withFileTypes: true })
-    } catch (e) {
-      return null
-    }
-    for (const dirent of entries) {
-      if (dirent.isFile() && dirent.name.toLowerCase().endsWith('.html')) {
-        return path.join(reportDir, dirent.name)
-      }
-    }
-    return null
   }
 
   const patchTemplateForPdfLayout = (entryHtmlPath) => {
@@ -451,6 +419,15 @@ module.exports = (win, getClient) => {
   margin: 0 8px !important;
   max-width: none !important;
   width: auto !important;
+}
+#content pre,
+#content .fold-hole .card-content .fold-hole-code .content pre {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
 }
 table {
   width: 100% !important;
@@ -498,43 +475,14 @@ td {
     fs.writeFileSync(entryHtmlPath, htmlContent, 'utf-8')
   }
 
-  const asyncDownloadHtmlReport = (params) => {
-    return new Promise(async (resolve, reject) => {
-      const { outputDir, JsonRaw, reportName } = params
-      const inputFile = path.join(getHtmlTemplateDir(), 'template.zip')
-      const outputFile = path.join(outputDir, 'template.zip')
-      const reportNameFile = reportName.replaceAll(/\\|\/|\:|\*|\?|\"|\<|\>|\|/g, '') || 'html报告'
-      // 判断报告名是否存在？
-      const ReportItemName = path.join(outputDir, reportNameFile)
-      const judgeReportName = fs.existsSync(ReportItemName)
-      let isCreatDir = false
-      try {
-        // 复制模板到生成文件地址
-        await copyFileByDir(inputFile, outputFile)
-        // 文件夹已存在 则先清空之前内容
-        if (judgeReportName) delDir(ReportItemName)
-        if (!judgeReportName) {
-          fs.mkdirSync(ReportItemName)
-          isCreatDir = true
-        }
-        // 解压模板
-        await compressing.zip.uncompress(outputFile, ReportItemName)
-        // 删除zip
-        fs.unlinkSync(outputFile)
-        // 修改模板入口文件
-        const initDir = path.join(ReportItemName, 'js', 'init.js')
-        // 模板源注入
-        fs.writeFileSync(initDir, `let initData = ${JSON.stringify(JsonRaw)}`)
-        resolve({
-          ok: true,
-          outputDir: ReportItemName,
-        })
-      } catch (error) {
-        // 如若错误 删除已创建文件夹
-        if (isCreatDir) delDir(ReportItemName)
-        reject(error)
-      }
-    })
+  const asyncDownloadHtmlReport = async (params) => {
+    const { outputDir, JsonRaw, reportName } = params
+    const html = await renderReportFromTemplate({ JsonRaw, hideCatalog: false }, 'html')
+    const reportNameFile = (reportName || '').replaceAll(/\\|\/|\:|\*|\?|\"|\<|\>|\|/g, '') || 'html报告'
+    const reportDir = path.join(outputDir, reportNameFile)
+    fs.mkdirSync(reportDir, { recursive: true })
+    writeReportFile(path.join(reportDir, 'index.html'), html)
+    return { ok: true, outputDir: reportDir }
   }
   ipcMain.handle('DownloadHtmlReport', async (e, params) => {
     return await asyncDownloadHtmlReport(params)
@@ -757,15 +705,15 @@ td {
 
   /**
    * 基于 report/template.zip 导出 PDF（与 HTML 模板样式保持一致）
-   * 1) 复制并解压模板到临时目录，注入 init.js 数据源
+   * 1) 生成包含全部数据和本地资源的独立 HTML
    * 2) 可选应用 PDF 布局补丁（隐藏目录/侧边栏、修正打印样式）
    * 3) 隐藏窗口加载模板页，等待字体/图片资源就绪
    * 4) 将 ECharts 实例转为静态图片后替换原 DOM，避免打印阶段重排导致的偏移/截断
    * 5) 调用 webContents.printToPDF 输出文件，并清理临时目录
    */
-  const asyncPrintReportPdfFromTemplate = async (params) => {
-    const { outputPath, JsonRaw, reportName, hideCatalog = true } = params || {}
-    if (!outputPath || typeof outputPath !== 'string') {
+  const renderReportFromTemplate = async (params, format = 'pdf') => {
+    const { outputPath, JsonRaw, hideCatalog = true } = params || {}
+    if (format === 'pdf' && (!outputPath || typeof outputPath !== 'string')) {
       throw new Error('PrintReportPdfFromTemplate: outputPath required')
     }
     if (JsonRaw === undefined || JsonRaw === null) {
@@ -775,26 +723,12 @@ td {
     if (!fs.existsSync(inputFile)) {
       throw new Error(`HTML report template not found: ${inputFile}`)
     }
-    const reportNameFile = (reportName || 'html报告').replaceAll(/\\|\/|\:|\*|\?|\"|\<|\>|\|/g, '') || 'html报告'
-    const workDir = path.join(os.tmpdir(), `ruiyan-report-pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    const reportDir = path.join(workDir, reportNameFile)
-    const outputZip = path.join(workDir, 'template.zip')
+    const html = createOfflineReportHtml(inputFile, JsonRaw)
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-report-export-'))
     let printWin = null
     try {
-      fs.mkdirSync(workDir, { recursive: true })
-      await copyFileByDir(inputFile, outputZip)
-      if (fs.existsSync(reportDir)) {
-        delDir(reportDir)
-      }
-      fs.mkdirSync(reportDir)
-      await compressing.zip.uncompress(outputZip, reportDir)
-      fs.unlinkSync(outputZip)
-      const initDir = path.join(reportDir, 'js', 'init.js')
-      fs.writeFileSync(initDir, `let initData = ${JSON.stringify(JsonRaw)}`, 'utf-8')
-      const entryHtml = findReportTemplateEntryHtml(reportDir)
-      if (!entryHtml) {
-        throw new Error('PrintReportPdfFromTemplate: no entry html in template')
-      }
+      const entryHtml = path.join(workDir, 'index.html')
+      writeReportFile(entryHtml, html)
       if (hideCatalog) {
         patchTemplateForPdfLayout(entryHtml)
       }
@@ -805,9 +739,26 @@ td {
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
+          backgroundThrottling: false,
         },
       })
       await printWin.loadFile(entryHtml)
+      const renderStatus = await printWin.webContents.executeJavaScript(`
+        (() => {
+          document.querySelectorAll('.rule-risk-title.close, .fold-hole-title.close').forEach((element) => element.click())
+          document.querySelectorAll('#content .jsonview .collapsible').forEach((element) => element.style.setProperty('display', 'block', 'important'))
+          const root = document.getElementById('content')
+          return {
+            ready: window.__reportExportReady === true,
+            error: window.__reportExportError || '',
+            content: !!root && (!!(root.innerText || root.textContent || '').trim() || !!root.querySelector('canvas, img')),
+          }
+        })()
+      `)
+      if (!renderStatus.ready || renderStatus.error || !renderStatus.content) {
+        throw new Error(renderStatus.error || '报告正文为空，已停止导出')
+      }
+      if (format === 'html') return html
       // 第一次注入：等待页面字体与图片资源加载完毕，减少打印缺字/缺图和布局抖动
       await printWin.webContents.executeJavaScript(`
                 new Promise((resolve) => {
@@ -874,6 +825,15 @@ td {
                             } catch (_) {}
                         })
                     }
+                    document.querySelectorAll('#content canvas').forEach((canvas) => {
+                        const image = document.createElement('img')
+                        image.src = canvas.toDataURL('image/png')
+                        image.width = canvas.width
+                        image.height = canvas.height
+                        image.style.maxWidth = '100%'
+                        image.style.height = 'auto'
+                        canvas.replaceWith(image)
+                    })
                     return true
                 })();
             `)
@@ -881,6 +841,16 @@ td {
       await printWin.webContents.executeJavaScript(`
                 new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))));
             `)
+      if (format === 'word') {
+        return await printWin.webContents.executeJavaScript(`
+          (() => {
+            const content = document.getElementById('content').cloneNode(true)
+            content.querySelectorAll('script').forEach((script) => script.remove())
+            const styles = Array.from(document.querySelectorAll('style')).map((style) => style.outerHTML).join('')
+            return '<!DOCTYPE html><html><head><meta charset="UTF-8">' + styles + '</head><body>' + content.outerHTML + '</body></html>'
+          })()
+        `)
+      }
       const pdfBuffer = await printWin.webContents.printToPDF({
         printBackground: true,
         marginsType: 0,
@@ -901,7 +871,10 @@ td {
     }
   }
   ipcMain.handle('PrintReportPdfFromTemplate', async (e, params) => {
-    return await asyncPrintReportPdfFromTemplate(params)
+    return await renderReportFromTemplate(params)
+  })
+  ipcMain.handle('RenderReportWordHtml', async (e, params) => {
+    return await renderReportFromTemplate(params, 'word')
   })
 
   /** markdown PDF：printId -> { code, theme } */

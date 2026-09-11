@@ -22,6 +22,7 @@ const productConfig = require('../../../../product/renyan.json')
 const { resolveBuildSha, resolveEdition } = require('../../../../product/build')
 
 const devMode = process.env.NODE_ENV !== 'production'
+if (!devMode) require('../../../../scripts/build-report-assets').buildReportAssets()
 const skipDevTypeCheck = devMode && process.env.REACT_APP_SKIP_DEV_TYPE_CHECK === 'true'
 const AUX_ENTRY = path.resolve(__dirname, 'src/auxWindow/aux-entry.tsx')
 // Windows 保留设备名 aux，不可用 aux.html

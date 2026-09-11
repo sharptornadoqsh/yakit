@@ -167,6 +167,7 @@ export interface ExportHtmlProps {
   htmlContent: string
   fileName: string
   data: Risk[]
+  language?: 'zh' | 'zh-TW' | 'en'
 }
 /** export-risk-html */
 export const apiExportHtml: (params: ExportHtmlProps) => Promise<string> = (params) => {

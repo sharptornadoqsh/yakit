@@ -93,7 +93,7 @@ export const getHtmlTemplate = () => {
                     <SearchOutlined style={{ color: filtered ? 'var(--Colors-Use-Blue-Bg)' : undefined }} />
                 ),
                 onFilter: (value, record) =>
-                    record[dataIndex]
+                    (record[dataIndex] ?? "")
                         .toString()
                         .toLowerCase()
                         .includes((value).toLowerCase())
@@ -208,7 +208,7 @@ export const getHtmlTemplate = () => {
                                         <Descriptions.Item label='端口'>{info.Port || "-"}</Descriptions.Item>
                                         <Descriptions.Item label='Host'>{info.Host || "-"}</Descriptions.Item>
                                         <Descriptions.Item label='类型'>
-                                            {(info?.RiskTypeVerbose || info.RiskType).replaceAll("NUCLEI-", "")}
+                                            {(info?.RiskTypeVerbose || info.RiskType || "").replaceAll("NUCLEI-", "")}
                                         </Descriptions.Item>
                                         <Descriptions.Item label='来源'>{info?.FromYakScript || "漏洞检测"}</Descriptions.Item>
                                         <Descriptions.Item label='反连Token' contentStyle={{ minWidth: 120 }}>
@@ -375,7 +375,7 @@ export const getHtmlZhTWTemplate = () => {
         <SearchOutlined style={{ color: filtered ? 'var(--Colors-Use-Blue-Bg)' : undefined }} />
       ),
       onFilter: (value, record) =>
-        record[dataIndex]
+        (record[dataIndex] ?? "")
           .toString()
           .toLowerCase()
           .includes((value).toLowerCase())
@@ -490,7 +490,7 @@ export const getHtmlZhTWTemplate = () => {
                   <Descriptions.Item label='連接埠'>{info.Port || "-"}</Descriptions.Item>
                   <Descriptions.Item label='Host'>{info.Host || "-"}</Descriptions.Item>
                   <Descriptions.Item label='類型'>
-                    {(info?.RiskTypeVerbose || info.RiskType).replaceAll("NUCLEI-", "")}
+                    {(info?.RiskTypeVerbose || info.RiskType || "").replaceAll("NUCLEI-", "")}
                   </Descriptions.Item>
                   <Descriptions.Item label='來源'>{info?.FromYakScript || "Vulnerability Detection"}</Descriptions.Item>
                   <Descriptions.Item label='反連 Token' contentStyle={{ minWidth: 120 }}>
@@ -657,7 +657,7 @@ export const getHtmlEnTemplate = () => {
         <SearchOutlined style={{ color: filtered ? 'var(--Colors-Use-Blue-Bg)' : undefined }} />
       ),
       onFilter: (value, record) =>
-        record[dataIndex]
+        (record[dataIndex] ?? "")
           .toString()
           .toLowerCase()
           .includes((value).toLowerCase())
@@ -772,7 +772,7 @@ export const getHtmlEnTemplate = () => {
                   <Descriptions.Item label='Port'>{info.Port || "-"}</Descriptions.Item>
                   <Descriptions.Item label='Host'>{info.Host || "-"}</Descriptions.Item>
                   <Descriptions.Item label='Type'>
-                    {(info?.RiskTypeVerbose || info.RiskType).replaceAll("NUCLEI-", "")}
+                    {(info?.RiskTypeVerbose || info.RiskType || "").replaceAll("NUCLEI-", "")}
                   </Descriptions.Item>
                   <Descriptions.Item label='Source'>{info?.FromYakScript || "Vulnerability Detection"}</Descriptions.Item>
                   <Descriptions.Item label='Reverse Token' contentStyle={{ minWidth: 120 }}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { YakitResizeBox } from '@/components/yakitUI/YakitResizeBox/YakitResizeBox'
 import { YakitCard } from '@/components/yakitUI/YakitCard/YakitCard'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
@@ -27,7 +27,6 @@ import { openABSFileLocated } from '@/utils/openWebsite'
 import { yakitDialog } from '@/services/electronBridge'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { ReportItem } from './reportRenders/schema'
-import html2canvas from 'html2canvas'
 import { saveAs } from 'file-saver'
 import htmlDocx from 'html-docx-js/dist/html-docx'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
@@ -378,23 +377,6 @@ const truncateArrayBySize = (arr: ReportItem[], maxSizeKB: number, maxItemsPerCh
   return result
 }
 
-const getEchartsHtml2CanvasOptions = (echartType: string | null) => {
-  switch (echartType) {
-    case 'vertical-bar':
-    case 'stacked-vertical-bar':
-      return { scale: 1, windowWidth: 1000, x: 150, y: 0 }
-    case 'hollow-pie':
-    case 'e-chart':
-      return { scale: 1, windowWidth: 1000 }
-    case 'multi-pie':
-      return { scale: 0.8, windowWidth: 1200 }
-    case 'nightingle-rose':
-      return { scale: 1, windowWidth: 1000, x: 150, y: 0, height: 400 }
-    default:
-      return {}
-  }
-}
-
 interface ReportViewerProp {
   reportId?: number
 }
@@ -411,11 +393,9 @@ const ReportViewer: React.FC<ReportViewerProp> = (props) => {
     PublishedAt: 0,
     Title: '-',
   })
-  const isEchartsToImg = useRef<boolean>(true)
   const [allReportItems, setAllReportItems] = useState<ReportItem[][]>([])
   const [current, setCurrent] = useState<number>(1)
   const [reportItems, setReportItems] = useState<ReportItem[]>([])
-  const divRef = useRef<HTMLDivElement>(null)
   const [downloadLoading, setDownloadLoading] = useState<boolean>(false)
 
   useEffect(() => {
@@ -427,7 +407,6 @@ const ReportViewer: React.FC<ReportViewerProp> = (props) => {
       return
     }
 
-    isEchartsToImg.current = true
     setLoading(true)
     ipcRenderer
       .invoke('QueryReport', { Id: reportId, Type: getEnvTypeByProjects() })
@@ -509,59 +488,27 @@ const ReportViewer: React.FC<ReportViewerProp> = (props) => {
   }
 
   // 下载Word
-  const downloadWord = () => {
-    if (!divRef || !divRef.current) return
+  const downloadWord = async () => {
     setDownloadLoading(true)
-    // 此处定时器为了确保已处理其余任务
-    setTimeout(() => {
-      exportToWord()
-    }, 300)
+    await exportToWord()
   }
   // 下载报告
   const exportToWord = async () => {
-    if (!divRef || !divRef.current) return
-    const contentHTML = divRef.current
-    if (isEchartsToImg.current) {
-      isEchartsToImg.current = false
-      // 使用html2canvas将ECharts图表转换为图像
-      const echartsElements = contentHTML.querySelectorAll('[data-type="echarts-box"]')
-      const promises = Array.from(echartsElements).map(async (element) => {
-        const echartType = (element as HTMLElement).getAttribute('echart-type')
-        const options = getEchartsHtml2CanvasOptions(echartType)
-        const canvas = await html2canvas(element as HTMLElement, options)
-        return canvas.toDataURL('image/jpeg')
+    try {
+      const html = await ipcRenderer.invoke('RenderReportWordHtml', {
+        JsonRaw: report.JsonRaw,
+        reportName: report.Title,
       })
-
-      const echartsImages = await Promise.all(promises)
-
-      // 将图像插入到contentHTML中
-      echartsImages.forEach((imageDataUrl, index) => {
-        const img = document.createElement('img')
-        img.src = imageDataUrl
-        img.style.display = 'none'
-        echartsElements[index].appendChild(img)
-      })
+      saveAs(htmlDocx.asBlob(html), `${report.Title}.docx`)
+      yakitNotify('success', t('ReportViewerPage.exportSuccess'))
+    } catch (error) {
+      yakitNotify('error', `Export Word failed: ${error}`)
+    } finally {
+      setDownloadLoading(false)
     }
-    // word报告不要附录 table添加边框 移除南丁格尔玫瑰图点击详情(图像中已含)
-    let wordStr: string = contentHTML.outerHTML
-    if (wordStr.includes('附录：')) {
-      wordStr = wordStr.substring(0, contentHTML.outerHTML.indexOf('附录：'))
-    }
-    wordStr = wordStr
-      .replace(/<table(.*?)>/g, '<table$1 border="1">')
-      .replace(/<th(.*?)>/g, '<th$1 style="width: 10%">')
-      .replace(/<div[^>]*id=("nightingle-rose-title"|"nightingle-rose-content")[^>]*>[\s\S]*?<\/div>/g, '')
-
-    saveAs(
-      //保存文件到本地
-      htmlDocx.asBlob(wordStr), //将html转为docx
-      `${report.Title}.doc`,
-    )
-    setDownloadLoading(false)
   }
 
   const onChangePagination = (page: number) => {
-    isEchartsToImg.current = true
     setReportItems(allReportItems[page - 1] || [])
     setCurrent(page)
   }
@@ -670,7 +617,7 @@ const ReportViewer: React.FC<ReportViewerProp> = (props) => {
               </div>
             }
           >
-            <div ref={divRef} className={classNames(styles['card-body'], styles['report-content-scroll'])}>
+            <div className={classNames(styles['card-body'], styles['report-content-scroll'])}>
               <Space direction={'vertical'} style={{ width: '100%' }}>
                 {reportItems.map((i, index) => (
                   <ReportItemRender item={i} key={index} />

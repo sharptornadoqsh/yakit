@@ -2,6 +2,8 @@ const { app, ipcMain } = require('electron')
 const FS = require('fs')
 const path = require('path')
 const { handleSaveFileSystem } = require('./fileSystemDialog')
+const { getHtmlTemplateDir } = require('../filePath')
+const { createOfflineRiskHtml, writeReportFile } = require('../reportExport')
 
 module.exports = {
   register: (win, getClient) => {
@@ -23,13 +25,14 @@ module.exports = {
     const asyncExportRiskHtml = (params) => {
       return new Promise(async (resolve, reject) => {
         try {
-          const { htmlContent, fileName, data } = params
+          const { fileName } = params
           const { filePath } = await handleSaveFileSystem({
             title: fileName,
             defaultPath: path.join(app.getPath('desktop'), fileName),
           })
 
           if (filePath) {
+            const htmlContent = createOfflineRiskHtml(path.join(getHtmlTemplateDir(), 'template.zip'), params)
             const folderPath = filePath
 
             if (!FS.existsSync(folderPath)) {
@@ -37,9 +40,7 @@ module.exports = {
             }
 
             const filePath1 = path.join(folderPath, `${fileName}.html`)
-            const filePath2 = path.join(folderPath, 'data.js')
-            FS.writeFileSync(filePath1, htmlContent, 'utf-8')
-            FS.writeFileSync(filePath2, `const initData = ${JSON.stringify(data)}`, 'utf-8')
+            writeReportFile(filePath1, htmlContent)
             resolve(filePath)
           } else {
             resolve('')

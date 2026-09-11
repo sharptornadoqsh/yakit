@@ -110,6 +110,7 @@ const resolveLegacyArtifactName = ({ platform, architecture, productVersion, isL
 }
 
 const beforePack = async (context) => {
+  require('../../scripts/build-report-assets').validateReportAssets()
   const isLegacy = process.env.THE_LEGACY == 'true'
   const includeEngine = process.env.INCLUDE_ENGINE !== 'false'
   const architecture = resolveBuildArchitecture(context.arch)
