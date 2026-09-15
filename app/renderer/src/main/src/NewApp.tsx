@@ -1,8 +1,8 @@
-import { useRef, useEffect, Suspense, lazy, useState } from 'react'
+import { useRef, useEffect, Suspense, lazy } from 'react'
 // by types
 import { failed, warn, yakitFailed } from './utils/notification'
 import { getRemoteValue, setRemoteValue } from './utils/kv'
-import { useDebounceFn, useInterval, useMemoizedFn } from 'ahooks'
+import { useDebounceFn, useMemoizedFn } from 'ahooks'
 import { NetWorkApi } from './services/fetch'
 import { API } from './services/swagger/resposeType'
 import { useGoogleChromePluginPath, useStore, yakitDynamicStatus } from './store'
@@ -18,7 +18,7 @@ import { handleFetchSystemInfo } from './constants/hardware'
 import { closeWebSocket, startWebSocket } from './utils/webSocket/webSocket'
 import { startShortcutKeyMonitor, stopShortcutKeyMonitor } from './utils/globalShortcutKey/utils'
 import { getStorageGlobalShortcutKeyEvents } from './utils/globalShortcutKey/events/global'
-import { useUploadInfoByEnpriTrace } from './components/layout/utils'
+import { useRealtimeDataSync, useUploadInfoByEnpriTrace } from './components/layout/utils'
 import emiter from './utils/eventBus/eventBus'
 import { JSONParseLog } from './utils/tool'
 import { debugToPrintLogs } from './utils/logCollection'
@@ -322,16 +322,7 @@ function NewApp() {
     }
   }, [])
 
-  // 半小时间隔定时收集流量信息
-  const [interval] = useState<number | undefined>(30 * 60 * 1000)
-  useInterval(() => {
-    const { token } = userInfo
-    if (token && token.length > 0) {
-      uploadProjectEvent.startUpload({
-        isUploadSyncData: true,
-      })
-    }
-  }, interval)
+  useRealtimeDataSync()
 
   return (
     <UILayout linkSuccess={linkSuccess}>

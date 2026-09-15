@@ -4,12 +4,13 @@ import { apiUpdateGlobalNetworkConfig } from '@/pages/spaceEngine/utils'
 import { NetWorkApi } from '@/services/fetch'
 import { API } from '@/services/swagger/resposeType'
 import { useEeSystemConfig, useStore } from '@/store'
-import { isEnpriTrace } from '@/utils/envfile'
+import { isEnpriTrace, isEnpriTraceAgent } from '@/utils/envfile'
 import emiter from '@/utils/eventBus/eventBus'
 import { aboutLoginUpload, loginHTTPFlowsToOnline } from '@/utils/login'
 import { yakitNotify } from '@/utils/notification'
 import { DownloadingState } from '@/yakitGVDefine'
-import { useMemoizedFn } from 'ahooks'
+import { useMemoizedFn, useRequest } from 'ahooks'
+import { useEffect } from 'react'
 import omit from 'lodash/omit'
 import { yakitProject, yakitUpload } from '@/services/electronBridge'
 import i18n from '@/i18n/i18n'
@@ -134,18 +135,37 @@ interface StartUploadProps {
   isUpdateGlobalConfig?: boolean
 }
 
+let dataSyncTask: Promise<void> | undefined
+
+const syncData = (token: string) => {
+  if (!dataSyncTask) {
+    dataSyncTask = Promise.allSettled([
+      Promise.resolve().then(() => aboutLoginUpload(token)),
+      Promise.resolve().then(() => loginHTTPFlowsToOnline(token)),
+    ])
+      .then(() => undefined)
+      .finally(() => {
+        dataSyncTask = undefined
+      })
+  }
+  return dataSyncTask
+}
+
 export const useUploadInfoByEnpriTrace = () => {
   const { userInfo } = useStore()
   const { setEeSystemConfig } = useEeSystemConfig()
   const startUpload = useMemoizedFn(async (params: StartUploadProps): Promise<API.SystemConfigList[] | undefined> => {
     const { isAutoUploadProject, isUploadSyncData, isUpdateGlobalConfig } = params || {}
     const { isLogin, token } = userInfo
-    if (isEnpriTrace()) {
+    if (!isLogin || !token) return undefined
+    if (isEnpriTrace() || isEnpriTraceAgent()) {
       // 登录根据配置参数判断是否自动上传项目
       // 退出登录不需要去中止正在上传的项目；线上接口会抛错；因为循环跑接口，所以抛错信息很能很多(已告知产品)
       if (isLogin) {
         try {
           const config = await apiSystemConfig(true)
+          const currentUser = useStore.getState().userInfo
+          if (!currentUser.isLogin || currentUser.token !== token) return undefined
           const data = config.data || []
           setEeSystemConfig([...data])
           let autoUploadProjectParams = {
@@ -153,11 +173,6 @@ export const useUploadInfoByEnpriTrace = () => {
             day: 10,
           }
           data.forEach((item) => {
-            if (isUploadSyncData && item.configName === 'syncData') {
-              if (item.isOpen) {
-                syncData(token)
-              }
-            }
             if (item.configName === 'autoUploadProject') {
               autoUploadProjectParams = {
                 isOpen: item.isOpen,
@@ -178,6 +193,9 @@ export const useUploadInfoByEnpriTrace = () => {
           if (isAutoUploadProject && autoUploadProjectParams.isOpen) {
             emiter.emit('autoUploadProject', JSON.stringify(autoUploadProjectParams))
           }
+          if (isUploadSyncData && data.some((item) => item.configName === 'syncData' && item.isOpen)) {
+            await syncData(token)
+          }
           return data
         } catch {
           setEeSystemConfig([])
@@ -186,15 +204,24 @@ export const useUploadInfoByEnpriTrace = () => {
       }
       return undefined
     }
-    isUploadSyncData && syncData(token)
+    if (isUploadSyncData) await syncData(token)
     return undefined
   })
 
-  // 登录前同步与HTTPFlows同步
-  const syncData = useMemoizedFn((token: string) => {
-    aboutLoginUpload(token)
-    loginHTTPFlowsToOnline(token)
-  })
-
   return [{ startUpload }] as const
+}
+
+export const useRealtimeDataSync = () => {
+  const { userInfo } = useStore()
+  const [uploader] = useUploadInfoByEnpriTrace()
+  const ready = userInfo.isLogin && Boolean(userInfo.token) && (isEnpriTrace() || isEnpriTraceAgent())
+  const { cancel } = useRequest(() => uploader.startUpload({ isUploadSyncData: true }), {
+    ready,
+    refreshDeps: [userInfo.token],
+    pollingInterval: ready ? 3000 : undefined,
+    pollingWhenHidden: true,
+  })
+  useEffect(() => {
+    if (!ready) cancel()
+  }, [ready, cancel])
 }
