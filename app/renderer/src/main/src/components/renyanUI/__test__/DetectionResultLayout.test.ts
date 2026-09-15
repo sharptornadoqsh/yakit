@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
+import { readFileSync } from 'fs'
+import path from 'path'
 import { describe, expect, it } from 'vitest'
 
 const root = process.env.DETECTION_LAYOUT_ROOT || process.cwd()
