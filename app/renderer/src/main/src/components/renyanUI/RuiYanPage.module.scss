@@ -163,6 +163,12 @@
   min-height: 0;
 }
 
+.ruiyan-page :global([class*='virtual-table-col']) {
+  --Colors-Use-Neutral-Bg-Hover: var(--ruiyan-color-surface-muted);
+  --Colors-Use-Neutral-Text-1-Title: var(--ruiyan-color-text-secondary);
+  --Colors-Use-Neutral-Disable: var(--ruiyan-color-text-secondary);
+}
+
 .ruiyan-page :global([class*='virtual-table-body'] [class*='virtual-table-list-container']) {
   min-height: 0;
   flex: 1 1 auto;
