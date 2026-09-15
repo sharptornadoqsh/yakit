@@ -218,4 +218,47 @@ describe('本地引擎离线启动', () => {
 
     expect(props.setLog).toHaveBeenCalledWith(['正在初始化数据库'])
   })
+
+  it('使用能力检查返回的新端口并记录端口调整', async () => {
+    vi.mocked(grpcCheckAllowSecretLocal).mockResolvedValue({
+      ok: true,
+      status: 'success',
+      message: '',
+      json: { port: 9013, secret: 'test-secret', version: '1.4.8-beta3' } as any,
+    })
+    renderComponent()
+    await initialize()
+
+    expect(props.onLinkEngine).toHaveBeenCalledWith({ port: 9013, secret: 'test-secret' })
+    expect(props.setLog).toHaveBeenCalledWith(expect.arrayContaining([expect.stringMatching(/9011.*9013/)]))
+  })
+
+  it.each(['break', 'unmount'])('能力检查期间 %s 后忽略返回结果', async (change) => {
+    let finish: (result: any) => void
+    vi.mocked(grpcCheckAllowSecretLocal).mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+    const { rerender, unmount } = renderComponent()
+    act(() => {
+      void ref.current!.init(9011)
+    })
+    if (change === 'unmount') unmount()
+    else rerender(<LocalEngine ref={ref} {...props} yakitStatus="break" />)
+    await act(async () => finish({ ok: true, status: 'success', json: { port: 9014, version: '1.4.8-beta3' } }))
+
+    expect(props.onLinkEngine).not.toHaveBeenCalled()
+    expect(props.setYakitStatus).not.toHaveBeenCalled()
+  })
+
+  it('新能力检查取代旧请求', async () => {
+    let first: (result: any) => void
+    vi.mocked(grpcCheckAllowSecretLocal).mockImplementationOnce(() => new Promise((resolve) => (first = resolve)))
+    renderComponent()
+    act(() => {
+      void ref.current!.init(9011)
+    })
+    await act(async () => ref.current!.link(9015))
+    vi.mocked(props.onLinkEngine).mockClear()
+    await act(async () => first({ ok: true, status: 'success', json: { port: 9012, version: '1.4.8-beta3' } }))
+
+    expect(props.onLinkEngine).not.toHaveBeenCalled()
+  })
 })

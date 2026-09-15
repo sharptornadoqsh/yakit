@@ -13,209 +13,181 @@ export interface YaklangEngineWatchDogProps {
   credential: YaklangEngineWatchDogCredential
   keepalive: boolean
   engineLink: boolean
-
   onReady?: () => void
   onFailed?: (failedCount: number) => void
   onKeepaliveShouldChange?: (keepalive: boolean) => void
-
+  onLocalEngineStarted?: (port: number, requested: YaklangEngineWatchDogCredential) => boolean | Promise<boolean>
   yakitStatus: YakitStatusType
   setYakitStatus: (v: YakitStatusType) => void
-
   setCheckLog: (log: string[]) => void
 }
 
 export const YaklangEngineWatchDog: React.FC<YaklangEngineWatchDogProps> = React.memo((props) => {
-  const yakitStatusRef = useRef<YakitStatusType>(props.yakitStatus)
-  // 是否自动重启引擎进程
-  const [autoStartProgress, setAutoStartProgress] = useState(false)
-  // 是否正在重启引擎进程
-  const startingUp = useRef<boolean>(false)
+  const latestProps = useRef(props)
+  latestProps.current = props
+  const mountedRef = useRef(true)
   const latestStartCallIdRef = useRef(0)
+  const startingUp = useRef(false)
+  const [startRequest, setStartRequest] = useState<{
+    id: number
+    credential: YaklangEngineWatchDogCredential
+  } | null>(null)
 
   useEffect(() => {
-    yakitStatusRef.current = props.yakitStatus
-  }, [props.yakitStatus])
-
-  useEffect(() => {
-    if (!props.engineLink) setAutoStartProgress(false)
-  }, [props.engineLink])
-
-  /** 接受连接引擎的指令 */
-  useEffect(() => {
-    emiter.on('startAndCreateEngineProcess', () => {
-      engineTest()
-    })
+    mountedRef.current = true
     return () => {
-      emiter.off('startAndCreateEngineProcess')
+      mountedRef.current = false
+      latestStartCallIdRef.current++
     }
   }, [])
 
-  /** 引擎信息认证 */
-  const engineTest = useMemoizedFn(() => {
-    debugToPrintLog(`[IFNO] engine-test mode:${props.credential.Mode} port:${props.credential.Port}`)
-    // 重置状态
-    setAutoStartProgress(false)
-
-    const mode = props.credential.Mode
-    if (!mode) {
-      return
+  useEffect(() => {
+    if (props.yakitStatus === 'break' || props.credential.Mode !== 'local') {
+      latestStartCallIdRef.current++
+      startingUp.current = false
+      setStartRequest(null)
     }
+  }, [props.yakitStatus, props.credential.Mode])
 
-    if (props.credential.Port <= 0) {
-      outputToWelcomeConsole('端口被设置为空，无法连接引擎')
-      return
-    }
+  const isCurrent = (id: number, requested: YaklangEngineWatchDogCredential, actualPort = requested.Port) => {
+    const current = latestProps.current
+    const credential = current.credential
+    return (
+      mountedRef.current &&
+      id === latestStartCallIdRef.current &&
+      current.yakitStatus !== 'break' &&
+      credential.Mode === requested.Mode &&
+      credential.Host === requested.Host &&
+      credential.Password === requested.Password &&
+      credential.IsTLS === requested.IsTLS &&
+      credential.PemBytes === requested.PemBytes &&
+      (credential.Port === requested.Port || credential.Port === actualPort)
+    )
+  }
 
-    /**
-     * 认证要小心做，拿到准确的信息之后，尝试连接一次，确定连接成功之后才可以开始后续步骤
-     * 当然引擎没有启动的时候无法连接成功，要准备根据引擎状态选择合适的方式启动引擎
-     */
+  const engineTest = useMemoizedFn(async () => {
+    const credential = { ...props.credential }
+    if (!credential.Mode || credential.Port <= 0 || props.yakitStatus === 'break') return
+    const id = ++latestStartCallIdRef.current
+    startingUp.current = false
+    setStartRequest(null)
     outputToWelcomeConsole('开始尝试连接 RuiYan Engine')
-    debugToPrintLog(`------ 测试目标引擎是否存在进程存活情况------`)
-    yakitEngine
-      .connectYaklangEngine(props.credential)
-      .then(() => {
-        debugToPrintLog(`------ 目标引擎进程存活 ------`)
-        outputToWelcomeConsole(`连接核心引擎成功！`)
-        if (props.onKeepaliveShouldChange) {
-          props.onKeepaliveShouldChange(true)
-        }
-      })
-      .catch((e) => {
-        debugToPrintLog(`------ 目标引擎进程不存在 ------`)
-        outputToWelcomeConsole('未连接到引擎，尝试启动引擎进程')
-        switch (mode) {
-          case 'local':
-            outputToWelcomeConsole('尝试启动本地进程')
-            setAutoStartProgress(true)
-            return
-          case 'remote':
-            outputToWelcomeConsole('远程模式不自动启动本地引擎')
-            props.setCheckLog([`远程引擎连接失败：${String(e)}`])
-            props.setYakitStatus('error')
-            yakitNotify('error', e + '')
-            return
-        }
-      })
+    try {
+      await yakitEngine.connectYaklangEngine(credential)
+      if (!isCurrent(id, credential)) return
+      props.onKeepaliveShouldChange?.(true)
+    } catch (error) {
+      if (!isCurrent(id, credential)) return
+      if (credential.Mode === 'local') {
+        setStartRequest({ id, credential })
+      } else {
+        props.setCheckLog([`远程引擎连接失败：${String(error)}`])
+        props.setYakitStatus('error')
+        yakitNotify('error', String(error))
+      }
+    }
   })
+
+  useEffect(() => {
+    const start = () => {
+      void engineTest()
+    }
+    emiter.on('startAndCreateEngineProcess', start)
+    return () => {
+      emiter.off('startAndCreateEngineProcess', start)
+    }
+  }, [])
 
   useDebounceEffect(
     () => {
-      const mode = props.credential.Mode
-
-      if (!mode) {
-        return
-      }
-      if (mode === 'remote') {
-        return
-      }
-      if (props.credential.Port <= 0) {
-        return
-      }
-      if (!autoStartProgress) {
-        // 不启动进程的话，就直接退出
-        return
-      }
-      debugToPrintLog(`[INFO] 尝试启动新的引擎进程 port:${props.credential.Port}`)
-      // 只有普通模式才涉及到引擎启动的流程
-      outputToWelcomeConsole(`开始以普通权限启动本地引擎进程，本地端口为: ${props.credential.Port}`)
-
-      if (mode === 'local') {
-        if (!startingUp.current) {
-          const callId = ++latestStartCallIdRef.current
-          grpcStartLocalEngine({
-            port: props.credential.Port,
-            password: props.credential.Password,
-            version: __PLATFORM__,
-            isEnpriTraceAgent: isEnpriTraceAgent(),
-            softwareVersion: FetchSoftwareVersion(),
-          })
-            .then((res) => {
-              if (yakitStatusRef.current === 'break') return
-
-              if (res.ok && res.status === 'success') {
-                debugToPrintLog(`[INFO] 本地新引擎进程启动成功`)
-                if (props.onKeepaliveShouldChange) {
-                  props.onKeepaliveShouldChange(true)
-                }
-              } else {
-                if (res.status === 'timeout') {
-                  props.setCheckLog(['命令执行超时，请点击重新执行'])
-                  props.setYakitStatus('start_timeout')
-                } else {
-                  outputToWelcomeConsole('引擎启动失败:' + res.status + ':' + res.message)
-                }
-                debugToPrintLog(`[ERROR] 本地新引擎进程启动失败: ${res.status + ':' + res.message}`)
-              }
-              startingUp.current = false
-            })
-            .catch((error) => {
-              // 旧调用直接跳过
-              if (callId !== latestStartCallIdRef.current) return
-              // 如果手动中断 显示中断界面 意外情况暂时不做处理
-              outputToWelcomeConsole(`引擎启动命令被中断或意外情况：${error}`)
-              props.setCheckLog(['引擎启动命令被中断或意外情况，可查看日志详细信息...'])
-            })
-        }
-      }
-    },
-    [autoStartProgress, props.onKeepaliveShouldChange, props.credential],
-    {
-      leading: false,
-      wait: 1000,
-    },
-  )
-
-  /**
-   * 引擎连接尝试逻辑
-   * 引擎连接有效尝试次数: 1-10
-   */
-  useEffect(() => {
-    const keepalive = props.keepalive
-    if (!keepalive) {
-      if (props.onFailed) {
-        props.onFailed(100)
-      }
-      return
-    }
-    debugToPrintLog(`------ 开始启动引擎进程探活逻辑------`)
-
-    let count = 0
-    let failedCount = 0
-    let notified = false
-
-    const connect = () => {
-      count++
-      isEngineConnectionAlive()
-        .then(() => {
-          if (!keepalive) {
+      if (!startRequest || startingUp.current) return
+      const { id, credential } = startRequest
+      if (!isCurrent(id, credential) || credential.Mode !== 'local') return
+      startingUp.current = true
+      let actualPort = credential.Port
+      outputToWelcomeConsole(`开始启动本地引擎，端口：${credential.Port}`)
+      grpcStartLocalEngine({
+        port: credential.Port,
+        password: credential.Password,
+        version: __PLATFORM__,
+        isEnpriTraceAgent: isEnpriTraceAgent(),
+        softwareVersion: FetchSoftwareVersion(),
+      })
+        .then(async (result) => {
+          if (!isCurrent(id, credential)) return
+          if (result.ok && result.status === 'success') {
+            const port = result.port ?? credential.Port
+            actualPort = port
+            if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('引擎返回的端口无效')
+            if (props.onLocalEngineStarted) {
+              const accepted = await props.onLocalEngineStarted(port, credential)
+              if (!accepted) return
+            } else if (port !== credential.Port) {
+              await yakitEngine.connectYaklangEngine({ ...credential, Port: port })
+            }
+            if (!isCurrent(id, credential, port)) return
+            props.onKeepaliveShouldChange?.(true)
             return
           }
-          if (!notified) {
-            outputToWelcomeConsole('引擎已准备好，可以进行连接')
-            notified = true
+          if (result.status === 'cancelled') {
+            props.setCheckLog([result.message || '本地引擎启动已取消'])
+            props.setYakitStatus('break')
+            return
           }
-          failedCount = 0
-          if (props.onReady) {
-            props.onReady()
-          }
+          props.setCheckLog([result.message || `本地引擎启动失败：${result.status}`])
+          props.setYakitStatus(
+            result.status === 'timeout'
+              ? 'start_timeout'
+              : result.status === 'port_occupied'
+                ? 'port_occupied'
+                : 'error',
+          )
         })
-        .catch((e) => {
-          failedCount++
-          if (failedCount > 0 && failedCount <= 10) {
-            outputToWelcomeConsole(`引擎未完全启动，无法连接，失败次数：${failedCount}`)
-          }
-          if (props.onFailed) {
-            props.onFailed(failedCount)
-          }
+        .catch((error) => {
+          if (!isCurrent(id, credential, actualPort)) return
+          debugToPrintLog(`[ERROR] 本地引擎启动失败：${String(error)}`)
+          props.setCheckLog([`本地引擎启动失败：${String(error)}`])
+          props.setYakitStatus('error')
         })
-    }
-    connect()
-    const id = setInterval(connect, 3000)
-    return () => {
-      clearInterval(id)
-    }
-  }, [props.keepalive, props.onReady, props.onFailed])
+        .finally(() => {
+          if (id === latestStartCallIdRef.current) startingUp.current = false
+        })
+    },
+    [startRequest],
+    { leading: false, wait: 1000 },
+  )
 
-  return <></>
+  useEffect(() => {
+    if (!props.keepalive) {
+      props.onFailed?.(100)
+      return
+    }
+    let active = true
+    let pending = false
+    let failedCount = 0
+    const connect = async () => {
+      if (pending) return
+      pending = true
+      try {
+        await isEngineConnectionAlive()
+        if (!active || !mountedRef.current || latestProps.current.yakitStatus === 'break') return
+        failedCount = 0
+        props.onReady?.()
+      } catch {
+        if (!active || !mountedRef.current || latestProps.current.yakitStatus === 'break') return
+        failedCount++
+        props.onFailed?.(failedCount)
+      } finally {
+        pending = false
+      }
+    }
+    void connect()
+    const timer = setInterval(connect, 3000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [props.keepalive, props.onReady, props.onFailed, props.credential])
+
+  return null
 })

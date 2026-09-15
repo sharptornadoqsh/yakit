@@ -1,8 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-
-const TRUSTED_DEV_HOSTS = new Set(['127.0.0.1', 'localhost'])
-const TRUSTED_DEV_PORTS = new Set(['3000', '5173'])
+const { getDevRendererOrigins } = require('./devRendererUrls')
 const BLOCKED_OPEN_PATH_EXTENSIONS = new Set([
   '.app',
   '.appimage',
@@ -55,7 +53,7 @@ const isTrustedAppSender = (event) => {
 
   try {
     const parsed = new URL(senderUrl)
-    return TRUSTED_DEV_HOSTS.has(parsed.hostname) && TRUSTED_DEV_PORTS.has(parsed.port)
+    return getDevRendererOrigins().includes(parsed.origin)
   } catch (error) {
     return false
   }

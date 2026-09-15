@@ -2,6 +2,7 @@ const { BrowserWindow } = require('electron')
 const path = require('path')
 const crypto = require('crypto')
 const isDev = require('electron-is-dev')
+const { getDevRendererUrl } = require('../../devRendererUrls')
 const { CHANNEL_INIT, CHANNEL_PUSH, CHANNEL_OPENED, CHANNEL_CLOSED, CHANNEL_APP_SYNC } = require('./channels')
 
 const AUX_APP_HTML = path.resolve(__dirname, '../../../renderer/pages/main/yakit-aux.html')
@@ -69,7 +70,7 @@ class AuxWindowManager {
   buildAuxAppLoadTarget(meta) {
     const query = this.buildAuxAppQuery(meta)
     if (isDev) {
-      return { type: 'url', value: `http://127.0.0.1:3000/yakit-aux.html?${query}` }
+      return { type: 'url', value: getDevRendererUrl('main', `/yakit-aux.html?${query}`) }
     }
     return {
       type: 'file',

@@ -1,5 +1,6 @@
 const { ipcMain, BrowserWindow } = require('electron')
 const isDev = require('electron-is-dev')
+const { getDevRendererUrl } = require('../devRendererUrls')
 const { getHtmlTemplateDir } = require('../filePath')
 const fs = require('fs')
 const os = require('os')
@@ -991,7 +992,7 @@ td {
 
       const search = `window=markdown-pdf-print&printId=${encodeURIComponent(printId)}`
       if (isDev) {
-        await printWin.loadURL(`http://127.0.0.1:3000/?${search}`)
+        await printWin.loadURL(getDevRendererUrl('main', `/?${search}`))
       } else {
         await printWin.loadFile(path.resolve(__dirname, '../../renderer/pages/main/index.html'), { search })
       }

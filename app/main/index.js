@@ -4,6 +4,7 @@ const { configureApplicationIdentity, productConfig } = require('./product')
 configureApplicationIdentity(app)
 
 const isDev = require('electron-is-dev')
+const { getDevRendererUrl } = require('./devRendererUrls')
 const path = require('path')
 const os = require('os')
 const url = require('url')
@@ -151,7 +152,7 @@ function createEngineLinkWindow() {
   })
 
   if (!hasPos) engineLinkWin.center()
-  if (isDev) engineLinkWin.loadURL('http://127.0.0.1:5173')
+  if (isDev) engineLinkWin.loadURL(getDevRendererUrl('startup'))
   else engineLinkWin.loadFile(path.join(__dirname, '../renderer/engine-link-startup/dist/index.html'))
 
   engineLinkWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -259,7 +260,7 @@ function createWindow() {
     icon: path.join(__dirname, '../assets/renyan-icon.png'),
   })
 
-  if (isDev) win.loadURL('http://127.0.0.1:3000')
+  if (isDev) win.loadURL(getDevRendererUrl('main'))
   else win.loadFile(path.resolve(__dirname, '../renderer/pages/main/index.html'))
 
   if (isDev) win.webContents.openDevTools({ mode: 'detach' })

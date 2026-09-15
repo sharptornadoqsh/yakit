@@ -15,6 +15,7 @@ import {
   grpcInitCVEDatabase,
   grpcReclaimDatabaseSpace,
   grpcUnpackBuildInYak,
+  isEngineConnectionAlive,
 } from './grpc'
 import { debugToPrintLog } from '@/utils/logCollection'
 import { LocalGVS } from '@/enums/yakitGV'
@@ -22,6 +23,7 @@ import {
   ModalIsTop,
   System,
   TypeCallbackExtra,
+  LoadingClickExtra,
   YakitStatusType,
   YaklangEngineMode,
   YaklangEngineWatchDogCredential,
@@ -48,6 +50,8 @@ import emiter from '@/utils/eventBus/eventBus'
 import { YaklangEngineWatchDog } from './components/YaklangEngineWatchDog'
 import { useTheme } from '@/hooks/useTheme'
 import { StartupSplash } from './components/StartupSplash'
+import { EngineLifecyclePanel } from './components/EngineLifecyclePanel'
+import { QuestionModal } from './components/QuestionModal'
 import { yakitApp, yakitEngine } from '@/utils/electronBridge'
 import { useYakitStatus } from '@/hooks/useYakitStatus'
 import styles from './index.module.scss'
@@ -70,6 +74,7 @@ const DefaultCredential: YaklangEngineWatchDogCredential = {
 export const StartupPage: React.FC = () => {
   /** 是否置顶 */
   const [isTop, setIsTop] = useState<ModalIsTop>(0)
+  const [showManualInstall, setShowManualInstall] = useState(false)
   /** 操作系统 */
   const [system, setSystem] = useState<System>('Darwin')
   /** 本地引擎自检输出日志 */
@@ -103,7 +108,7 @@ export const StartupPage: React.FC = () => {
   /** 手动点击倒计时连接取消 */
   const cancelCountdownLinkRef = useRef<boolean>(false)
   /** 倒计时步数（2秒共4步，每0.5秒递减1） */
-  const [, setCountdown] = useState<number>(4)
+  const [countdown, setCountdown] = useState<number>(4)
   /** 倒计时定时器引用 */
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null)
   /** 当前引擎连接状态 */
@@ -452,7 +457,7 @@ export const StartupPage: React.FC = () => {
 
   // #region 初始化界面操作
   // 手动重连时按钮的loading
-  const [, setRestartLoading] = useState<boolean>(false)
+  const [restartLoading, setRestartLoading] = useState<boolean>(false)
   const setTimeoutLoading = useMemoizedFn((setLoading: (v: boolean) => any, time = 2000) => {
     setLoading(true)
     setTimeout(() => {
@@ -583,6 +588,7 @@ export const StartupPage: React.FC = () => {
   const handleLinkLocalEngine = useMemoizedFn((params: LocalLinkParams) => {
     debugToPrintLog(`------ 开始启动引擎, 指定端口: ${params.port} ------`)
     setCheckLog([`本地普通权限引擎模式，开始启动本地引擎-端口: ${params.port}`])
+    setCustomPort(params.port)
     setCredential({
       Host: '127.0.0.1',
       IsTLS: false,
@@ -596,8 +602,30 @@ export const StartupPage: React.FC = () => {
     onStartLinkEngine()
   })
 
+  const onLocalEngineStarted = useMemoizedFn(async (port: number, requested: YaklangEngineWatchDogCredential) => {
+    const current = getCredential()
+    if (
+      breakHandleRef.current ||
+      getEngineMode() !== 'local' ||
+      current.Mode !== 'local' ||
+      current.Host !== requested.Host ||
+      current.Port !== requested.Port ||
+      current.Password !== requested.Password
+    )
+      return false
+    const next = { ...current, Port: port }
+    setCredential(next)
+    setCustomPort(port)
+    await yakitEngine.connectYaklangEngine(next)
+    if (getCredential() !== next || breakHandleRef.current) return false
+    await isEngineConnectionAlive()
+    return getCredential() === next && !breakHandleRef.current
+  })
+
   // 断开连接
   const onDisconnect = useMemoizedFn(() => {
+    void yakitEngine.cancelAllTasks?.().catch(() => {})
+    clearCountDownTime()
     setCredential({ ...DefaultCredential })
     setKeepalive(false)
     setEngineLink(false)
@@ -650,6 +678,8 @@ export const StartupPage: React.FC = () => {
       yakitStatus === 'allow-secret-error' ||
       yakitStatus === 'check_timeout' ||
       yakitStatus === 'start_timeout' ||
+      yakitStatus === 'port_occupied_prev' ||
+      yakitStatus === 'port_occupied' ||
       yakitStatus === 'error'
     ) {
       transitionEngineLifecycle('recoverable-error', '引擎启动遇到可恢复错误')
@@ -820,68 +850,140 @@ export const StartupPage: React.FC = () => {
       offFromMainWindow()
     }
   }, [])
-  const handleOperations = useMemoizedFn((type: YakitStatusType | YaklangEngineMode, extra?: TypeCallbackExtra) => {
-    switch (type) {
-      case 'skipAgreement_InstallNetWork': // 小风车重置引擎失败
-        setCheckLog([`预置引擎恢复失败：${extra?.message || '未知原因'}，请检查仓库工件后重试`])
-        onDisconnect()
-        onSetEngineMode(undefined)
-        safeSetYakitStatus('skipAgreement_Install')
-        break
-      case 'break': // 主动中断连接 或 小风车断开引擎
-        safeSetYakitStatus('break')
-        onDisconnect()
-        setCheckLog(['已主动断开, 请点击手动连接引擎'])
-        break
-      case 'reclaimDatabaseSpace_start':
-        stopErrorStatusRef.current = true
-        reclaimDbSpacePath.current = extra?.dbPath || []
-        onDisconnect()
-        safeSetYakitStatus('reclaimDatabaseSpace_start')
-        handleReclaimDatabaseSpace()
-        break
-      case 'install': // 下载的yaklang时候，或切换本地时 --- 本地引擎不存在
-        onDisconnect()
-        isEngineInstalled.current = false
-        setTimeout(() => {
+  const handleOperations = useMemoizedFn(
+    (type: YakitStatusType | YaklangEngineMode, extra?: TypeCallbackExtra & LoadingClickExtra) => {
+      switch (type) {
+        case 'check_timeout':
+        case 'start_timeout':
+        case 'port_occupied':
+        case 'port_occupied_prev':
+          breakHandleRef.current = false
+          cancelCountdownLinkRef.current = false
+          if (getEngineMode() === 'remote' && getCredential().Mode === 'remote') {
+            setKeepalive(false)
+            setEngineLink(false)
+            safeSetYakitStatus('ready')
+            onStartLinkEngine()
+            break
+          }
+          onDisconnect()
+          safeSetYakitStatus('')
+          setRestartLoading(true)
           handleLinkLocalMode()
-        }, 500)
-        return
-      case 'installNetWork':
-        onDisconnect()
-        isEngineInstalled.current = false
-        safeSetYakitStatus('install')
-        setTimeout(() => {
-          handleLinkLocalMode()
-        }, 500)
-        return
-      case 'error':
-        if (stopErrorStatusRef.current) return
-        setEngineLink(false)
-        safeSetYakitStatus('error')
-        break
-      case 'local':
-        onDisconnect()
-        onSetEngineMode(undefined)
-        isCheckVersion.current = false
-        setTimeout(() => {
-          handleLinkLocalMode()
-        }, 500)
-        break
-      case 'remote':
-        setTimeout(() => {
-          handleLinkRemoteMode()
-        }, 500)
-        break
-      default:
-        break
-    }
-  })
+          break
+        case 'skipAgreement_InstallNetWork': // 小风车重置引擎失败
+          setCheckLog([`预置引擎恢复失败：${extra?.message || '未知原因'}，请检查仓库工件后重试`])
+          onDisconnect()
+          onSetEngineMode(undefined)
+          safeSetYakitStatus('skipAgreement_Install')
+          break
+        case 'break': // 主动中断连接 或 小风车断开引擎
+          if (extra?.linkAgain) {
+            breakHandleRef.current = false
+            safeSetYakitStatus('')
+            handleLinkLocalMode()
+            break
+          }
+          safeSetYakitStatus('break')
+          onDisconnect()
+          setCheckLog(['已主动断开, 请点击手动连接引擎'])
+          break
+        case 'reclaimDatabaseSpace_start':
+          stopErrorStatusRef.current = true
+          reclaimDbSpacePath.current = extra?.dbPath || []
+          onDisconnect()
+          safeSetYakitStatus('reclaimDatabaseSpace_start')
+          handleReclaimDatabaseSpace()
+          break
+        case 'install': // 下载的yaklang时候，或切换本地时 --- 本地引擎不存在
+          onDisconnect()
+          isEngineInstalled.current = false
+          setTimeout(() => {
+            handleLinkLocalMode()
+          }, 500)
+          return
+        case 'installNetWork':
+          onDisconnect()
+          isEngineInstalled.current = false
+          safeSetYakitStatus('install')
+          setTimeout(() => {
+            handleLinkLocalMode()
+          }, 500)
+          return
+        case 'error':
+          if (stopErrorStatusRef.current) return
+          setEngineLink(false)
+          safeSetYakitStatus('error')
+          break
+        case 'local':
+          onDisconnect()
+          onSetEngineMode(undefined)
+          isCheckVersion.current = false
+          setTimeout(() => {
+            handleLinkLocalMode()
+          }, 500)
+          break
+        case 'remote':
+          setTimeout(() => {
+            handleLinkRemoteMode()
+          }, 500)
+          break
+        default:
+          break
+      }
+    },
+  )
+
+  const showRecovery =
+    ['missing', 'incompatible', 'recoverable-error', 'error'].includes(engineLifecycle.state) ||
+    [
+      'port_occupied_prev',
+      'port_occupied',
+      'check_timeout',
+      'start_timeout',
+      'error',
+      'allow-secret-error',
+      'antivirus_blocked',
+      'old_version',
+      'skipAgreement_Install',
+      'database_error',
+      'fix_database_timeout',
+      'fix_database_error',
+      'reclaimDatabaseSpace_error',
+      'break',
+    ].includes(yakitStatus)
 
   return (
     <div className={styles['startup-wrapper']}>
       <div className={styles['startup-header-drap']} style={{ height: DragHeaderHeight }}></div>
-      <StartupSplash theme={theme} />
+      {!showRecovery && !isRemoteEngine && <StartupSplash theme={theme} />}
+      {(showRecovery || isRemoteEngine) && (
+        <div className={styles['startup-recovery']}>
+          <EngineLifecyclePanel
+            lifecycle={engineLifecycle}
+            yakitStatus={yakitStatus}
+            logs={checkLog}
+            busy={restartLoading || remoteLinkLoading}
+            buildInEngineVersion={buildInEngineVersion}
+            countdown={countdown}
+            onAction={handleOperations}
+            onManualInstall={() => setShowManualInstall(true)}
+          />
+          {isRemoteEngine && !engineLink && (
+            <RemoteEngine
+              loading={remoteLinkLoading}
+              setLoading={setRemoteLinkLoading}
+              onSubmit={handleLinkRemoteEngine}
+              autoConnect={true}
+              headless={false}
+              onSwitchLocalEngine={handleRemoteToLocal}
+            />
+          )}
+        </div>
+      )}
+      {showManualInstall && (
+        <QuestionModal isTop={isTop} setIsTop={setIsTop} system={system} visible setVisible={setShowManualInstall} />
+      )}
       <div className={styles['startup-operation-layer']} aria-hidden="true">
         <YaklangEngineWatchDog
           credential={credential}
@@ -893,8 +995,9 @@ export const StartupPage: React.FC = () => {
           yakitStatus={yakitStatus}
           setYakitStatus={safeSetYakitStatus}
           setCheckLog={setCheckLog}
+          onLocalEngineStarted={onLocalEngineStarted}
         />
-        {!isRemoteEngine ? (
+        {!isRemoteEngine && (
           <LocalEngine
             ref={localEngineRef}
             setLog={setCheckLog}
@@ -906,17 +1009,6 @@ export const StartupPage: React.FC = () => {
             yakitUpdate={yakitUpdate}
             setYakitUpdate={setYakitUpdate}
           />
-        ) : (
-          !engineLink && (
-            <RemoteEngine
-              loading={remoteLinkLoading}
-              setLoading={setRemoteLinkLoading}
-              onSubmit={handleLinkRemoteEngine}
-              autoConnect={true}
-              headless={true}
-              onSwitchLocalEngine={handleRemoteToLocal}
-            />
-          )
         )}
         {!isRemoteEngine && !engineLink && yaklangDownload && (
           <DownloadYaklang

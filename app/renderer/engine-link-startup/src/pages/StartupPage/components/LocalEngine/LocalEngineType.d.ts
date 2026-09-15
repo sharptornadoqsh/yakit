@@ -62,6 +62,7 @@ export interface ExecResult {
   ok: boolean
   status: string
   message: string
+  port?: number
 }
 
 export interface AllowSecretLocalExecResult extends ExecResult {

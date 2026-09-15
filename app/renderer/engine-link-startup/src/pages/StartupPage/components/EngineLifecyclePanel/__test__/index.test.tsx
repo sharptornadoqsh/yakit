@@ -1,4 +1,5 @@
 import React from 'react'
+import '@testing-library/jest-dom/vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { yakitLogs } from '@/utils/electronBridge'
@@ -85,5 +86,23 @@ describe('通用引擎初始化面板', () => {
     expect(screen.getByText('摘要不匹配')).toBeInTheDocument()
     expect(screen.getByText('重试启动')).toBeInTheDocument()
     expect(screen.getByText('手工安装')).toBeInTheDocument()
+  })
+
+  it.each(['port_occupied_prev', 'port_occupied'] as const)('端口错误 %s 提供重新检查入口', (status) => {
+    render(
+      <EngineLifecyclePanel
+        lifecycle={{ state: 'starting', message: '端口不可用' }}
+        yakitStatus={status}
+        logs={['候选端口已全部占用']}
+        busy={false}
+        buildInEngineVersion=""
+        countdown={4}
+        onAction={onAction}
+        onManualInstall={onManualInstall}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '重试启动' }))
+    expect(onAction).toHaveBeenCalledWith('check_timeout')
   })
 })

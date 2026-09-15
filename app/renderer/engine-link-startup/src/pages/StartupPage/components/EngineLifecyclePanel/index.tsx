@@ -34,6 +34,10 @@ const stateLabels: Record<EngineLifecycleState['state'], string> = {
 
 const missingStatuses: YakitStatusType[] = ['installNetWork', 'skipAgreement_InstallNetWork']
 const errorStatuses: YakitStatusType[] = [
+  'port_occupied_prev',
+  'port_occupied',
+  'database_error',
+  'fix_database_timeout',
   'check_timeout',
   'start_timeout',
   'error',

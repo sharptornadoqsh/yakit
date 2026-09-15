@@ -12,10 +12,21 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
     const { setLog, onLinkEngine, yakitStatus, setYakitStatus, buildInEngineVersion, setRestartLoading } = props
     const allowSecretLocalJson = useRef<AllowSecretLocalJson>(null)
     const yakitStatusRef = useRef(yakitStatus)
+    const mountedRef = useRef(true)
+    const requestIdRef = useRef(0)
+    yakitStatusRef.current = yakitStatus
 
     useEffect(() => {
-      yakitStatusRef.current = yakitStatus
+      if (yakitStatus === 'break') requestIdRef.current++
     }, [yakitStatus])
+
+    useEffect(() => {
+      mountedRef.current = true
+      return () => {
+        mountedRef.current = false
+        requestIdRef.current++
+      }
+    }, [])
 
     const startYakEngine = useMemoizedFn(() => {
       if (yakitStatusRef.current === 'break' || !allowSecretLocalJson.current) return
@@ -31,6 +42,11 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
         return
       }
 
+      const requestId = ++requestIdRef.current
+      const isCurrent = () =>
+        mountedRef.current && requestId === requestIdRef.current && yakitStatusRef.current !== 'break'
+      allowSecretLocalJson.current = null
+
       debugToPrintLog('------ 开始执行本地引擎能力检查 ------')
       setLog(['正在检查本地引擎兼容能力...'])
       try {
@@ -39,10 +55,12 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
           softwareVersion: FetchSoftwareVersion(),
           version: __PLATFORM__,
         })
+        if (!isCurrent()) return
         setRestartLoading(false)
         if (result.ok && result.status === 'success' && result.json) {
           const currentVersion = result.json.version || (await yakitEngine.getCurrentYak().catch(() => ''))
           const lifecycleInfo = await yakitEngine.getEngineLifecycleInfo().catch(() => undefined)
+          if (!isCurrent()) return
           const compatibility = assessEngineCompatibility({
             currentVersion,
             capability: 'compatible',
@@ -73,6 +91,7 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
           }
           setYakitStatus('')
           startYakEngine()
+          if (result.json.port !== port) setLog([`本地端口 ${port} 已调整为 ${result.json.port}`])
           return
         }
 
@@ -80,7 +99,7 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
         switch (result.status) {
           case 'timeout':
           case 'call_error':
-            setLog(['本地引擎能力检查超时，可重试或查看日志'])
+            setLog(['本地引擎能力检查超时，可重试或查看日志', result.message].filter(Boolean))
             setYakitStatus('check_timeout')
             break
           case 'old_version':
@@ -92,8 +111,12 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
             setYakitStatus('old_version')
             break
           case 'port_occupied':
-            setLog(['本地端口不可用，可更换端口或终止占用进程'])
+            setLog(['本地端口不可用，可释放端口后重试', result.message].filter(Boolean))
             setYakitStatus('port_occupied_prev')
+            break
+          case 'cancelled':
+            setLog(['本地引擎检查已取消'])
+            setYakitStatus('break')
             break
           case 'antivirus_blocked':
             setLog(['本地引擎被系统防护软件阻止，请查看诊断日志'])
@@ -113,6 +136,7 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
             setYakitStatus('allow-secret-error')
         }
       } catch (error) {
+        if (!isCurrent()) return
         setRestartLoading(false)
         setLog([`本地引擎能力检查异常：${error}`])
         setYakitStatus('allow-secret-error')

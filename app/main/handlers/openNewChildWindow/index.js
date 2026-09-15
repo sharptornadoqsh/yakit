@@ -1,5 +1,6 @@
 const { ipcMain, BrowserWindow } = require('electron')
 const isDev = require('electron-is-dev')
+const { getDevRendererUrl } = require('../../devRendererUrls')
 const path = require('path')
 const crypto = require('crypto')
 
@@ -122,7 +123,7 @@ module.exports = {
         // 通知 loading.html 显示“正在加载主页面...”
         childWindow.webContents.send('start-child-loading')
         if (isDev) {
-          childWindow.loadURL('http://127.0.0.1:3000/?window=child')
+          childWindow.loadURL(getDevRendererUrl('main', '/?window=child'))
         } else {
           childWindow.loadFile(path.resolve(__dirname, '../../../renderer/pages/main/index.html'), {
             search: 'window=child',

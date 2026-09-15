@@ -4,6 +4,7 @@ const { GLOBAL_YAK_SETTING } = require('../state')
 const { getLocalYaklangEngine, getYakitHome } = require('../filePath')
 const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
 const { getDefaultDatabaseEnvironment } = require('../defaultDatabase')
+const { isLocalPortConflict, assertLocalPortAvailable, runWithLocalPortRetry } = require('../localEnginePort')
 
 // 引擎连接过程中涉及到能中断的执行任务
 const runningTasks = new Map()
@@ -14,6 +15,18 @@ const LOCAL_ENGINE_START_TIMEOUT_MS = 180_000
 
 module.exports = {
   registerNewIPC: (win, callback, getClient, newClient, ipcEventPre) => {
+    let currentCheckRequestId = 0
+    let currentStartRequestId = 0
+    const cancelTasks = (prefix) => {
+      for (const [key, cancel] of runningTasks) {
+        if (key.startsWith(prefix)) cancel()
+      }
+    }
+    const reportPortRetry = (port, nextPort) => {
+      const message = `本地端口 ${port} 已被占用，正在尝试 ${nextPort}`
+      engineLogOutputFileAndUI(win, message)
+      win.webContents.send('startUp-engine-msg', message)
+    }
     /** 输出到欢迎界面的日志中 */
     ipcMain.handle(ipcEventPre + 'output-log-to-welcome-console', (e, msg) => {
       engineLogOutputUI(win, `${msg}`, true)
@@ -35,6 +48,7 @@ module.exports = {
 
           const defaltEnv = { ...process.env, YAKIT_HOME: getYakitHome() }
           const subprocess = childProcess.spawn(command, args, {
+            windowsHide: true,
             stdio: ['ignore', 'pipe', 'pipe'],
             env: { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) },
           })
@@ -60,6 +74,7 @@ module.exports = {
                 process.kill(subprocess.pid, 'SIGKILL')
               }
             } catch {}
+            if (!timeOut) reject({ status: 'cancelled', message: '本地引擎检查已取消' })
           }
 
           runningTasks.set(taskKey, killFun)
@@ -133,8 +148,8 @@ module.exports = {
                 : [String(json.reason || json.info || combinedOutput || '')]
               const has = (keyword) => reasons.some((r) => r.includes(keyword))
 
-              if (has('net.Listen(tcp, addr) failed')) {
-                const msg = `端口 ${params.port} 已被占用，请检查是否已有其他 RuiYan 实例或进程正在运行，建议用户手动释放或修改端口。`
+              if (isLocalPortConflict(json)) {
+                const msg = `本地端口 ${params.port} 已被占用`
                 engineLogOutputFileAndUI(win, `----- 检查失败: ${msg} -----`)
                 return reject({ status: 'port_occupied', message: msg, json })
               } else if (has('build yak grpc server failed')) {
@@ -216,9 +231,16 @@ module.exports = {
       })
     }
     ipcMain.handle(ipcEventPre + 'check-allow-secret-local-yaklang-engine', async (e, params) => {
+      const requestId = ++currentCheckRequestId
+      cancelTasks('check_')
       try {
-        const result = await asyncAllowSecretLocal(win, params)
-        return { ok: true, ...result }
+        const result = await runWithLocalPortRetry({
+          port: params.port,
+          operation: (port) => asyncAllowSecretLocal(win, { ...params, port }),
+          onRetry: reportPortRetry,
+          isCurrent: () => requestId === currentCheckRequestId,
+        })
+        return { ok: true, ...result, json: { ...result.json, port: result.port } }
       } catch (err) {
         const safeError = typeof err === 'object' && err !== null ? err : { message: String(err) }
         return {
@@ -609,9 +631,11 @@ module.exports = {
           let stderr = ''
           let successDetected = false
           let killed = false
+          let processEnded = false
           const taskKey = 'start_' + checkId
           let cleaned = false
           let pollIntervalId = null
+          let pollStartTimeoutId = null
           /** 轮询检测引擎连接状态 */
           const startConnectionPolling = () => {
             engineLogOutputFileAndUI(win, `开始轮询检测引擎连接状态 (每 2 秒一次)...`)
@@ -638,7 +662,7 @@ module.exports = {
                   }
 
                   if (data && data['result'] === ECHO_TEST_MSG) {
-                    onSuccess('引擎启动成功（通过连接检测）', `轮询检测到引擎连接成功 (Echo 测试通过)！`)
+                    onSuccess('引擎启动成功（通过连接检测）', `轮询检测到引擎连接成功 (Echo 测试通过)！`, true)
                   }
                 })
               } catch (e) {
@@ -647,13 +671,14 @@ module.exports = {
             }, 2000) // 每 2 秒检测一次
           }
           // 延迟 2 秒开始轮询，给引擎一点启动时间
-          setTimeout(() => {
+          pollStartTimeoutId = setTimeout(() => {
             if (!successDetected && !killed && checkId === currentStartId) {
               startConnectionPolling()
             }
           }, 2000)
           /** 清理轮询 */
           const cleanup = () => {
+            clearTimeout(pollStartTimeoutId)
             if (pollIntervalId) {
               clearInterval(pollIntervalId)
               pollIntervalId = null
@@ -666,6 +691,7 @@ module.exports = {
             cleanup()
             cleanTask()
             clearTimeout(timeoutId)
+            process.removeListener('exit', onProcessExit)
             !timeOut && engineLogOutputFileAndUI(win, `----- 执行中止 启动本地引擎  -----`)
             try {
               subprocess.kill()
@@ -675,7 +701,10 @@ module.exports = {
                 process.kill(subprocess.pid, 'SIGKILL')
               }
             } catch {}
+            if (!timeOut) reject({ status: 'cancelled', message: '本地引擎启动已取消' })
           }
+
+          const onProcessExit = () => killFun()
 
           runningTasks.set(taskKey, killFun)
           const cleanTask = () => {
@@ -685,21 +714,30 @@ module.exports = {
           }
 
           const timeoutId = setTimeout(() => {
-            if (checkId !== currentStartId || successDetected || killed) return
+            if (checkId !== currentStartId || successDetected || killed || processEnded) return
             killFun(true)
             engineLogOutputFileAndUI(win, `----- 启动本地引擎超时 (${LOCAL_ENGINE_START_TIMEOUT_MS / 1000}s) -----`)
             reject({ status: 'timeout', message: '启动本地引擎超时' })
           }, LOCAL_ENGINE_START_TIMEOUT_MS)
 
           /** 成功回调，确保只触发一次 */
-          const onSuccess = (msg1, msg2) => {
-            if (checkId !== currentStartId || successDetected || killed) return
+          const onSuccess = (msg1, msg2, verified = false) => {
+            if (checkId !== currentStartId || successDetected || killed || processEnded) return
+            if (!verified) {
+              try {
+                callback(`127.0.0.1:${port}`, '', password)
+                newClient().Echo({ text: ECHO_TEST_MSG }, (error, data) => {
+                  if (!error && data?.result === ECHO_TEST_MSG) onSuccess(msg1, msg2, true)
+                })
+              } catch {}
+              return
+            }
             successDetected = true
             cleanup()
             cleanTask()
             clearTimeout(timeoutId)
             engineLogOutputFileAndUI(win, msg2)
-            resolve({ status: 'success', msg1 })
+            resolve({ status: 'success', msg1, port })
           }
 
           subprocess.stdout.on('data', (data) => {
@@ -731,27 +769,41 @@ module.exports = {
             engineLogOutputFileAndUI(win, output)
           })
 
-          process.on('exit', () => {
-            killFun()
-          })
+          process.once('exit', onProcessExit)
 
           subprocess.on('error', (err) => {
+            processEnded = true
             if (checkId !== currentStartId) return
             cleanup()
             cleanTask()
             clearTimeout(timeoutId)
+            process.removeListener('exit', onProcessExit)
             engineLogOutputFileAndUI(win, `启动引擎出错: ${err.message}`)
             win.webContents.send('start-yaklang-engine-error', `本地引擎遭遇错误，错误原因为：${err}`)
-            reject({ status: 'process_error', message: err.message })
+            reject({ status: isLocalPortConflict(err) ? 'port_occupied' : 'process_error', message: err.message })
           })
 
-          subprocess.on('close', (code) => {
+          subprocess.on('close', async (code) => {
+            processEnded = true
+            process.removeListener('exit', onProcessExit)
             if (checkId !== currentStartId || killed || successDetected) return
             cleanup()
             cleanTask()
             clearTimeout(timeoutId)
             engineLogOutputFileAndUI(win, `----- 引擎进程退出，退出码: ${code} -----`)
-            reject({ status: 'exit', message: `引擎进程提前退出 (${code})` })
+            const detail = (stderr || stdout).trim()
+            let portOccupied = isLocalPortConflict(stdout + stderr)
+            if (!portOccupied && code !== 0 && /start to listen on:/i.test(stdout + stderr)) {
+              try {
+                await assertLocalPortAvailable(port)
+              } catch (error) {
+                portOccupied = error.code === 'EADDRINUSE'
+              }
+            }
+            reject({
+              status: portOccupied ? 'port_occupied' : 'exit',
+              message: `引擎进程提前退出 (${code})${detail ? `：${detail.slice(-2000)}` : ''}`,
+            })
           })
         } catch (e) {
           reject({ status: 'exception', message: e.message || String(e) })
@@ -761,8 +813,19 @@ module.exports = {
       })
     }
     ipcMain.handle(ipcEventPre + 'start-secret-local-yaklang-engine', async (e, params) => {
+      const requestId = ++currentStartRequestId
+      cancelTasks('start_')
       try {
-        const result = await asyncStartSecretLocalYakEngineServer(win, params)
+        const result = await runWithLocalPortRetry({
+          port: params.port,
+          operation: async (port) => {
+            await assertLocalPortAvailable(port)
+            if (requestId !== currentStartRequestId) throw { status: 'cancelled', message: '本地引擎启动已取消' }
+            return asyncStartSecretLocalYakEngineServer(win, { ...params, port })
+          },
+          onRetry: reportPortRetry,
+          isCurrent: () => requestId === currentStartRequestId,
+        })
         return { ok: true, ...result }
       } catch (err) {
         const safeError = typeof err === 'object' && err !== null ? err : { message: String(err) }
@@ -776,6 +839,8 @@ module.exports = {
 
     // 中断连接 取消所有正在执行的任务
     ipcMain.handle(ipcEventPre + 'cancel-all-tasks', () => {
+      currentCheckRequestId++
+      currentStartRequestId++
       if (runningTasks.size === 0) {
         return { ok: true, canceled: 0 }
       }
