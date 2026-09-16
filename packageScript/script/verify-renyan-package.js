@@ -40,6 +40,7 @@ const resolvePackage = (root, target) => {
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
 const verifyRendererStartup = async (executable, env, userData) => {
+  const logDirectory = path.join(userData, 'projects', 'print-log')
   const child = spawn(executable, [`--user-data-dir=${userData}`], {
     env,
     windowsHide: true,
@@ -62,7 +63,6 @@ const verifyRendererStartup = async (executable, env, userData) => {
       if (child.exitCode !== null || child.signalCode !== null) {
         throw new Error(`Packaged application exited before startup: ${child.exitCode}/${child.signalCode}\n${output}`)
       }
-      const logDirectory = path.join(env.YAKIT_HOME, 'print-log')
       const logs = fs.existsSync(logDirectory)
         ? fs
             .readdirSync(logDirectory)
@@ -79,7 +79,7 @@ const verifyRendererStartup = async (executable, env, userData) => {
       if (ready && Date.now() - started >= 10000) return
       await wait(500)
     }
-    throw new Error(`Packaged renderer did not load within 45 seconds\n${output}`)
+    throw new Error(`Packaged renderer did not load within 45 seconds\nStartup logs: ${logDirectory}\n${output}`)
   } finally {
     if (child.exitCode === null && child.signalCode === null && !launchError) {
       const closed = new Promise((resolve) => child.once('close', resolve))
@@ -101,6 +101,7 @@ const verifyPackage = async ({
   native = true,
 }) => {
   const info = resolvePackage(root, target)
+  let userData
   if (native) {
     assert.equal(process.platform, info.platform, 'Package verification requires the target operating system')
     assert.equal(process.arch, info.architecture, 'Package verification requires the target architecture')
@@ -110,8 +111,9 @@ const verifyPackage = async ({
         : info.platform === 'darwin'
           ? path.join(os.homedir(), 'Library/Application Support')
           : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
+    userData = appData && path.join(appData, product.defaultDataDirectory)
     assert.ok(
-      appData && !fs.existsSync(path.join(appData, product.defaultDataDirectory)),
+      userData && !fs.existsSync(userData),
       'Native package verification requires a clean RuiYan profile on a disposable build account',
     )
   }
@@ -159,7 +161,9 @@ const verifyPackage = async ({
         execFileSync('codesign', ['--verify', '--deep', '--strict', info.appDirectory], { timeout: 30000 })
         if (signed) execFileSync('xcrun', ['stapler', 'validate', info.appDirectory], { timeout: 30000 })
       }
-      const env = { ...process.env, YAKIT_HOME: path.join(temporary, 'home'), ELECTRON_RUN_AS_NODE: '1' }
+      const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+      delete env.NODE_OPTIONS
+      delete env.YAKIT_HOME
       const runtime = JSON.parse(
         execFileSync(
           info.executable,
@@ -179,7 +183,7 @@ const verifyPackage = async ({
       assert.equal(runtime.arch, info.architecture)
       assert.equal(runtime.electron, packageJson.devDependencies.electron)
       delete env.ELECTRON_RUN_AS_NODE
-      await verifyRendererStartup(info.executable, env, path.join(temporary, 'user-data'))
+      await verifyRendererStartup(info.executable, env, userData)
     }
     return { target, architecture: info.architecture, includeEngine, native }
   } finally {
