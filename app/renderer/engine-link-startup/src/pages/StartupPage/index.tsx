@@ -50,8 +50,6 @@ import emiter from '@/utils/eventBus/eventBus'
 import { YaklangEngineWatchDog } from './components/YaklangEngineWatchDog'
 import { useTheme } from '@/hooks/useTheme'
 import { StartupSplash } from './components/StartupSplash'
-import { EngineLifecyclePanel } from './components/EngineLifecyclePanel'
-import { QuestionModal } from './components/QuestionModal'
 import { yakitApp, yakitEngine } from '@/utils/electronBridge'
 import { useYakitStatus } from '@/hooks/useYakitStatus'
 import styles from './index.module.scss'
@@ -74,11 +72,10 @@ const DefaultCredential: YaklangEngineWatchDogCredential = {
 export const StartupPage: React.FC = () => {
   /** 是否置顶 */
   const [isTop, setIsTop] = useState<ModalIsTop>(0)
-  const [showManualInstall, setShowManualInstall] = useState(false)
   /** 操作系统 */
   const [system, setSystem] = useState<System>('Darwin')
   /** 本地引擎自检输出日志 */
-  const [checkLog, setCheckLog] = useState<string[]>(['正在进行环境检查...'])
+  const [, setCheckLog] = useState<string[]>(['正在进行环境检查...'])
   const [engineLifecycle, dispatchEngineLifecycle] = useReducer(engineLifecycleReducer, initialEngineLifecycleState)
   const transitionEngineLifecycle = useMemoizedFn(
     (
@@ -108,7 +105,7 @@ export const StartupPage: React.FC = () => {
   /** 手动点击倒计时连接取消 */
   const cancelCountdownLinkRef = useRef<boolean>(false)
   /** 倒计时步数（2秒共4步，每0.5秒递减1） */
-  const [countdown, setCountdown] = useState<number>(4)
+  const [, setCountdown] = useState<number>(4)
   /** 倒计时定时器引用 */
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null)
   /** 当前引擎连接状态 */
@@ -457,7 +454,7 @@ export const StartupPage: React.FC = () => {
 
   // #region 初始化界面操作
   // 手动重连时按钮的loading
-  const [restartLoading, setRestartLoading] = useState<boolean>(false)
+  const [, setRestartLoading] = useState<boolean>(false)
   const setTimeoutLoading = useMemoizedFn((setLoading: (v: boolean) => any, time = 2000) => {
     setLoading(true)
     setTimeout(() => {
@@ -934,56 +931,10 @@ export const StartupPage: React.FC = () => {
     },
   )
 
-  const showRecovery =
-    ['missing', 'incompatible', 'recoverable-error', 'error'].includes(engineLifecycle.state) ||
-    [
-      'port_occupied_prev',
-      'port_occupied',
-      'check_timeout',
-      'start_timeout',
-      'error',
-      'allow-secret-error',
-      'antivirus_blocked',
-      'old_version',
-      'skipAgreement_Install',
-      'database_error',
-      'fix_database_timeout',
-      'fix_database_error',
-      'reclaimDatabaseSpace_error',
-      'break',
-    ].includes(yakitStatus)
-
   return (
     <div className={styles['startup-wrapper']}>
       <div className={styles['startup-header-drap']} style={{ height: DragHeaderHeight }}></div>
-      {!showRecovery && !isRemoteEngine && <StartupSplash theme={theme} />}
-      {(showRecovery || isRemoteEngine) && (
-        <div className={styles['startup-recovery']}>
-          <EngineLifecyclePanel
-            lifecycle={engineLifecycle}
-            yakitStatus={yakitStatus}
-            logs={checkLog}
-            busy={restartLoading || remoteLinkLoading}
-            buildInEngineVersion={buildInEngineVersion}
-            countdown={countdown}
-            onAction={handleOperations}
-            onManualInstall={() => setShowManualInstall(true)}
-          />
-          {isRemoteEngine && !engineLink && (
-            <RemoteEngine
-              loading={remoteLinkLoading}
-              setLoading={setRemoteLinkLoading}
-              onSubmit={handleLinkRemoteEngine}
-              autoConnect={true}
-              headless={false}
-              onSwitchLocalEngine={handleRemoteToLocal}
-            />
-          )}
-        </div>
-      )}
-      {showManualInstall && (
-        <QuestionModal isTop={isTop} setIsTop={setIsTop} system={system} visible setVisible={setShowManualInstall} />
-      )}
+      <StartupSplash theme={theme} />
       <div className={styles['startup-operation-layer']} aria-hidden="true">
         <YaklangEngineWatchDog
           credential={credential}
@@ -1008,6 +959,16 @@ export const StartupPage: React.FC = () => {
             setRestartLoading={setRestartLoading}
             yakitUpdate={yakitUpdate}
             setYakitUpdate={setYakitUpdate}
+          />
+        )}
+        {isRemoteEngine && !engineLink && (
+          <RemoteEngine
+            loading={remoteLinkLoading}
+            setLoading={setRemoteLinkLoading}
+            onSubmit={handleLinkRemoteEngine}
+            autoConnect={true}
+            headless={true}
+            onSwitchLocalEngine={handleRemoteToLocal}
           />
         )}
         {!isRemoteEngine && !engineLink && yaklangDownload && (

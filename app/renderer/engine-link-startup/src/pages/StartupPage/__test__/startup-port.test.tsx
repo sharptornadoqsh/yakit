@@ -1,27 +1,18 @@
 import React from 'react'
 import '@testing-library/jest-dom/vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StartupPage } from '../index'
 import * as grpc from '../grpc'
 import { yakitApp, yakitEngine } from '@/utils/electronBridge'
 import { getLocalValue, setLocalValue } from '@/utils/kv'
 import { LocalGVS } from '@/enums/yakitGV'
+import { RemoteEngine } from '../components/RemoteEngine/RemoteEngine'
 
 vi.mock('../index.module.scss', () => ({ default: {} }))
 vi.mock('../components/EngineLifecyclePanel/EngineLifecyclePanel.module.scss', () => ({ default: {} }))
 vi.mock('../components/StartupSplash/StartupSplash.module.scss', () => ({ default: {} }))
-vi.mock('../components/RemoteEngine/RemoteEngine', () => ({
-  RemoteEngine: ({ headless, onSubmit }: any) =>
-    headless ? null : (
-      <div>
-        远程引擎设置
-        <button onClick={() => onSubmit({ host: '127.0.0.1', port: '18080', password: 'remote-secret' })}>
-          连接远程测试引擎
-        </button>
-      </div>
-    ),
-}))
+vi.mock('../components/RemoteEngine/RemoteEngine', () => ({ RemoteEngine: vi.fn(() => null) }))
 vi.mock('../components/DownloadYaklang', () => ({ DownloadYaklang: () => null }))
 vi.mock('../components/QuestionModal', () => ({ QuestionModal: () => <div>手工安装说明</div> }))
 vi.mock('@/hooks/useTheme', () => ({ useTheme: () => ({ theme: 'light' }) }))
@@ -131,62 +122,78 @@ describe('启动页面端口与恢复集成', () => {
     expect(setLocalValue).toHaveBeenCalledWith(LocalGVS.YakitEEPort, 9014)
   })
 
-  it.each(['port_occupied', 'unexpected', 'timeout'])('能力检查错误 %s 可见且重试重新执行检查', async (status) => {
-    vi.mocked(grpc.grpcCheckAllowSecretLocal).mockResolvedValue({
-      ok: false,
-      status,
-      message: '检查阶段真实错误',
-      json: null,
-    })
-    render(<StartupPage />)
-    await advance()
+  const expectBrandedSplashOnly = () => {
+    expect(screen.getByRole('status')).toHaveTextContent('睿眼自动化渗透系统正在启动')
+    expect(screen.queryByText('可恢复错误')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '安装引擎' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '选择远程引擎' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '手工安装' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '重试启动' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '打开诊断日志' })).not.toBeInTheDocument()
+    expect(screen.queryByText('手工安装说明')).not.toBeInTheDocument()
+  }
 
-    const retry = screen.getByRole('button', { name: '重试启动' })
-    expect(retry.closest('[aria-hidden="true"]')).toBeNull()
-    expect(retry).toBeEnabled()
-    expect(screen.getByText('检查阶段真实错误')).toBeVisible()
-    expect(grpc.grpcCheckAllowSecretLocal).toHaveBeenCalledTimes(1)
-    fireEvent.click(retry)
-    await advance()
-    expect(grpc.grpcCheckAllowSecretLocal).toHaveBeenCalledTimes(2)
-  })
+  const sendMainWindowAction = (yakitStatus: string) => {
+    const listener = vi.mocked(yakitApp.onFromMainWindow).mock.calls.at(-1)![0]
+    act(() => listener({ yakitStatus } as any))
+  }
 
-  it.each(['build_yak_error', 'port_occupied', 'timeout'])('真正启动错误 %s 可见且可重试', async (status) => {
-    vi.mocked(grpc.grpcStartLocalEngine).mockResolvedValue({ ok: false, status, message: '启动阶段真实错误' })
-    render(<StartupPage />)
-    await advance()
+  it.each(['port_occupied', 'unexpected', 'timeout', 'database_error'])(
+    '能力检查错误 %s 保持品牌启动页并保留外部重试',
+    async (status) => {
+      vi.mocked(grpc.grpcCheckAllowSecretLocal).mockResolvedValue({
+        ok: false,
+        status,
+        message: '检查阶段真实错误',
+        json: null,
+      })
+      render(<StartupPage />)
+      await advance()
+      expectBrandedSplashOnly()
+      expect(screen.queryByText('检查阶段真实错误')).not.toBeInTheDocument()
+      expect(grpc.grpcCheckAllowSecretLocal).toHaveBeenCalledTimes(1)
+      sendMainWindowAction('check_timeout')
+      await advance()
+      expect(grpc.grpcCheckAllowSecretLocal).toHaveBeenCalledTimes(2)
+    },
+  )
 
-    const retry = screen.getByRole('button', { name: '重试启动' })
-    expect(retry.closest('[aria-hidden="true"]')).toBeNull()
-    expect(screen.getByText(/启动阶段真实错误/)).toBeVisible()
-    fireEvent.click(retry)
-    await advance()
-    expect(grpc.grpcCheckAllowSecretLocal).toHaveBeenCalledTimes(2)
-    expect(yakitApp.completeEngineLink).not.toHaveBeenCalled()
-  })
+  it.each(['build_yak_error', 'port_occupied', 'timeout'])(
+    '真正启动错误 %s 不挂载恢复面板且保留端口重试入口',
+    async (status) => {
+      vi.mocked(grpc.grpcStartLocalEngine).mockResolvedValue({ ok: false, status, message: '启动阶段真实错误' })
+      render(<StartupPage />)
+      await advance()
+      expectBrandedSplashOnly()
+      expect(screen.queryByText(/启动阶段真实错误/)).not.toBeInTheDocument()
+      sendMainWindowAction('start_timeout')
+      await advance()
+      expect(grpc.grpcCheckAllowSecretLocal).toHaveBeenCalledTimes(2)
+      expect(yakitApp.completeEngineLink).not.toHaveBeenCalled()
+    },
+  )
 
-  it('引擎缺失时显示操作面板，远程切换显示可操作的设置', async () => {
+  it('引擎缺失时也不显示安装操作面板', async () => {
     vi.mocked(grpc.grpcFetchYakInstallResult).mockResolvedValue(false)
     vi.mocked(grpc.grpcFetchBuildInYakVersion).mockResolvedValue('')
     render(<StartupPage />)
     await advance()
-    expect(screen.getByRole('button', { name: '安装引擎' })).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: '选择远程引擎' }))
-    await advance()
-    expect(screen.getByText('远程引擎设置')).toBeVisible()
-    expect(screen.getByText('远程引擎设置').closest('[aria-hidden="true"]')).toBeNull()
+    expectBrandedSplashOnly()
   })
 
-  it('远程连接失败后重试保持远程端口，不启动本地引擎', async () => {
-    vi.mocked(grpc.grpcFetchYakInstallResult).mockResolvedValue(false)
-    vi.mocked(grpc.grpcFetchBuildInYakVersion).mockResolvedValue('')
+  it('远程连接仍在后台运行，外部重试保持原端口', async () => {
+    vi.mocked(getLocalValue).mockImplementation((key) =>
+      Promise.resolve(key === LocalGVS.YaklangEngineMode ? 'remote' : undefined),
+    )
     render(<StartupPage />)
     await advance()
-    fireEvent.click(screen.getByRole('button', { name: '选择远程引擎' }))
+    const props = vi.mocked(RemoteEngine).mock.calls.at(-1)![0]
+    expect(props.headless).toBe(true)
+    expect(props.autoConnect).toBe(true)
+    await act(async () => props.onSubmit({ host: '127.0.0.1', port: '18080', password: 'remote-secret' } as any))
     await advance()
-    fireEvent.click(screen.getByRole('button', { name: '连接远程测试引擎' }))
-    await advance()
-    fireEvent.click(screen.getByRole('button', { name: '重试启动' }))
+    expectBrandedSplashOnly()
+    sendMainWindowAction('check_timeout')
     await advance()
     expect(yakitEngine.connectYaklangEngine).toHaveBeenCalledTimes(2)
     expect(yakitEngine.connectYaklangEngine).toHaveBeenLastCalledWith(

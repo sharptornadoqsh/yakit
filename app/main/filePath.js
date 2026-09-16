@@ -80,17 +80,13 @@ const setConfig = (key, value) => {
 // --- 核心路径 getter ---
 
 /**
- * 解析 YAKIT_HOME: 支持绝对路径和相对目录名
- * 优先级: config.json > 环境变量 YAKIT_HOME > 默认值
+ * Only this product's explicit configuration may override its data directory.
+ * Child engines still receive YAKIT_HOME, but another product's global value is ignored.
  */
 const getYakitHome = () => {
   try {
     const config = getConfig()
-    let homePath = config.YAKIT_HOME
-
-    if (!homePath && process.env.YAKIT_HOME) {
-      homePath = process.env.YAKIT_HOME
-    }
+    const homePath = config.YAKIT_HOME
 
     if (!homePath) {
       return _resolveDefaultProjectPath()

@@ -314,8 +314,66 @@ const getActiveLocalEngineProcesses = () => {
   }
 }
 
-const assertNoActiveLocalEngines = () => {
-  const processes = getActiveLocalEngineProcesses()
+const getLocalEngineIdentity = (pid) => {
+  try {
+    if (process.platform === 'win32') {
+      const script = `$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); Get-CimInstance Win32_Process -Filter 'ProcessId = ${Number(pid)}' | Select-Object ExecutablePath,CommandLine | ConvertTo-Json -Compress`
+      const stdout = childProcess.execFileSync(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command', script],
+        {
+          encoding: 'utf8',
+          timeout: PROCESS_LIST_TIMEOUT_MS,
+          windowsHide: true,
+        },
+      )
+      const identity = JSON.parse(stdout)
+      return { executable: identity.ExecutablePath, commandLine: identity.CommandLine || '' }
+    }
+    if (process.platform === 'linux') {
+      const environment = fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0')
+      return {
+        executable: fs.readlinkSync(`/proc/${pid}/exe`),
+        commandLine: fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' '),
+        home: environment.find((item) => item.startsWith('YAKIT_HOME='))?.slice('YAKIT_HOME='.length),
+      }
+    }
+    const options = { encoding: 'utf8', timeout: PROCESS_LIST_TIMEOUT_MS }
+    return {
+      executable: childProcess.execFileSync('ps', ['-p', String(pid), '-o', 'comm='], options).trim(),
+      commandLine: childProcess.execFileSync('ps', ['-p', String(pid), '-o', 'command='], options).trim(),
+    }
+  } catch {
+    return null
+  }
+}
+
+const normalizeEnginePath = (value) => {
+  let normalized = path.resolve(value)
+  try {
+    normalized = fs.realpathSync(normalized)
+  } catch {}
+  normalized = normalized.replace(/\\/g, '/').replace(/\/$/, '')
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+}
+
+const engineMayUseDirectory = (engine, directory) => {
+  const identity = getLocalEngineIdentity(engine.pid)
+  if (!identity?.executable || !path.isAbsolute(identity.executable)) return true
+  const target = normalizeEnginePath(directory)
+  const command = identity.commandLine.replace(/\\/g, '/')
+  const normalizedCommand = process.platform === 'win32' ? command.toLowerCase() : command
+  if (normalizedCommand.includes(target)) return true
+  if (/(?:^|\s)--(?:project-db|profile-db)(?:[=\s]|$)/.test(command)) return true
+  if (identity.home) return normalizeEnginePath(identity.home) === target
+  const engineDirectory = path.dirname(identity.executable)
+  // Standard desktop clients keep their engine inside the selected data root.
+  if (path.basename(engineDirectory).toLowerCase() !== 'yak-engine') return true
+  return normalizeEnginePath(path.dirname(engineDirectory)) === target
+}
+
+const assertNoActiveLocalEngines = (directory) => {
+  const processes = getActiveLocalEngineProcesses().filter((engine) => engineMayUseDirectory(engine, directory))
   if (processes.length === 0) return
   const error = new Error(`检测到活动的本地引擎：${processes.map(({ pid }) => pid).join('、')}`)
   error.code = 'DATABASE_MIGRATION_ACTIVE_ENGINE'
@@ -341,7 +399,7 @@ const captureDatabaseActivity = (filePaths) =>
   new Map(filePaths.map((filePath) => [filePath, getFileSignature(filePath)]))
 
 const confirmDatabaseIdle = ({ directory, databaseNames }) => {
-  assertNoActiveLocalEngines()
+  assertNoActiveLocalEngines(directory)
   const filePaths = getDatabaseActivityPaths(directory, databaseNames)
   const rollbackJournal = filePaths.find((filePath) => filePath.endsWith('-journal') && fs.existsSync(filePath))
   if (rollbackJournal) {
@@ -353,7 +411,7 @@ const confirmDatabaseIdle = ({ directory, databaseNames }) => {
   const before = captureDatabaseActivity(filePaths)
   Atomics.wait(DATABASE_IDLE_WAIT_ARRAY, 0, 0, DATABASE_IDLE_SAMPLE_MS)
   const after = captureDatabaseActivity(filePaths)
-  assertNoActiveLocalEngines()
+  assertNoActiveLocalEngines(directory)
 
   const changedPath = filePaths.find((filePath) => before.get(filePath) !== after.get(filePath))
   if (!changedPath) return true

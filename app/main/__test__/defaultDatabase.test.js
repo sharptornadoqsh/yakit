@@ -42,6 +42,24 @@ const getActiveEngineProcessList = () => {
   return '4242 yak\n'
 }
 
+const mockEngineIdentity = (executablePath, commandLine = '') => {
+  childProcess.execFileSync.mockImplementation((command, args) => {
+    if (String(command).includes('fastlist') || args?.includes('-A')) return getActiveEngineProcessList()
+    if (String(command).includes('powershell'))
+      return JSON.stringify({ ExecutablePath: executablePath, CommandLine: commandLine })
+    return args?.includes('comm=') ? executablePath : commandLine
+  })
+  if (process.platform === 'linux') {
+    vi.spyOn(fs, 'readlinkSync').mockReturnValue(executablePath)
+    const read = fs.readFileSync.bind(fs)
+    vi.spyOn(fs, 'readFileSync').mockImplementation((file, ...args) => {
+      if (file === '/proc/4242/cmdline') return commandLine
+      if (file === '/proc/4242/environ') return ''
+      return read(file, ...args)
+    })
+  }
+}
+
 const runConcurrentMigrationWorker = (directory, controlBuffer) =>
   new Worker(
     `
@@ -455,6 +473,55 @@ describe('睿眼默认数据库', () => {
     expect(() => migrateLegacyDefaultDatabases(directory)).toThrow('检测到活动的本地引擎')
     expectDatabaseFamily(directory, sourceName, 'legacy')
     expect(fs.existsSync(path.join(directory, 'default-RuiYan.db'))).toBe(false)
+  })
+
+  it('另一个产品独立数据目录的引擎不拦截本目录迁移', () => {
+    const directory = createTemporaryDirectory()
+    const other = createTemporaryDirectory()
+    writeDatabaseFamily(directory, 'default-yakit.db', 'ruiyan')
+    writeDatabaseFamily(other, 'default-yakit.db', 'yakit')
+    mockEngineIdentity(path.join(other, 'yak-engine', process.platform === 'win32' ? 'yak.exe' : 'yak'))
+    expect(migrateLegacyDefaultDatabases(directory)).toEqual([{ from: 'default-yakit.db', to: 'default-RuiYan.db' }])
+    expectDatabaseFamily(directory, 'default-RuiYan.db', 'ruiyan')
+    expectDatabaseFamily(other, 'default-yakit.db', 'yakit')
+  })
+
+  it('当前产品数据目录的活动引擎仍然拦截迁移', () => {
+    const directory = createTemporaryDirectory()
+    writeDatabaseFamily(directory, 'default-yakit.db', 'original')
+    mockEngineIdentity(path.join(directory, 'yak-engine', process.platform === 'win32' ? 'yak.exe' : 'yak'))
+    expect(() => migrateLegacyDefaultDatabases(directory)).toThrow('检测到活动的本地引擎')
+    expectDatabaseFamily(directory, 'default-yakit.db', 'original')
+  })
+
+  it('其他目录的引擎显式使用当前数据库时仍然拦截', () => {
+    const directory = createTemporaryDirectory()
+    const other = createTemporaryDirectory()
+    writeDatabaseFamily(directory, 'default-yakit.db', 'original')
+    mockEngineIdentity(
+      path.join(other, 'yak-engine', 'yak.exe'),
+      `yak grpc --project-db "${path.join(directory, 'default-yakit.db')}"`,
+    )
+    expect(() => migrateLegacyDefaultDatabases(directory)).toThrow('检测到活动的本地引擎')
+    expectDatabaseFamily(directory, 'default-yakit.db', 'original')
+  })
+
+  it('非标准引擎位置或不可识别身份保持保守检查', () => {
+    const directory = createTemporaryDirectory()
+    const other = createTemporaryDirectory()
+    writeDatabaseFamily(directory, 'default-yakit.db', 'original')
+    mockEngineIdentity(path.join(other, 'custom-engine', 'yak.exe'))
+    expect(() => migrateLegacyDefaultDatabases(directory)).toThrow('检测到活动的本地引擎')
+    expectDatabaseFamily(directory, 'default-yakit.db', 'original')
+  })
+
+  it('其他目录的引擎带有相对数据库参数时保持保守检查', () => {
+    const directory = createTemporaryDirectory()
+    const other = createTemporaryDirectory()
+    writeDatabaseFamily(directory, 'default-yakit.db', 'original')
+    mockEngineIdentity(path.join(other, 'yak-engine', 'yak.exe'), 'yak grpc --project-db ./default-yakit.db')
+    expect(() => migrateLegacyDefaultDatabases(directory)).toThrow('检测到活动的本地引擎')
+    expectDatabaseFamily(directory, 'default-yakit.db', 'original')
   })
 
   it('无法确认引擎状态时拒绝移动数据库文件', () => {
