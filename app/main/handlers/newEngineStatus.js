@@ -1,7 +1,9 @@
 const { ipcMain } = require('electron')
 const childProcess = require('child_process')
 const { GLOBAL_YAK_SETTING } = require('../state')
-const { getLocalYaklangEngine, getYakitHome } = require('../filePath')
+const { getLocalYaklangEngine, getYakitHome, loadExtraFilePath } = require('../filePath')
+const { prepareOfflinePluginsForConnection } = require('../offlinePlugins')
+const { runSpecialDetectionActivation } = require('../specialDetectionActivation')
 const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
 const { getDefaultDatabaseEnvironment } = require('../defaultDatabase')
 const { isLocalPortConflict, assertLocalPortAvailable, runWithLocalPortRetry } = require('../localEnginePort')
@@ -15,6 +17,7 @@ const LOCAL_ENGINE_START_TIMEOUT_MS = 180_000
 
 module.exports = {
   registerNewIPC: (win, callback, getClient, newClient, ipcEventPre) => {
+    let localEngineEnvironment
     let currentCheckRequestId = 0
     let currentStartRequestId = 0
     const cancelTasks = (prefix) => {
@@ -47,10 +50,11 @@ module.exports = {
           engineLogOutputFileAndUI(win, `执行命令: ${command} ${args.join(' ')}`)
 
           const defaltEnv = { ...process.env, YAKIT_HOME: getYakitHome() }
+          localEngineEnvironment = { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) }
           const subprocess = childProcess.spawn(command, args, {
             windowsHide: true,
             stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) },
+            env: localEngineEnvironment,
           })
 
           let stdout = ''
@@ -590,6 +594,28 @@ module.exports = {
             reject(`ECHO ${ECHO_TEST_MSG} ERROR`)
           }
         })
+      }).then(async (data) => {
+        if (params.Mode === 'local') {
+          const client = newClient()
+          try {
+            const result = await prepareOfflinePluginsForConnection({
+              client,
+              mode: 'local',
+              host: hostFormatted,
+              key: addr,
+              directory: loadExtraFilePath('bins/database'),
+              activate: () =>
+                runSpecialDetectionActivation({
+                  command: getLocalYaklangEngine(),
+                  env: localEngineEnvironment || { ...process.env, YAKIT_HOME: getYakitHome() },
+                }),
+            })
+            engineLogOutputFileAndUI(win, `Offline plugins ready: imported=${result.imported}`)
+          } finally {
+            client.close?.()
+          }
+        }
+        return data
       })
     })
 
@@ -618,11 +644,12 @@ module.exports = {
           engineLogOutputFileAndUI(win, `启动命令: ${command} ${resultParams.join(' ')}`)
 
           const defaltEnv = { ...process.env, YAKIT_HOME: getYakitHome() }
+          localEngineEnvironment = { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) }
           const subprocess = childProcess.spawn(command, resultParams, {
             detached: false,
             windowsHide: true,
             stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) },
+            env: localEngineEnvironment,
           })
 
           subprocess.unref()

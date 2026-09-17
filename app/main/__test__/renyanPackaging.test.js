@@ -536,6 +536,7 @@ describe('Cross-platform package regression', () => {
         const resources = path.join(contents, platform === 'darwin' ? 'Resources' : 'resources')
         fs.mkdirSync(resources, { recursive: true })
         fs.mkdirSync(path.join(contents, 'bins'), { recursive: true })
+        fs.cpSync(path.resolve('bins/database'), path.join(contents, 'bins/database'), { recursive: true })
         const executable =
           platform === 'darwin'
             ? path.join(contents, 'MacOS', product.executableName)
@@ -556,6 +557,14 @@ describe('Cross-platform package regression', () => {
           target,
           native: false,
         })
+
+        const pluginArchive = path.join(contents, 'bins/database/official-plugins.zip')
+        const pluginBytes = fs.readFileSync(pluginArchive)
+        fs.unlinkSync(pluginArchive)
+        await expect(verifyPackage({ root, target, includeEngine: true, native: false })).rejects.toThrow(/ENOENT/)
+        fs.writeFileSync(pluginArchive, Buffer.concat([pluginBytes, Buffer.from('corrupted')]))
+        await expect(verifyPackage({ root, target, includeEngine: true, native: false })).rejects.toThrow(/checksum/)
+        fs.writeFileSync(pluginArchive, pluginBytes)
 
         fs.appendFileSync(path.join(contents, 'bins/yak.zip'), 'corrupted-container')
         await expect(verifyPackage({ root, target, includeEngine: true, native: false })).rejects.toThrow(/checksum/)

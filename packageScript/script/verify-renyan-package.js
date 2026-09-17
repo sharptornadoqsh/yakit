@@ -8,6 +8,7 @@ const product = require('../../product/renyan.json')
 const packageJson = require('../../package.json')
 const { extractAndVerifyEngineArchive } = require('../../app/main/engineLifecycle')
 const { supportedAssets, verifyEngineBinary, parseBoolean } = require('./prepare-renyan-engine')
+const { readOfflinePluginBundle } = require('../../app/main/offlinePlugins')
 
 const targets = {
   'macos-x64': ['darwin', 'x64', 'mac'],
@@ -122,6 +123,7 @@ const verifyPackage = async ({
     return mapping.platform === info.platform && mapping.architecture === info.architecture
   })
   verifyEngineBinary(info.executable, asset)
+  readOfflinePluginBundle(path.join(info.contents, 'bins/database'))
   const archivePath = path.join(info.resources, 'app.asar')
   const readJson = (entry) => JSON.parse(asar.extractFile(archivePath, entry).toString('utf8'))
   const bundledProduct = readJson('product/renyan.json')

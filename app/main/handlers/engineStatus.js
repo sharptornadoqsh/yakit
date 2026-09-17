@@ -5,7 +5,8 @@ const path = require('path')
 const _sudoPrompt = require('sudo-prompt')
 const { GLOBAL_YAK_SETTING } = require('../state')
 const { testRemoteClient } = require('../ipc')
-const { getLocalYaklangEngine, getYakitHome } = require('../filePath')
+const { getLocalYaklangEngine, getYakitHome, loadExtraFilePath } = require('../filePath')
+const { prepareOfflinePluginsForConnection } = require('../offlinePlugins')
 const net = require('net')
 const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
 const { assertTrustedAppSender, normalizePid } = require('../security')
@@ -370,6 +371,7 @@ module.exports = (win, callback, getClient, newClient) => {
     engineLogOutputFileAndUI(win, `开始连接引擎地址为：${addr} Host: ${hostRaw} Port: ${portFromRaw}`)
     GLOBAL_YAK_SETTING.defaultYakGRPCAddr = addr
     currentEngineMode = params.Mode || (LOCAL_ENGINE_HOSTS.has(hostFormatted.toLowerCase()) ? 'local' : 'remote')
+    const connectionMode = currentEngineMode
 
     callback(
       GLOBAL_YAK_SETTING.defaultYakGRPCAddr,
@@ -391,6 +393,28 @@ module.exports = (win, callback, getClient, newClient) => {
           reject(`ECHO ${ECHO_TEST_MSG} ERROR`)
         }
       })
+    }).then(async (data) => {
+      if (connectionMode === 'local') {
+        const client = newClient()
+        try {
+          const result = await prepareOfflinePluginsForConnection({
+            client,
+            mode: 'local',
+            host: hostFormatted,
+            key: addr,
+            directory: loadExtraFilePath('bins/database'),
+            activate: () =>
+              runSpecialDetectionActivation({
+                command: getLocalYaklangEngine(),
+                env: (lastLocalEngineRuntime || createFallbackLocalEngineRuntime()).environment,
+              }),
+          })
+          engineLogOutputFileAndUI(win, `Offline plugins ready: imported=${result.imported}`)
+        } finally {
+          client.close?.()
+        }
+      }
+      return data
     })
   })
 

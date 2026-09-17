@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "source": "https://www.yaklang.com/api/plugins/download",
+  "capturedAt": "2026-09-17T07:56:45.105Z",
+  "pluginCount": 497,
+  "types": {
+    "port-scan": 373,
+    "mitm": 34,
+    "yak": 57,
+    "codec": 33
+  },
+  "sha256": "a3db025d61813ffdcb5f29ed12b3caa04e06d89c12ee33d44c4b110ccc9658b6"
+}

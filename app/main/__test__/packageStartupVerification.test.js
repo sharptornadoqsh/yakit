@@ -116,6 +116,7 @@ const createHarness = (platform = 'win32', architecture = 'x64', behavior = 'rea
           Buffer.from(JSON.stringify(entry === 'package.json' ? packageJson : productConfig)),
       },
       '../../app/main/engineLifecycle': { extractAndVerifyEngineArchive: vi.fn() },
+      '../../app/main/offlinePlugins': { readOfflinePluginBundle: vi.fn() },
       './prepare-renyan-engine': { supportedAssets, verifyEngineBinary: vi.fn(), parseBoolean: vi.fn() },
     },
     { platform, arch: architecture, env: environment },

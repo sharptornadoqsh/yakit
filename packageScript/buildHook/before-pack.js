@@ -1,4 +1,6 @@
 const fs = require('fs')
+const path = require('path')
+const { readOfflinePluginBundle } = require('../../app/main/offlinePlugins')
 const packageJson = require('../../package.json')
 const productConfig = require('../../product/renyan.json')
 const { calculateFileSha256, getCompatibilityEntry, normalizeSha256 } = require('../../app/main/engineLifecycle')
@@ -110,6 +112,7 @@ const resolveLegacyArtifactName = ({ platform, architecture, productVersion, isL
 }
 
 const beforePack = async (context) => {
+  readOfflinePluginBundle(path.resolve('bins/database'))
   require('../../scripts/build-report-assets').validateReportAssets()
   const isLegacy = process.env.THE_LEGACY == 'true'
   const includeEngine = process.env.INCLUDE_ENGINE !== 'false'
