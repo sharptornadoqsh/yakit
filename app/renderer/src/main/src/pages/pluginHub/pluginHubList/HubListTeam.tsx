@@ -7,6 +7,11 @@ import { YakitModal } from '@/components/yakitUI/YakitModal/YakitModal'
 import { useStore } from '@/store'
 import { success, yakitFailed } from '@/utils/notification'
 import * as teamCollaboration from '@/services/teamCollaboration'
+import {
+  normalizePluginDistributionFields,
+  validateTeamPluginVersion,
+  requirePluginVersion,
+} from '@/services/teamPluginMetadata'
 import { apiFetchSaveYakScriptGroupLocal, apiQueryYakScriptBase } from '@/pages/plugins/utils'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { getRemoteHttpSettingGV } from '@/utils/envfile'
@@ -112,7 +117,6 @@ interface PluginVersionPicker {
 }
 
 const service = teamCollaboration
-const sha256Pattern = /^[0-9a-f]{64}$/
 const buildVersionDownloadURL = (teamId: number, pluginId: number, version: number) =>
   `/api/v2/teams/${teamId}/plugins/${pluginId}/versions/${version}/download`
 
@@ -690,16 +694,18 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
       }
       const versions = unwrapItems<teamCollaboration.TeamPluginVersion>(response, ['versions'])
       if (!versions.length) throw new Error('插件没有可下载的历史版本')
-      const valid = versions.every(
-        (item) =>
-          Number(item.team_id) === operationTeamId &&
-          Number(item.plugin_id) === plugin.id &&
-          Number.isSafeInteger(Number(item.version)) &&
-          Number(item.version) > 0 &&
-          sha256Pattern.test(String(item.file_hash)),
-      )
-      if (!valid) throw new Error('插件版本元数据无效')
-      return [...versions].sort((left, right) => right.version - left.version)
+      const available: teamCollaboration.TeamPluginVersion[] = []
+      const issues: string[] = []
+      versions.forEach((item) => {
+        try {
+          available.push(validateTeamPluginVersion(item, operationTeamId, plugin.id))
+        } catch (error) {
+          issues.push(`版本 ${String(item.version)}：${readError(error).message}`)
+        }
+      })
+      if (!available.length) throw new Error(issues.join('；'))
+      if (issues.length) setOperationMessage(`以下历史记录不可下载：${issues.join('；')}`)
+      return available.sort((left, right) => right.version - left.version)
     },
   )
 
@@ -760,15 +766,7 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
   const installPlugin = useMemoizedFn(
     async (plugin: TeamPluginRecord, selectedVersion: teamCollaboration.TeamPluginVersion, operationTeamId: number) => {
       assertOperationPermission(operationTeamId, 'plugin.read')
-      if (
-        selectedVersion.team_id !== operationTeamId ||
-        selectedVersion.plugin_id !== plugin.id ||
-        !Number.isSafeInteger(selectedVersion.version) ||
-        selectedVersion.version <= 0 ||
-        !sha256Pattern.test(selectedVersion.file_hash)
-      ) {
-        throw new Error('插件版本元数据无效')
-      }
+      selectedVersion = validateTeamPluginVersion(selectedVersion, operationTeamId, plugin.id)
       let expectedFileHash = selectedVersion.file_hash
       if (selectedVersion.version === plugin.version) {
         const manifestResponse = await service.listOfflinePluginManifest(operationTeamId, {
@@ -777,9 +775,9 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
           keyword: plugin.script_name,
         })
         assertOperationPermission(operationTeamId, 'plugin.read')
-        const manifest = unwrapItems<teamCollaboration.OfflinePluginManifestItem>(manifestResponse).find(
-          (item) => item.id === plugin.id && item.version === selectedVersion.version,
-        )
+        const manifest = unwrapItems<teamCollaboration.OfflinePluginManifestItem>(manifestResponse)
+          .map(normalizePluginDistributionFields)
+          .find((item) => item.id === plugin.id && item.version === selectedVersion.version)
         if (
           !manifest ||
           manifest.team_id !== operationTeamId ||
@@ -919,7 +917,9 @@ export const HubListTeam: React.FC<HubListTeamProps> = memo(({ onInstall }) => {
         assertOperationPermission(operationTeamId, 'plugin.read')
         const versions = await loadPluginVersions(plugin)
         if (!versions) throw new Error('插件版本请求已失效')
-        const selectedVersion = versions.find((item) => item.version === plugin.version) || versions[0]
+        const currentVersion = requirePluginVersion(plugin.version)
+        const selectedVersion = versions.find((item) => item.version === currentVersion)
+        if (!selectedVersion) throw new Error(`version=${currentVersion} 缺少可下载记录，请刷新版本列表`)
         const result = await installPlugin(plugin, selectedVersion, operationTeamId)
         if ('skipped' in result) skipped += 1
         else {

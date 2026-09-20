@@ -50,6 +50,7 @@ import {
   unbindPluginGroup,
 } from '../teamCollaboration'
 import { createHash } from 'crypto'
+import { Buffer } from 'buffer'
 import {
   subscribeTeamAuthenticationInvalidation,
   subscribeTeamPermissionInvalidation,
@@ -65,7 +66,29 @@ vi.mock('../fetch', () => ({
   NetWorkApi: mocks.NetWorkApi,
 }))
 
+const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto')
 describe('team collaboration service', () => {
+  beforeAll(() => {
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: {
+        subtle: {
+          digest: async (algorithm: string, content: ArrayBuffer) => {
+            if (algorithm !== 'SHA-256') throw new Error('测试仅接受 SHA-256')
+            return Uint8Array.from(
+              createHash('sha256')
+                .update(Buffer.from(new Uint8Array(content)))
+                .digest(),
+            ).buffer
+          },
+        },
+      },
+    })
+  })
+  afterAll(() => {
+    if (originalCrypto) Object.defineProperty(globalThis, 'crypto', originalCrypto)
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.NetWorkApi.mockResolvedValue({ ok: true, data: [] })
@@ -676,6 +699,19 @@ describe('team collaboration service', () => {
       expect(listener).not.toHaveBeenCalled()
     } finally {
       unsubscribe()
+    }
+  })
+  it('版本列表和离线清单在接口边界统一数字字符串并保留分页', async () => {
+    const { listTeamPluginVersions, listOfflinePluginManifest } = await import('../teamCollaboration')
+    const paging = { page: 1, limit: 200, total: 1, total_pages: 1 }
+    mocks.NetWorkApi.mockResolvedValue({
+      ok: true,
+      paging,
+      data: [{ id: '9', plugin_id: '5', team_id: '3', version: '2', file_hash: 'a'.repeat(64) }],
+    })
+    for (const result of [await listTeamPluginVersions(3, 5), await listOfflinePluginManifest(3)]) {
+      expect(result.data[0]).toMatchObject({ id: 9, plugin_id: 5, team_id: 3, version: 2, file_hash: 'a'.repeat(64) })
+      expect(result.paging).toBe(paging)
     }
   })
 })

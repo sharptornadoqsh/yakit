@@ -76,7 +76,7 @@ describe('团队插件本地安装', () => {
           saveMapping,
         },
       ),
-    ).rejects.toThrow('插件版本缺少有效正文摘要')
+    ).rejects.toThrow('file_hash 必须是 64 位小写 SHA-256 正文摘要，收到 ')
     expect(savePlugin).not.toHaveBeenCalled()
     expect(saveGroups).not.toHaveBeenCalled()
     expect(saveMapping).not.toHaveBeenCalled()

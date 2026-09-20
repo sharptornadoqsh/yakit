@@ -1,4 +1,5 @@
 import { NetWorkApi } from './fetch'
+import { normalizePluginDistributionFields, requirePluginHash, requirePluginVersion } from './teamPluginMetadata'
 import {
   publishTeamAuthenticationInvalidation,
   publishTeamPermissionInvalidation,
@@ -805,17 +806,27 @@ export const deleteTestResult = (teamId: V2Identifier, projectId: V2Identifier, 
 export const listAuditLogs = (teamId: V2Identifier, params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<AuditLog[]>>(`v2/teams/${teamId}/audit-logs`, params)
 
+const normalizePluginList = <T extends object>(response: V2Response<T[]>): V2Response<T[]> => {
+  const data = response.data.map(normalizePluginDistributionFields)
+  return data.every((item, index) => item === response.data[index]) ? response : { ...response, data }
+}
+
 export const listTeamPlugins = (teamId: V2Identifier, params: V2ListQuery = {}) =>
-  getV2<V2ListQuery, V2Response<TeamPlugin[]>>(`v2/teams/${teamId}/plugins`, params)
+  getV2<V2ListQuery, V2Response<TeamPlugin[]>>(`v2/teams/${teamId}/plugins`, params).then(normalizePluginList)
 
 export const listOfflinePluginManifest = (teamId: V2Identifier, params: V2ListQuery = {}) =>
-  getV2<V2ListQuery, V2Response<OfflinePluginManifestItem[]>>(`v2/teams/${teamId}/plugins/offline-manifest`, params)
+  getV2<V2ListQuery, V2Response<OfflinePluginManifestItem[]>>(
+    `v2/teams/${teamId}/plugins/offline-manifest`,
+    params,
+  ).then(normalizePluginList)
 
 export const getTeamPlugin = (teamId: V2Identifier, pluginId: V2Identifier) =>
   getV2<Record<string, never>, V2Response<TeamPlugin>>(`v2/teams/${teamId}/plugins/${pluginId}`, {})
 
 export const listTeamPluginVersions = (teamId: V2Identifier, pluginId: V2Identifier, params: V2ListQuery = {}) =>
-  getV2<V2ListQuery, V2Response<TeamPluginVersion[]>>(`v2/teams/${teamId}/plugins/${pluginId}/versions`, params)
+  getV2<V2ListQuery, V2Response<TeamPluginVersion[]>>(`v2/teams/${teamId}/plugins/${pluginId}/versions`, params).then(
+    normalizePluginList,
+  )
 
 export const createTeamPlugin = (teamId: V2Identifier, data: CreateTeamPluginInput) =>
   writeV2<CreateTeamPluginInput, V2Response<TeamPlugin>>('post', `v2/teams/${teamId}/plugins`, data)
@@ -911,6 +922,7 @@ export const downloadTeamPluginVersionWithSummary = async (
   pluginId: V2Identifier,
   version: number,
 ): Promise<TeamPluginDownloadSummary> => {
+  version = requirePluginVersion(version)
   const url = `v2/teams/${teamId}/plugins/${pluginId}/versions/${version}/download`
   const response = await NetWorkApi<Record<string, never>, { body: ArrayBuffer; headers?: Record<string, string> }>({
     method: 'get',
@@ -919,16 +931,10 @@ export const downloadTeamPluginVersionWithSummary = async (
     responseType: 'arraybuffer',
     includeResponseHeaders: true,
   }).catch((error) => rethrowV2Error(url, error))
-  const sha256 = `${response.headers?.['x-content-sha256'] || ''}`.trim().toLowerCase()
-  const responseVersion = Number(response.headers?.['x-plugin-version'])
-  if (
-    !(response.body instanceof ArrayBuffer) ||
-    !/^[a-f0-9]{64}$/.test(sha256) ||
-    !Number.isSafeInteger(responseVersion) ||
-    responseVersion !== version
-  ) {
-    throw new Error('团队插件下载摘要或版本无效')
-  }
+  if (!(response.body instanceof ArrayBuffer)) throw new Error('下载正文 body 必须是二进制 ArrayBuffer')
+  const sha256 = requirePluginHash(response.headers?.['x-content-sha256']?.trim().toLowerCase(), 'x-content-sha256')
+  const responseVersion = requirePluginVersion(response.headers?.['x-plugin-version'], 'x-plugin-version')
+  if (responseVersion !== version) throw new Error(`x-plugin-version 不匹配：期望 ${version}，收到 ${responseVersion}`)
   if ((await sha256ArrayBuffer(response.body)) !== sha256) throw new Error('插件正文摘要校验失败')
   return { body: response.body, sha256, version: responseVersion }
 }

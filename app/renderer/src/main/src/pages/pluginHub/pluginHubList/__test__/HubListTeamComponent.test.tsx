@@ -1,45 +1,54 @@
 /// <reference types="vitest/globals" />
 
 import React from 'react'
+import { HubListTeam } from '../HubListTeam'
 import { readFileSync } from 'fs'
 import { createHash } from 'crypto'
+import { Buffer } from 'buffer'
 import { resolve } from 'path'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useStore } from '@/store'
 import {
   publishTeamAuthenticationInvalidation,
   publishTeamPermissionInvalidation,
 } from '@/pages/teamCollaboration/teamPermissionContext'
 
-const mocks = vi.hoisted(() => ({
-  apiQueryYakScriptBase: vi.fn(),
-  createPluginCategory: vi.fn(),
-  createPluginGroup: vi.fn(),
-  createTeamPlugin: vi.fn(),
-  deletePluginCategory: vi.fn(),
-  deletePluginGroup: vi.fn(),
-  deleteTeamPlugin: vi.fn(),
-  downloadTeamPlugin: vi.fn(),
-  downloadTeamPluginVersion: vi.fn(),
-  getCurrentYak: vi.fn(),
-  getMe: vi.fn(),
-  getTeamPlugin: vi.fn(),
-  importTeamPlugins: vi.fn(),
-  ipcInvoke: vi.fn(),
-  listOfflinePluginManifest: vi.fn(),
-  listPluginCategories: vi.fn(),
-  listPluginGroups: vi.fn(),
-  listTeamPluginVersions: vi.fn(),
-  listTeamPlugins: vi.fn(),
-  listTeams: vi.fn(),
-  setPluginVisibility: vi.fn(),
-  success: vi.fn(),
-  updatePluginCategory: vi.fn(),
-  updatePluginGroup: vi.fn(),
-  updateTeamPlugin: vi.fn(),
-  unbindPluginGroup: vi.fn(),
-  yakitFailed: vi.fn(),
-}))
+const mocks = vi.hoisted(() => {
+  const mocks = {
+    apiQueryYakScriptBase: vi.fn(),
+    createPluginCategory: vi.fn(),
+    createPluginGroup: vi.fn(),
+    createTeamPlugin: vi.fn(),
+    deletePluginCategory: vi.fn(),
+    deletePluginGroup: vi.fn(),
+    deleteTeamPlugin: vi.fn(),
+    downloadTeamPlugin: vi.fn(),
+    downloadTeamPluginVersion: vi.fn(),
+    getCurrentYak: vi.fn(),
+    getMe: vi.fn(),
+    getTeamPlugin: vi.fn(),
+    importTeamPlugins: vi.fn(),
+    ipcInvoke: vi.fn(),
+    listOfflinePluginManifest: vi.fn(),
+    listPluginCategories: vi.fn(),
+    listPluginGroups: vi.fn(),
+    listTeamPluginVersions: vi.fn(),
+    listTeamPlugins: vi.fn(),
+    listTeams: vi.fn(),
+    setPluginVisibility: vi.fn(),
+    success: vi.fn(),
+    updatePluginCategory: vi.fn(),
+    updatePluginGroup: vi.fn(),
+    updateTeamPlugin: vi.fn(),
+    unbindPluginGroup: vi.fn(),
+    yakitFailed: vi.fn(),
+  }
+  Object.defineProperty(window, 'require', {
+    configurable: true,
+    value: () => ({ ipcRenderer: { invoke: mocks.ipcInvoke } }),
+  })
+  return mocks
+})
 
 const createPluginRecord = (overrides: Record<string, unknown> = {}) => ({
   id: 5,
@@ -291,23 +300,32 @@ vi.mock('@/utils/envfile', () => ({
   getRemoteHttpSettingGV: vi.fn().mockReturnValue('remote-http-setting'),
 }))
 
+const originalCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto')
+
 describe('团队插件仓库管理', () => {
+  afterAll(() => {
+    if (originalCrypto) Object.defineProperty(globalThis, 'crypto', originalCrypto)
+  })
+  afterEach(cleanup)
+
   beforeEach(() => {
     publishTeamAuthenticationInvalidation()
     vi.clearAllMocks()
-    if (!globalThis.crypto?.subtle) {
-      Object.defineProperty(globalThis, 'crypto', {
-        configurable: true,
-        value: {
-          subtle: {
-            digest: async (_algorithm: string, content: ArrayBuffer) => {
-              const digest = createHash('sha256').update(new Uint8Array(content)).digest()
-              return Uint8Array.from(digest).buffer
-            },
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: {
+        subtle: {
+          digest: async (algorithm: string, content: ArrayBuffer) => {
+            if (algorithm !== 'SHA-256') throw new Error('测试仅接受 SHA-256')
+            return Uint8Array.from(
+              createHash('sha256')
+                .update(Buffer.from(new Uint8Array(content)))
+                .digest(),
+            ).buffer
           },
         },
-      })
-    }
+      },
+    })
     useStore.setState({
       userInfo: {
         isLogin: true,
@@ -422,13 +440,11 @@ describe('团队插件仓库管理', () => {
   })
 
   const renderPage = async () => {
-    const { HubListTeam } = await import('../HubListTeam')
     render(<HubListTeam />)
     expect(await screen.findByText('Plugin A')).toBeInTheDocument()
   }
 
   const renderShell = async () => {
-    const { HubListTeam } = await import('../HubListTeam')
     render(<HubListTeam />)
     await waitFor(() => expect(mocks.getMe).toHaveBeenCalled())
   }
@@ -1036,8 +1052,10 @@ describe('团队插件仓库管理', () => {
     expect(screen.getByRole('button', { name: '批量安装' })).toBeDisabled()
     expect(screen.queryByText('Plugin A')).not.toBeInTheDocument()
     expect(mocks.success).not.toHaveBeenCalledWith('删除远端插件成功')
-    expect(screen.getByRole('status')).toHaveTextContent(
-      '删除远端插件已提交，但插件列表刷新失败，请使用刷新按钮读取最新状态',
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '删除远端插件已提交，但插件列表刷新失败，请使用刷新按钮读取最新状态',
+      ),
     )
   })
 
@@ -1778,5 +1796,41 @@ describe('团队插件仓库管理', () => {
     ]) {
       expect(source).toContain(className)
     }
+  })
+  it('历史零版本不阻塞有效分发版本，字符串标识规范化后安装真实正文', async () => {
+    mocks.listTeamPluginVersions.mockResolvedValue({
+      data: [
+        { id: 1, team_id: '3', plugin_id: '5', version: '0', file_hash: pluginBodyHash },
+        { id: 2, team_id: '3', plugin_id: '5', version: '1', file_hash: pluginBodyHash },
+      ],
+    })
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '下载到本地' }))
+    const dialog = await screen.findByRole('dialog', { name: '选择插件版本' })
+    expect(screen.getByText(/version=0.*服务端.*迁移/)).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: '安装选中版本' }))
+    await waitFor(() =>
+      expect(mocks.ipcInvoke).toHaveBeenCalledWith(
+        'SaveYakScript',
+        expect.objectContaining({ Content: pluginBody, OnlineId: 5 }),
+      ),
+    )
+    expect(mocks.downloadTeamPluginVersion).toHaveBeenCalledWith(3, 5, 1)
+    expect(mocks.downloadTeamPluginVersion).not.toHaveBeenCalledWith(3, 5, 0)
+  })
+
+  it.each([
+    ['team_id', 99],
+    ['plugin_id', 99],
+    ['file_hash', 'missing'],
+  ])('异常 %s 明确说明且不写入本地', async (field, value) => {
+    mocks.listTeamPluginVersions.mockResolvedValue({
+      data: [{ id: 1, team_id: 3, plugin_id: 5, version: 1, file_hash: pluginBodyHash, [field]: value }],
+    })
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '下载到本地' }))
+    await waitFor(() => expect(mocks.yakitFailed).toHaveBeenCalledWith(expect.stringContaining(field)))
+    expect(mocks.downloadTeamPluginVersion).not.toHaveBeenCalled()
+    expect(mocks.ipcInvoke.mock.calls.some(([channel]) => channel === 'SaveYakScript')).toBe(false)
   })
 })

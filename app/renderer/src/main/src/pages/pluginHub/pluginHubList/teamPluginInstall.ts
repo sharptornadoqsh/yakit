@@ -1,3 +1,5 @@
+import { requirePluginHash, requirePluginVersion } from '@/services/teamPluginMetadata'
+
 export interface TeamPluginInstallRecord {
   id: number
   teamId?: number
@@ -79,13 +81,8 @@ export const installTeamPluginDownload = async (
   plugin: TeamPluginInstallRecord,
   dependencies: TeamPluginInstallDependencies,
 ) => {
-  if (!Number.isSafeInteger(plugin.version) || plugin.version <= 0) {
-    throw new Error('插件版本无效')
-  }
-  const expectedHash = plugin.fileHash.trim()
-  if (!/^[0-9a-f]{64}$/.test(expectedHash)) {
-    throw new Error('插件版本缺少有效正文摘要')
-  }
+  const version = requirePluginVersion(plugin.version)
+  const expectedHash = requirePluginHash(plugin.fileHash)
 
   let targetScriptName = plugin.scriptName
   let targetPluginId: number | undefined
@@ -115,7 +112,7 @@ export const installTeamPluginDownload = async (
     }
   }
 
-  const downloadContent = await dependencies.download(plugin.version)
+  const downloadContent = await dependencies.download(version)
   const bytes = normalizeDownloadedPluginBytes(downloadContent)
   if (bytes.byteLength === 0) throw new Error('团队插件正文为空')
   const actualHash = await (dependencies.digest || sha256ArrayBuffer)(bytes)
@@ -167,7 +164,7 @@ export const installTeamPluginDownload = async (
     localPluginId: localPlugin.Id,
     localPluginUUID: localPlugin.UUID,
     localScriptName,
-    version: plugin.version,
+    version,
     revision: plugin.revision,
     fileHash: actualHash,
     categoryId: plugin.categoryId,
