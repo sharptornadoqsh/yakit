@@ -924,19 +924,20 @@ export const downloadTeamPluginVersionWithSummary = async (
 ): Promise<TeamPluginDownloadSummary> => {
   version = requirePluginVersion(version)
   const url = `v2/teams/${teamId}/plugins/${pluginId}/versions/${version}/download`
-  const response = await NetWorkApi<Record<string, never>, { body: ArrayBuffer; headers?: Record<string, string> }>({
+  const response = await NetWorkApi<Record<string, never>, { body: unknown; headers?: Record<string, string> }>({
     method: 'get',
     url,
     params: {},
     responseType: 'arraybuffer',
     includeResponseHeaders: true,
   }).catch((error) => rethrowV2Error(url, error))
-  if (!(response.body instanceof ArrayBuffer)) throw new Error('下载正文 body 必须是二进制 ArrayBuffer')
+  const body = response.body instanceof Uint8Array ? Uint8Array.from(response.body).buffer : response.body
+  if (!(body instanceof ArrayBuffer)) throw new Error('下载正文 body 必须是二进制 ArrayBuffer')
   const sha256 = requirePluginHash(response.headers?.['x-content-sha256']?.trim().toLowerCase(), 'x-content-sha256')
   const responseVersion = requirePluginVersion(response.headers?.['x-plugin-version'], 'x-plugin-version')
   if (responseVersion !== version) throw new Error(`x-plugin-version 不匹配：期望 ${version}，收到 ${responseVersion}`)
-  if ((await sha256ArrayBuffer(response.body)) !== sha256) throw new Error('插件正文摘要校验失败')
-  return { body: response.body, sha256, version: responseVersion }
+  if ((await sha256ArrayBuffer(body)) !== sha256) throw new Error('插件正文摘要校验失败')
+  return { body, sha256, version: responseVersion }
 }
 
 export const setPluginVisibility = (
