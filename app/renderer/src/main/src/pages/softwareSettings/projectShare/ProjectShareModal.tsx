@@ -48,12 +48,6 @@ const unwrapData = <T,>(response: { data?: T } | T): T => {
   return response as T
 }
 
-const unavailablePublishContext = async (): Promise<ProjectSharePublishContext> => {
-  throw Object.assign(new Error('当前 yak.exe 缺少项目插件引用能力，已停止发布，避免生成不完整项目环境'), {
-    code: 'project_share_engine_plugin_references_unavailable',
-  })
-}
-
 const formatDateTime = (value?: string | number | null) => {
   if (!value) return '-'
   const date = new Date(value)
@@ -77,7 +71,7 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({
   localProject,
   onClose,
   onImported,
-  resolvePublishContext = unavailablePublishContext,
+  resolvePublishContext,
 }) => {
   const runtime = useMemo(() => createElectronProjectShareRuntimeDependencies(), [])
   const [loading, setLoading] = useState(false)
@@ -175,6 +169,10 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({
   })
 
   const createShare = useMemoizedFn(async () => {
+    if (!resolvePublishContext) {
+      yakitFailed('当前入口未接入引擎插件引用能力；普通项目归档请使用“发布到团队项目”')
+      return
+    }
     if (!teamId || !selectedOnlineProject || !localProject) {
       yakitFailed('请选择团队项目，并确认当前本地项目有效')
       return
@@ -395,6 +393,11 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({
       </div>
 
       <div className={styles.createPanel} data-testid="project-share-create">
+        {!resolvePublishContext && (
+          <p role="status">
+            当前入口未接入引擎插件引用能力，完整环境密令暂不可发布。普通归档请从本地项目列表选择“发布到团队项目”；归档发布不包含完整插件环境。
+          </p>
+        )}
         <Form layout="vertical">
           <div className={styles.formRow}>
             <Form.Item label="密令名称" required>
@@ -413,7 +416,7 @@ export const ProjectShareModal: React.FC<ProjectShareModalProps> = ({
           <RuiYanButton
             variant="primary"
             loading={loading}
-            disabled={!localProject || !selectedOnlineProject}
+            disabled={!resolvePublishContext || !localProject || !selectedOnlineProject}
             onClick={createShare}
           >
             发布完整环境并创建密令

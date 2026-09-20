@@ -28,6 +28,9 @@ import {
 } from '@/services/teamCollaboration'
 import { publishTeamProjectBundle, restoreTeamProjectBundle, type ProjectBundleProgress } from './teamProjectBundle'
 import { createDefaultTeamProjectBundleDependencies } from './teamProjectBundleRuntime'
+import { getProjectBundleManifest, type ProjectBundleManifest } from './projectBundleData'
+import { getRemoteValue, setRemoteValue } from '@/utils/kv'
+import { getRemoteHttpSettingGV } from '@/utils/envfile'
 import {
   acceptTeamPermissionMemberVersion,
   buildTeamPermissionSnapshots,
@@ -151,7 +154,7 @@ const getSyncedProject = (syncInfo?: ApiEntity): ApiEntity | undefined => {
   return project && !Array.isArray(project) && typeof project === 'object' ? project : syncInfo
 }
 
-const getId = (record: ApiEntity | undefined): string => `${getValue(record, ['id', 'ID', 'uuid', 'UUID'])}`
+const getId = (record: ApiEntity | undefined): string => `${getValue(record, ['id', 'ID', 'Id', 'uuid', 'UUID'])}`
 
 const getList = (response: any, keys: string[] = []): ApiEntity[] => {
   if (Array.isArray(response)) return response
@@ -281,7 +284,12 @@ export const createAvailableLocalProjectCopyName = (projectName: string, localPr
   return `${baseName}-${localProjects.length + 3}`
 }
 
-export const TeamCollaborationPage: React.FC = React.memo(() => {
+interface TeamCollaborationPageProps {
+  initialLocalProjectId?: string
+}
+
+export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React.memo((props) => {
+  const { initialLocalProjectId } = props
   const userInfo = useStore((state) => state.userInfo)
   const authenticatedUserId = Number(userInfo.user_id)
   const authenticationSessionKey = `${
@@ -304,7 +312,38 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   const [selectedTeamId, setSelectedTeamId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [localProjects, setLocalProjects] = useState<ApiEntity[]>([])
-  const [selectedLocalProjectId, setSelectedLocalProjectId] = useState('')
+  const [selectedLocalProjectId, setSelectedLocalProjectId] = useState(initialLocalProjectId || '')
+  const [onlineBaseUrl, setOnlineBaseUrl] = useState('')
+  const [publishedManifest, setPublishedManifest] = useState<ProjectBundleManifest>()
+  const [publishedAt, setPublishedAt] = useState('')
+  const publishReceiptKey = `team-project-publish:${encodeURIComponent(onlineBaseUrl)}:${selectedTeamId}:${selectedProjectId}:${selectedLocalProjectId}`
+  useEffect(() => {
+    let active = true
+    getRemoteValue(getRemoteHttpSettingGV())
+      .then((value) => {
+        if (active) setOnlineBaseUrl(String(JSON.parse(value || '{}').BaseUrl || ''))
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [])
+  useEffect(() => {
+    let active = true
+    setPublishedAt('')
+    if (onlineBaseUrl && selectedTeamId && selectedProjectId && selectedLocalProjectId) {
+      getRemoteValue(publishReceiptKey)
+        .then((value) => {
+          if (active) setPublishedAt(value || '')
+        })
+        .catch(() => undefined)
+    }
+    return () => {
+      active = false
+    }
+  }, [publishReceiptKey, onlineBaseUrl, selectedLocalProjectId, selectedProjectId, selectedTeamId])
+  const selectedLocalProjectIdRef = useRef(selectedLocalProjectId)
+  selectedLocalProjectIdRef.current = selectedLocalProjectId
   const [localCopyName, setLocalCopyName] = useState('')
   const [bundleMessage, setBundleMessage] = useState('')
   const [localProjectConflict, setLocalProjectConflict] = useState<ApiEntity>()
@@ -650,6 +689,11 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
           : nextSync.project?.snapshot
         const nextSnapshotText = formatProjectSnapshot(nextSnapshot)
         if (nextSnapshotText !== undefined) setSnapshotText(nextSnapshotText)
+        try {
+          setPublishedManifest(getProjectBundleManifest(JSON.parse(nextSnapshotText || '{}')))
+        } catch {
+          setPublishedManifest(undefined)
+        }
         setSnapshotReady(nextSnapshotText !== undefined)
       } catch (error) {
         if (!isCurrentRequest()) return
@@ -752,14 +796,14 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
       setLocalProjects(nextProjects)
       setSelectedLocalProjectId((current) => {
         if (nextProjects.some((project: ApiEntity) => getId(project) === current)) return current
-        return getId(nextProjects[0])
+        return initialLocalProjectId ? '' : getId(nextProjects[0])
       })
     } catch (error) {
       setLocalProjects([])
       setSelectedLocalProjectId('')
       setErrorMessage(getErrorMessage(error))
     }
-  }, [])
+  }, [initialLocalProjectId])
 
   const refreshCurrentContext = useCallback(async () => {
     const teamId = toPositiveTeamId(selectedTeamIdRef.current)
@@ -892,6 +936,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     setSyncInfo(undefined)
     setSyncConflict(false)
     setSnapshotText('{}')
+    setPublishedManifest(undefined)
     setBundleMessage('')
     setLocalProjectConflict(undefined)
     setConflictCopyName('')
@@ -997,7 +1042,12 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
   }, [selectedProject])
 
   const updateBundleProgress = useCallback((progress: ProjectBundleProgress) => {
-    const labels = { export: '导出本地项目', upload: '上传项目归档', download: '下载项目归档', import: '导入本地副本' }
+    const labels = {
+      export: '导出本地项目',
+      upload: '上传项目归档',
+      download: '下载项目归档',
+      import: '导入本地副本',
+    }
     setBundleMessage(`${labels[progress.stage]}：${progress.completed}/${progress.total}`)
   }, [])
 
@@ -1012,10 +1062,25 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     ) {
       return
     }
+    const context = {
+      teamId: selectedTeamId,
+      projectId: selectedProjectId,
+      localProjectId: selectedLocalProjectId,
+      session: authenticationSessionKey,
+    }
+    const isCurrent = () =>
+      recordContextRef.current.teamId === context.teamId &&
+      recordContextRef.current.projectId === context.projectId &&
+      selectedLocalProjectIdRef.current === context.localProjectId &&
+      authenticationSessionKeyRef.current === context.session
     setActionLoading('publish-project-bundle')
     setErrorMessage('')
     setBundleMessage('')
     try {
+      const setting = await getRemoteValue(getRemoteHttpSettingGV())
+      const targetService = String(JSON.parse(setting || '{}').BaseUrl || '')
+      if (!targetService || targetService !== onlineBaseUrl)
+        throw new Error('目标服务尚未确认或已变更，请重新打开发布入口')
       const result = await publishTeamProjectBundle(
         {
           teamId: selectedTeamId,
@@ -1024,11 +1089,28 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
             id: getValue(selectedLocalProject, ['Id', 'id']),
             name: getValue(selectedLocalProject, ['ProjectName', 'name']),
           },
-          onProgress: updateBundleProgress,
+          onProgress: (progress) => {
+            if (isCurrent()) updateBundleProgress(progress)
+          },
         },
         createDefaultTeamProjectBundleDependencies(),
       )
-      setBundleMessage(`项目归档已发布，共 ${result.manifest.chunk_count} 个分块`)
+      const completedSetting = await getRemoteValue(getRemoteHttpSettingGV())
+      if (String(JSON.parse(completedSetting || '{}').BaseUrl || '') !== targetService)
+        throw new Error('发布期间目标服务发生变更，请核对服务端归档；未记录本地成功状态')
+      const completedAt = new Date().toISOString()
+      let receiptSaved = true
+      try {
+        await setRemoteValue(publishReceiptKey, completedAt)
+      } catch {
+        receiptSaved = false
+      }
+      if (!isCurrent()) return
+      setPublishedAt(completedAt)
+      setPublishedManifest(result.manifest)
+      setBundleMessage(
+        `项目归档已发布：本地 ${getLocalProjectName(selectedLocalProject)}（ID ${getId(selectedLocalProject)}） → 团队 ${selectedTeamId} / 远端项目 ${selectedProjectId}，共 ${result.manifest.chunk_count} 个分块${receiptSaved ? '' : '；本地发布时间记录保存失败'}`,
+      )
       await loadTeamContext(selectedTeamId)
       await loadProjectContext(selectedTeamId, selectedProjectId)
     } catch (error) {
@@ -1038,6 +1120,10 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
     }
   }, [
     canPublishProject,
+    authenticationSessionKey,
+    selectedLocalProjectId,
+    onlineBaseUrl,
+    publishReceiptKey,
     hasActiveTeamPermission,
     loadProjectContext,
     loadTeamContext,
@@ -1642,16 +1728,42 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
 
                   <section className={`${styles['panel']} ${styles['bundle-panel']}`}>
                     <div className={styles['panel-title']}>
-                      <h2>本地项目归档</h2>
+                      <h2>本地项目归档 · 手动发布 / 恢复</h2>
                       <span>{bundleMessage || '在线项目保存权威共享版本，本地项目保存工作副本'}</span>
                     </div>
+                    <p>
+                      目标服务：{onlineBaseUrl || '尚未读取，请检查服务连接'}；团队：
+                      {getValue(
+                        teams.find((team) => getId(team) === selectedTeamId),
+                        ['name'],
+                        '',
+                      )}
+                      （ID {selectedTeamId}）；远端项目：{getValue(selectedProject, ['name', 'project_name'], '')}
+                      （远端 ID {selectedProjectId}）
+                    </p>
+                    <p>
+                      本地项目：
+                      {selectedLocalProject
+                        ? `${getLocalProjectName(selectedLocalProject)}（本地 ID ${selectedLocalProjectId}）`
+                        : '请选择本地项目'}
+                      。发布只上传此次归档；后续本地修改需要再次手动发布，不会自动同步或双向合并。
+                    </p>
+                    <p>本地记录的最后成功发布时间：{publishedAt ? formatTime(publishedAt) : '暂无'}。</p>
+                    {publishedManifest && (
+                      <p>
+                        远端当前归档来源：{publishedManifest.source_project.name}（来源客户端本地 ID{' '}
+                        {publishedManifest.source_project.id}）；归档生成时间：
+                        {formatTime(publishedManifest.created_at)}；摘要：{publishedManifest.sha256}
+                      </p>
+                    )}
                     <div className={styles['bundle-grid']}>
                       <div className={styles['create-row']}>
                         <YakitSelect
                           value={selectedLocalProjectId || undefined}
                           placeholder="选择本地项目"
+                          aria-label="选择本地项目"
                           onChange={(value) => setSelectedLocalProjectId(`${value}`)}
-                          disabled={!canPublishProject || localProjects.length === 0}
+                          disabled={!canPublishProject || localProjects.length === 0 || Boolean(actionLoading)}
                         >
                           {localProjects.map((project) => (
                             <YakitSelect.Option key={getId(project)} value={getId(project)}>
@@ -1664,7 +1776,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                           disabled={!canPublishProject || !selectedLocalProject}
                           loading={actionLoading === 'publish-project-bundle'}
                         >
-                          发布本地项目
+                          发布本地项目 → 团队
                         </YakitButton>
                       </div>
                       <div className={styles['create-row']}>
@@ -1688,9 +1800,9 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
 
                   <section className={`${styles['panel']} ${styles['sync-panel']}`}>
                     <div className={styles['panel-title']}>
-                      <h2>快照与同步</h2>
+                      <h2>远端协作数据与快照（不上传本地项目）</h2>
                       <span>
-                        最近同步：
+                        最近拉取：
                         {formatTime(
                           getValue(syncInfo, ['server_time', 'last_sync_at', 'lastSyncAt', 'synced_at', 'updated_at']),
                         )}
@@ -1708,7 +1820,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                           loading={syncLoading}
                           disabled={!canReadProject}
                         >
-                          重试同步
+                          重试拉取远端协作数据
                         </YakitButton>
                       </div>
                     )}
@@ -1726,7 +1838,7 @@ export const TeamCollaborationPage: React.FC = React.memo(() => {
                         loading={syncLoading}
                         disabled={!canReadProject}
                       >
-                        同步项目
+                        拉取远端协作数据
                       </YakitButton>
                       <YakitButton
                         onClick={updateSnapshot}

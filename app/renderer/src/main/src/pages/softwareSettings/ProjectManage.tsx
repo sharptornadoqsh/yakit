@@ -13,21 +13,14 @@ import {
   ResizerIcon,
   TrashIcon,
 } from '@/assets/newIcon'
-import {
-  ProjectDocumentTextSvgIcon,
-  ProjectExportSvgIcon,
-  ProjectFolderOpenSvgIcon,
-  ProjectImportSvgIcon,
-  ProjectViewGridSvgIcon,
-} from './icon'
+import { ProjectDocumentTextSvgIcon, ProjectFolderOpenSvgIcon, ProjectViewGridSvgIcon } from './icon'
 import ReactResizeDetector from 'react-resize-detector'
 import { CopyComponents, YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { formatTimestamp } from '@/utils/timeUtil'
-import { Cascader, Divider, Dropdown, DropdownProps, Form, Progress, Tooltip, Upload } from 'antd'
+import { Cascader, Divider, Dropdown, DropdownProps, Form, Tooltip, Upload } from 'antd'
 import { YakitMenu, YakitMenuProp } from '@/components/yakitUI/YakitMenu/YakitMenu'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { RuiYanButton, RuiYanDrawer, RuiYanIcon, RuiYanModal } from '@/components/renyanUI'
-import { randomString } from '@/utils/randomUtil'
 import { openABSFileLocated } from '@/utils/openWebsite'
 import { YakitSpin } from '@/components/yakitUI/YakitSpin/YakitSpin'
 import { YaklangEngineMode } from '@/yakitGVDefine'
@@ -51,10 +44,16 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { Trans } from 'react-i18next'
 import { getProjectDisplayText } from './projectBranding'
 import { ProjectShareModal } from './projectShare/ProjectShareModal'
+import { TransferProject } from './TransferProject'
+import { PROJECT_IMPORT_ACCEPT, validateProjectImportPath } from './projectImport'
 import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
+
+export { TransferProject } from './TransferProject'
+export type { ProjectIOProgress } from './TransferProject'
 
 const { ipcRenderer } = window.require('electron')
 const { YakitPanel } = YakitCollapse
+const TeamProjectPublisher = React.lazy(() => import('@/pages/teamCollaboration/TeamCollaborationPage'))
 
 export const getEnvTypeByProjects = () => {
   return isIRify() ? 'ssa_project' : 'project'
@@ -274,6 +273,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
 
   const [typeShow, setTypeShow] = useState<boolean>(false)
   const [timeShow, setTimeShow] = useState<boolean>(false)
+  const [publishProject, setPublishProject] = useState<ProjectDescription>()
   const [projectShareModal, setProjectShareModal] = useState<{ open: boolean; mode: 'share' | 'import' }>({
     open: false,
     mode: 'share',
@@ -507,6 +507,11 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
 
     return (
       <div className={styles['project-operate-wrapper']} onClick={(e) => e.stopPropagation()}>
+        {Type !== 'file' && (
+          <YakitButton type="text" onClick={() => setPublishProject(info)}>
+            发布到团队项目
+          </YakitButton>
+        )}
         {Type === 'file' ? (
           <DropdownMenu
             dropdown={{
@@ -1286,7 +1291,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                   onClick={() => setProjectShareModal({ open: true, mode: 'share' })}
                 >
                   <RuiYanIcon name="project" />
-                  <span>分享当前团队项目</span>
+                  <span>完整环境密令（需引擎插件引用能力）</span>
                 </button>
                 <button
                   type="button"
@@ -1376,7 +1381,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                       </div>
                     </div>
                     {/* { engineMode !== "remote" &&  */}
-                    <div style={{ width: 120 }}>{t('YakitTable.action')}</div>
+                    <div style={{ width: 260 }}>{t('YakitTable.action')}</div>
                     {/* } */}
                   </div>
 
@@ -1492,7 +1497,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                                   </div>
                                 </div>
                                 {/* { engineMode !== "remote" && ( */}
-                                <div style={{ width: 120 }} className={styles['opt-operate']}>
+                                <div style={{ width: 260 }} className={styles['opt-operate']}>
                                   {projectOperate(i.data)}
                                 </div>
                                 {/* )} */}
@@ -1519,6 +1524,21 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
         onModalSubmit={onModalSubmit}
       />
 
+      {publishProject && (
+        <RuiYanModal
+          open={true}
+          title={`发布到团队项目 · ${publishProject.ProjectName}（本地 ID：${publishProject.Id}）`}
+          width={960}
+          onClose={() => setPublishProject(undefined)}
+          closeOnBackdrop={false}
+        >
+          <div style={{ height: '75vh', overflow: 'auto' }}>
+            <React.Suspense fallback={<div>正在加载团队项目发布入口…</div>}>
+              <TeamProjectPublisher initialLocalProjectId={String(publishProject.Id)} />
+            </React.Suspense>
+          </div>
+        </RuiYanModal>
+      )}
       <ProjectShareModal
         open={projectShareModal.open}
         mode={projectShareModal.mode}
@@ -1776,7 +1796,7 @@ export interface ExportProjectProps {
   ProjectName: string
   Password: string
 }
-interface ImportProjectProps {
+export interface ImportProjectProps {
   ProjectFilePath: string
   LocalProjectName?: string
   Password?: string
@@ -1871,6 +1891,7 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
     ProjectName: '',
     Password: '',
   })
+  const importRequest = useRef(0)
   const [importInfo, setImportInfo] = useState<ImportProjectProps>({
     ProjectFilePath: '',
   })
@@ -1928,6 +1949,9 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
       }
     }
     if (!visible) {
+      importRequest.current += 1
+      setTransferShow({ visible: false })
+      setLoading(false)
       setIsCheck(false)
       setInfo({ ProjectName: '' })
       setExportInfo({
@@ -2059,72 +2083,35 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
       })
     }
     if (isImport) {
-      if (!importInfo.ProjectFilePath) {
-        setTimeout(() => setLoading(false), 300)
-        return
-      }
-
-      const newProject: ProjectParamsProps = {
-        ProjectName: '',
-        Description: '',
-        FolderId: importInfo.FolderId ? +importInfo.FolderId : 0,
-        ChildFolderId: importInfo.ChildFolderId ? +importInfo.ChildFolderId : 0,
-        Type: getEnvTypeByProjects(),
-      }
-
-      if (importInfo.LocalProjectName) {
-        newProject.ProjectName = importInfo.LocalProjectName
-        ipcRenderer
-          .invoke('IsProjectNameValid', newProject)
-          .then((e) => {
-            setTransferShow({
-              isImport: true,
-              visible: true,
-              data: { ...importInfo, LocalProjectName: importInfo.LocalProjectName },
-            })
+      const requestId = ++importRequest.current
+      const isCurrent = () => importRequest.current === requestId
+      void (async () => {
+        try {
+          const projectPath = validateProjectImportPath(importInfo.ProjectFilePath)
+          const name =
+            importInfo.LocalProjectName?.trim() || (await ipcRenderer.invoke('fetch-path-file-name', projectPath))
+          if (!isCurrent()) return
+          if (!name) throw new Error('解析路径内文件名为空')
+          await ipcRenderer.invoke('IsProjectNameValid', {
+            ProjectName: name,
+            Description: '',
+            FolderId: Number(importInfo.FolderId || 0),
+            ChildFolderId: Number(importInfo.ChildFolderId || 0),
+            Type: getEnvTypeByProjects(),
           })
-          .catch((e) => {
-            failed('创建新项目失败，项目名校验不通过：' + `${e}`)
-            setTimeout(() => {
-              setLoading(false)
-            }, 300)
+          if (!isCurrent()) return
+          setTransferShow({
+            isImport: true,
+            visible: true,
+            data: { ...importInfo, ProjectFilePath: projectPath, LocalProjectName: name },
           })
-      } else {
-        ipcRenderer
-          .invoke('fetch-path-file-name', importInfo.ProjectFilePath)
-          .then((fileName: string) => {
-            if (!fileName) {
-              failed(`解析路径内文件名为空`)
-              setTimeout(() => {
-                setLoading(false)
-              }, 300)
-              return
-            }
-
-            newProject.ProjectName = fileName
-            ipcRenderer
-              .invoke('IsProjectNameValid', newProject)
-              .then((e) => {
-                setTransferShow({
-                  isImport: true,
-                  visible: true,
-                  data: { ...importInfo, LocalProjectName: fileName },
-                })
-              })
-              .catch((e) => {
-                failed('创建新项目失败，项目名校验不通过：' + `${e}`)
-                setTimeout(() => {
-                  setLoading(false)
-                }, 300)
-              })
-          })
-          .catch((e) => {
-            failed(t('NewProjectAndFolder.parseFileNameFailed') + `: ${e}`)
-            setTimeout(() => {
-              setLoading(false)
-            }, 300)
-          })
-      }
+        } catch (error) {
+          if (!isCurrent()) return
+          failed(`导入项目失败：${error instanceof Error ? error.message : String(error)}`)
+          setLoading(false)
+          setTransferShow({ visible: false })
+        }
+      })()
     }
   })
 
@@ -2139,6 +2126,9 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
   }
 
   const onClose = useMemoizedFn(() => {
+    importRequest.current += 1
+    setTransferShow({ visible: false })
+    setLoading(false)
     form.resetFields()
     setVisible(false)
     handleExportTemporaryProject()
@@ -2440,12 +2430,19 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
                 <div className={styles['import-form-item-help-wrapper']}>
                   {t('YakitDraggerContent.click_here')}
                   <Upload
+                    accept={PROJECT_IMPORT_ACCEPT}
+                    fileList={[]}
                     multiple={false}
                     maxCount={1}
                     showUploadList={false}
                     beforeUpload={(f: any) => {
-                      setImportInfo({ ...importInfo, ProjectFilePath: f?.path || '' })
-                      return false
+                      try {
+                        setImportInfo({ ...importInfo, ProjectFilePath: validateProjectImportPath(f?.path || '') })
+                      } catch (error) {
+                        setImportInfo({ ...importInfo, ProjectFilePath: '' })
+                        failed((error as Error).message)
+                      }
+                      return Upload.LIST_IGNORE
                     }}
                   >
                     <a className={styles['upload-btn']} onClick={(e) => e.preventDefault()}>
@@ -2520,14 +2517,14 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
       <TransferProject
         usedBy="NewProjectAndFolder"
         {...transferShow}
+        visible={visible && transferShow.visible}
         onSuccess={(type) => {
           if (type === 'isExport') {
             handleExportTemporaryProject()
           }
           onModalSubmit(type, {} as any)
-          setTimeout(() => {
-            setTransferShow({ visible: false })
-          }, 500)
+          setTransferShow({ visible: false })
+          setLoading(false)
         }}
         setVisible={(open: boolean) => {
           setLoading(false)
@@ -2535,195 +2532,6 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
         }}
       />
     </RuiYanModal>
-  )
-})
-
-interface TransferProjectProps {
-  usedBy?: string
-  isExport?: boolean
-  isImport?: boolean
-  data?: ExportProjectProps | ImportProjectProps
-  visible: boolean
-  setVisible: (open: boolean) => any
-  onSuccess: (type: string) => any
-}
-export interface ProjectIOProgress {
-  TargetPath: string
-  Percent: number
-  Verbose: string
-}
-export const TransferProject: React.FC<TransferProjectProps> = memo((props) => {
-  const { t } = useI18nNamespaces(['projectManage', 'yakitUi'])
-  const { usedBy, isExport, isImport, data, visible, setVisible, onSuccess } = props
-
-  const { isExportTemporaryProjectFlag, setIsExportTemporaryProjectFlag } = useTemporaryProjectStore()
-
-  const [token, setToken] = useState(randomString(40))
-  const [percent, setPercent] = useState<number>(0.0)
-  const [infos, setInfos] = useState<string[]>([])
-  /** 导出功能时获取导出文件路径 */
-  const pathRef = useRef<string>('')
-
-  useEffect(() => {
-    const infos: string[] = []
-    if (!visible) {
-      setToken(randomString(40))
-      setPercent(0)
-      setInfos([])
-      pathRef.current = ''
-      return
-    }
-    if ((!isExport && !isImport) || !data) {
-      failed(t('NewProjectAndFolder.dataErrorRetry'))
-      return
-    }
-
-    const hintTitle = isImport ? '[ImportProject]' : isExport ? '[ExportProject]' : ''
-
-    if (isExport) {
-      const exportData: ExportProjectProps = { ...(data as any) }
-      ipcRenderer.invoke(
-        'ExportProject',
-        {
-          Id: exportData.Id,
-          Password: exportData.Password || '',
-        },
-        token,
-      )
-    }
-    if (isImport) {
-      const importData: ImportProjectProps = { ...(data as any) }
-
-      ipcRenderer.invoke(
-        `ImportProject`,
-        {
-          LocalProjectName: importData.LocalProjectName,
-          ProjectFilePath: importData.ProjectFilePath,
-          Password: importData?.Password || '',
-          FolderId: importData.FolderId || 0,
-          ChildFolderId: importData.ChildFolderId || 0,
-          Type: getEnvTypeByProjects(),
-        },
-        token,
-      )
-    }
-
-    ipcRenderer.on(`${token}-data`, async (e, data: ProjectIOProgress) => {
-      if (!!data.Verbose) {
-        infos.push(data.Verbose)
-      }
-      if (data.Percent > 0) {
-        setPercent(data.Percent * 100)
-      }
-      if (!!data.TargetPath) {
-        pathRef.current = data.TargetPath
-      }
-    })
-    ipcRenderer.on(`${token}-error`, (e, error) => {
-      failed(`${hintTitle} error:  ${error}`)
-      infos.push(`${hintTitle} error: ${error}`)
-    })
-    ipcRenderer.on(`${token}-end`, (e) => {
-      info(`${hintTitle} finished`)
-      const isError = infos.filter((item) => item.indexOf('error') > -1).length > 0
-      if (!isError) {
-        if (isImport) onSuccess('isImport')
-        if (isExport) {
-          onSuccess('isExport')
-          if (pathRef.current) openABSFileLocated(pathRef.current)
-        }
-      }
-    })
-
-    const id = setInterval(() => {
-      setInfos([...infos])
-    }, 1000)
-
-    return () => {
-      clearInterval(id)
-      ipcRenderer.invoke('cancel-ExportProject', token)
-      ipcRenderer.invoke('cancel-ImportProject', token)
-      ipcRenderer.removeAllListeners(`${token}-data`)
-      ipcRenderer.removeAllListeners(`${token}-error`)
-      ipcRenderer.removeAllListeners(`${token}-end`)
-    }
-  }, [visible])
-
-  // 处理导出临时项目问题
-  const handleExportTemporaryProject = () => {
-    // 当是加密导出 点击组件TransferProject取消时不执行删除操作
-    if (isExportTemporaryProjectFlag && usedBy !== 'NewProjectAndFolder') {
-      setIsExportTemporaryProjectFlag(false)
-      // 发送信号到ProjectManage去执行 getPageInfo(同时删除临时项目也是在这里操作的)
-      emiter.emit('onGetProjectInfo')
-    }
-  }
-  const onClose = useMemoizedFn(() => {
-    handleExportTemporaryProject()
-    setVisible(false)
-  })
-
-  return (
-    <div className={visible ? styles['transfer-project-mask'] : styles['transfer-project-hidden-mask']}>
-      <div className={styles['transfer-project-mask-body']}>
-        <div
-          className={classNames(
-            {
-              [styles['project-export-modal']]: isExport,
-              [styles['project-import-modal']]: isImport,
-            },
-            styles['modal-transfer-project'],
-          )}
-        >
-          <div className={styles['transfer-project-wrapper']}>
-            <div className={styles['modal-left-wrapper']}>
-              <div className={styles['modal-icon']}>
-                {isExport && <ProjectExportSvgIcon />}
-                {isImport && <ProjectImportSvgIcon />}
-              </div>
-            </div>
-
-            <div className={styles['modal-right-wrapper']}>
-              <div className={styles['modal-right-title']}>
-                {isExport && t('TransferProject.projectExporting')}
-                {isImport && t('TransferProject.projectImporting')}
-              </div>
-              <div className={styles['download-progress']}>
-                <Progress
-                  strokeColor="var(--Colors-Use-Main-Primary)"
-                  trailColor="var(--Colors-Use-Neutral-Bg)"
-                  percent={+percent.toFixed(2)}
-                  format={(p, sp) => {
-                    return (
-                      <div className={styles['progress-content-style']}>{`${t('TransferProject.progress')} ${p}%`}</div>
-                    )
-                  }}
-                />
-              </div>
-              <div className={styles['modal-right-content']}>
-                {infos.map((item) => {
-                  return (
-                    <div
-                      key={item}
-                      className={classNames({
-                        [styles['error-style']]: item.indexOf('error') > -1,
-                      })}
-                    >
-                      {item}
-                    </div>
-                  )
-                })}
-              </div>
-              <div className={styles['modal-right-btn']}>
-                <YakitButton size="max" type="outline2" onClick={onClose}>
-                  {t('YakitButton.cancel')}
-                </YakitButton>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 })
 

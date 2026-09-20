@@ -219,7 +219,7 @@ module.exports = (win, getClient) => {
   ipcMain.handle('cancel-ImportProject', handlerHelper.cancelHandler(streamImportProjectMap))
   ipcMain.handle('ImportProject', (e, params, token) => {
     let stream = getClient().ImportProject(params)
-    handlerHelper.registerHandler(win, stream, streamImportProjectMap, token)
+    handlerHelper.registerHandler(win, stream, streamImportProjectMap, token, { terminalOnError: true })
   })
 
   ipcMain.handle('InspectProjectArchive', (e, filePath) => projectArchiveStore.inspectArchive(filePath))

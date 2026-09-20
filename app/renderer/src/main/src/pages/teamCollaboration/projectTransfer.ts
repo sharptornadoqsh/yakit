@@ -18,6 +18,7 @@ interface RunProjectTransferInput {
   token?: string
   requireTargetPath?: boolean
   onProgress?: (progress: ProjectTransferProgress) => void
+  signal?: AbortSignal
   timeoutMs?: number
 }
 
@@ -39,9 +40,12 @@ export const runProjectTransfer = (ipc: ProjectTransferIpc, input: RunProjectTra
     const endChannel = `${token}-end`
     let targetPath = ''
     let settled = false
+    let started = false
+    let timeout: ReturnType<typeof setTimeout> | undefined
 
     const cleanup = () => {
       clearTimeout(timeout)
+      input.signal?.removeEventListener('abort', onAbort)
       ipc.removeListener(dataChannel, onData)
       ipc.removeListener(errorChannel, onError)
       ipc.removeListener(endChannel, onEnd)
@@ -50,11 +54,26 @@ export const runProjectTransfer = (ipc: ProjectTransferIpc, input: RunProjectTra
       if (settled) return
       settled = true
       cleanup()
-      reject(new Error(readErrorMessage(error)))
+      if (started) {
+        try {
+          Promise.resolve(ipc.invoke(`cancel-${input.channel}`, token)).catch(() => undefined)
+        } catch {}
+      }
+      reject(error instanceof Error ? error : new Error(readErrorMessage(error)))
+    }
+    const onAbort = () => {
+      const error = new Error('项目传输已取消')
+      error.name = 'AbortError'
+      fail(error)
     }
     const onData = (_event: unknown, progress: ProjectTransferProgress = {}) => {
+      if (settled) return
       if (progress.TargetPath) targetPath = progress.TargetPath
-      input.onProgress?.(progress)
+      try {
+        input.onProgress?.(progress)
+      } catch (error) {
+        fail(error)
+      }
     }
     const onError = (_event: unknown, error: unknown) => fail(error)
     const onEnd = () => {
@@ -67,11 +86,21 @@ export const runProjectTransfer = (ipc: ProjectTransferIpc, input: RunProjectTra
       cleanup()
       resolve(targetPath)
     }
-    const timeout = setTimeout(() => fail('项目传输超时'), input.timeoutMs ?? 30 * 60 * 1000)
+    if (input.signal?.aborted) {
+      onAbort()
+      return
+    }
+    timeout = setTimeout(() => fail('项目传输超时，请重试'), input.timeoutMs ?? 30 * 60 * 1000)
+    input.signal?.addEventListener('abort', onAbort, { once: true })
 
     ipc.on(dataChannel, onData)
     ipc.on(errorChannel, onError)
     ipc.on(endChannel, onEnd)
-    Promise.resolve(ipc.invoke(input.channel, input.params, token)).catch(fail)
+    try {
+      started = true
+      Promise.resolve(ipc.invoke(input.channel, input.params, token)).catch(fail)
+    } catch (error) {
+      fail(error)
+    }
   })
 }

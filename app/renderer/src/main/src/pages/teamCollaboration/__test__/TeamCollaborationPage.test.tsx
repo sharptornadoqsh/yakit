@@ -1,9 +1,10 @@
 import React from 'react'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { notification } from 'antd'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useStore } from '@/store'
 import { TeamCollaborationPage } from '../TeamCollaborationPage'
 import { publishTeamAuthenticationInvalidation, publishTeamPermissionInvalidation } from '../teamPermissionContext'
-import { restoreTeamProjectBundle } from '../teamProjectBundle'
+import { publishTeamProjectBundle, restoreTeamProjectBundle } from '../teamProjectBundle'
 import { prepareSharedHTTPFlow, prepareSharedRisk } from '../sharedRecordAdapters'
 import {
   createTeamProject,
@@ -22,6 +23,13 @@ import {
   listTestResults,
   updateProjectSnapshot,
 } from '@/services/teamCollaboration'
+
+vi.mock('@/utils/kv', () => ({
+  getRemoteValue: vi.fn(async (key: string) =>
+    key.startsWith('team-project-publish:') ? '' : JSON.stringify({ BaseUrl: 'https://team.example.test' }),
+  ),
+  setRemoteValue: vi.fn(async () => undefined),
+}))
 
 const networkMocks = vi.hoisted(() => ({
   axiosApi: vi.fn(),
@@ -125,7 +133,7 @@ vi.mock('@/services/teamCollaboration', async (importOriginal) => {
 
 vi.mock('../teamProjectBundle', async () => {
   const actual = await vi.importActual<typeof import('../teamProjectBundle')>('../teamProjectBundle')
-  return { ...actual, restoreTeamProjectBundle: vi.fn() }
+  return { ...actual, restoreTeamProjectBundle: vi.fn(), publishTeamProjectBundle: vi.fn() }
 })
 
 vi.mock('../SharedHTTPFlowDetail', () => ({
@@ -231,6 +239,12 @@ const createSharedProjectRecords = async () => {
 }
 
 describe('团队协作页面', () => {
+  afterEach(async () => {
+    cleanup()
+    await act(async () => {
+      notification.destroy()
+    })
+  })
   beforeEach(() => {
     publishTeamAuthenticationInvalidation()
     vi.clearAllMocks()
@@ -352,10 +366,10 @@ describe('团队协作页面', () => {
     expect(screen.getByText('{"summary":"通过"}')).toBeInTheDocument()
     expect(screen.getByText('snapshot.update')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '重试同步' }))
+    fireEvent.click(screen.getByRole('button', { name: '重试拉取远端协作数据' }))
 
     await waitFor(() => expect(getProjectSync).toHaveBeenCalledTimes(2))
-    expect(await screen.findByText(/最近同步/)).toBeInTheDocument()
+    expect(await screen.findByText(/最近拉取/)).toBeInTheDocument()
   })
 
   test('同步项目后移除服务端删除记录对应的成员、测试数据和测试结果', async () => {
@@ -385,7 +399,7 @@ describe('团队协作页面', () => {
     expect(screen.getByText('登录样本')).toBeInTheDocument()
     expect(screen.getByText('基线结果')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '同步项目' }))
+    fireEvent.click(screen.getByRole('button', { name: '拉取远端协作数据' }))
 
     await waitFor(() => expect(getProjectSync).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('待移除项目成员')).not.toBeInTheDocument())
@@ -540,7 +554,7 @@ describe('团队协作页面', () => {
       await secondSync.promise
     })
     expect(await screen.findByText('项目版本 22')).toBeInTheDocument()
-    expect(screen.getByText(/最近同步：2026/)).toBeInTheDocument()
+    expect(screen.getByText(/最近拉取：2026/)).toBeInTheDocument()
 
     await act(async () => {
       firstSync.resolve({
@@ -1018,7 +1032,7 @@ describe('团队协作页面', () => {
     await waitFor(() => expect(createTestData).toHaveBeenCalledTimes(1))
     expect(saveButton).toBeDisabled()
 
-    fireEvent.click(screen.getByRole('button', { name: '同步项目' }))
+    fireEvent.click(screen.getByRole('button', { name: '拉取远端协作数据' }))
     await waitFor(() => expect(getProjectSync).toHaveBeenCalledTimes(2))
     expect(saveButton).toBeDisabled()
 
@@ -1932,7 +1946,7 @@ describe('团队协作页面', () => {
     fireEvent.click(screen.getByRole('button', { name: '共享 Risk' }))
     await waitFor(() => expect(getTestData).toHaveBeenCalledWith('1', '21', '41'))
 
-    fireEvent.click(screen.getByRole('button', { name: '同步项目' }))
+    fireEvent.click(screen.getByRole('button', { name: '拉取远端协作数据' }))
     await waitFor(() => expect(getProjectSync).toHaveBeenCalledTimes(2))
     expect(await screen.findByText('共享 HTTP Flow 已更新')).toBeInTheDocument()
 
@@ -2066,5 +2080,62 @@ describe('团队协作页面', () => {
     expect(eventError).not.toHaveBeenCalled()
     expect(listTestData).toHaveBeenCalledTimes(1)
     expect(listTestResults).toHaveBeenCalledTimes(1)
+  })
+  test('从本地列表预选111，明确目标并仅在手动发布后记录成功时间', async () => {
+    vi.mocked(getMe).mockResolvedValue(
+      createMeResponse([
+        createMembership({
+          teamId: 1,
+          teamName: '蓝队',
+          permissions: ['project.read', 'project.manage', 'test_data.write'],
+        }),
+      ]) as never,
+    )
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ version: 4, snapshot: {} } as never)
+    Object.defineProperty(window, 'require', {
+      configurable: true,
+      value: () => ({
+        ipcRenderer: {
+          invoke: vi.fn(async () => ({
+            Projects: [
+              { Id: 77, ProjectName: '其他项目', Type: 'project' },
+              { Id: 78, ProjectName: '111', Type: 'project' },
+            ],
+          })),
+        },
+      }),
+    })
+    vi.mocked(publishTeamProjectBundle).mockResolvedValue({
+      manifest: {
+        source_project: { id: 78, name: '111' },
+        created_at: '2026-09-18T09:00:00Z',
+        sha256: 'a'.repeat(64),
+        chunk_count: 2,
+      },
+      createdDataIds: [1, 2],
+      version: 5,
+    } as never)
+    render(<TeamCollaborationPage initialLocalProjectId="78" />)
+    await waitFor(() => expect(screen.getByRole('combobox', { name: '选择本地项目' })).toHaveValue('78'))
+    expect(await screen.findByText(/目标服务：https:\/\/team.example.test/)).toHaveTextContent('远端 ID 21')
+    expect(screen.getByText(/本地项目：111/)).toHaveTextContent('本地 ID 78')
+    expect(publishTeamProjectBundle).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '发布本地项目 → 团队' }))
+    await waitFor(() =>
+      expect(publishTeamProjectBundle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          teamId: '1',
+          projectId: '21',
+          localProject: { id: 78, name: '111' },
+        }),
+        expect.any(Object),
+      ),
+    )
+    await waitFor(() => expect(screen.getByText(/本地记录的最后成功发布时间/)).not.toHaveTextContent('暂无'))
+    expect(screen.getByText(/后续本地修改需要再次手动发布/)).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('combobox', { name: '选择本地项目' }), { target: { value: '77' } })
+    expect(publishTeamProjectBundle).toHaveBeenCalledTimes(1)
   })
 })
