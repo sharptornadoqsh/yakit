@@ -220,6 +220,92 @@ const createRuntimeDependencies = () => {
 }
 
 describe('项目分享运行时', () => {
+  it('重命名失败保留重命名阶段，重试不提前完成或重复导入', async () => {
+    const { dependencies, getRecovery, setRecovery } = createRuntimeDependencies()
+    vi.mocked(dependencies.importProjectArchive).mockImplementation(async () => {
+      const record = getRecovery()!
+      setRecovery({
+        ...record,
+        status: 'renaming_project',
+        localProjectId: 41,
+        revision: record.revision + 1,
+      } as ProjectShareRecoveryRecord)
+      throw Object.assign(new Error('local_project_name_conflict'), { code: 'local_project_name_conflict' })
+    })
+    const input = {
+      token: 'test-token',
+      projectKey: 'imported-project',
+      name: '导入项目',
+      localProjectName: '本地项目',
+      password: '',
+      folderId: 0,
+      childFolderId: 0,
+      projectType: 'project',
+    }
+    await expect(importProjectShare(input, dependencies)).rejects.toThrow('local_project_name_conflict')
+    expect(getRecovery()).toMatchObject({ status: 'renaming_project', localProjectId: 41 })
+    expect(dependencies.completeImport).not.toHaveBeenCalled()
+    vi.mocked(dependencies.resolveImportedProject).mockImplementation(async () => {
+      const record = getRecovery()!
+      setRecovery({
+        ...record,
+        status: 'project_imported',
+        revision: record.revision + 1,
+      } as ProjectShareRecoveryRecord)
+      return { localProjectId: 41, localProjectName: '本地项目' }
+    })
+    await expect(resumeProjectShareImport(9, {}, dependencies)).resolves.toMatchObject({ localProjectId: 41 })
+    expect(dependencies.resolveImportedProject).toHaveBeenCalledTimes(1)
+    expect(dependencies.importProjectArchive).toHaveBeenCalledTimes(1)
+  })
+  it('插件安装中断保留本地项目和恢复记录，重试不重复导入数据库', async () => {
+    const { dependencies, getRecovery } = createRuntimeDependencies()
+    vi.mocked(dependencies.installPlugin).mockRejectedValueOnce(new Error('插件安装中断'))
+    const input = {
+      token: 'test-token',
+      projectKey: 'imported-project',
+      name: '导入项目',
+      localProjectName: '本地项目',
+      password: '',
+      folderId: 0,
+      childFolderId: 0,
+      projectType: 'project',
+    }
+    await expect(importProjectShare(input, dependencies)).rejects.toThrow('插件安装中断')
+    expect(getRecovery()).toMatchObject({ localProjectId: 41, status: 'retryable_failed_after_import' })
+    expect(dependencies.completeImport).not.toHaveBeenCalled()
+    await expect(resumeProjectShareImport(9, {}, dependencies)).resolves.toMatchObject({ localProjectId: 41 })
+    expect(dependencies.importProjectArchive).toHaveBeenCalledTimes(1)
+    expect(dependencies.installPlugin).toHaveBeenCalledTimes(2)
+    expect(getRecovery()).toBeUndefined()
+  })
+
+  it('下载摘要错误不进入导入，重新下载后可恢复', async () => {
+    const { dependencies, getRecovery } = createRuntimeDependencies()
+    vi.mocked(dependencies.downloadImportBundle).mockResolvedValueOnce({
+      handle: 'damaged',
+      fileSize: 1,
+      archiveSha256: 'f'.repeat(64),
+    })
+    const input = {
+      token: 'test-token',
+      projectKey: 'imported-project',
+      name: '导入项目',
+      localProjectName: '本地项目',
+      password: '',
+      folderId: 0,
+      childFolderId: 0,
+      projectType: 'project',
+    }
+    await expect(importProjectShare(input, dependencies)).rejects.toThrow('project_share_download_digest_mismatch')
+    expect(dependencies.importProjectArchive).not.toHaveBeenCalled()
+    expect(getRecovery()).toMatchObject({ status: 'retryable_failed_before_import' })
+    await expect(resumeProjectShareImport(9, { password: '' }, dependencies)).resolves.toMatchObject({
+      localProjectId: 41,
+    })
+    expect(dependencies.downloadImportBundle).toHaveBeenCalledTimes(2)
+  })
+
   it('只在远端 bundle ready 后创建一次性密令并清理本地发布句柄', async () => {
     const { dependencies, events } = createRuntimeDependencies()
     const bundle = readyBundle()

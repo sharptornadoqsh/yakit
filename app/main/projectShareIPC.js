@@ -1,5 +1,7 @@
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const LOCAL_IMPORT_NAME_PATTERN = /^__yakit_share_([1-9][0-9]*)_[0-9a-f]{32}$/
+const { importProjectWithReceipt, runProjectStream, callProjectRpc } = require('./projectImport')
+const { resolveProjectSharePublishContext } = require('./projectSharePublish')
 
 const errorWithCode = (code) => {
   const error = new Error(code)
@@ -48,66 +50,31 @@ const registerProjectShareIPC = ({
 }) => {
   const transfers = new Map()
 
+  ipcMain.handle('ResolveProjectSharePublishContext', (_event, input) =>
+    resolveProjectSharePublishContext(getClient(), input),
+  )
+  ipcMain.handle('GetProjectShareTarget', () => ({ baseUrl: getOnlineContext().baseUrl }))
+
   const send = (channel, value) => {
     if (!win || win.isDestroyed?.()) return
     win.webContents?.send(channel, value)
   }
 
-  const callUnary = (method, params) =>
-    new Promise((resolve, reject) => {
-      const client = getClient()
-      const callback = (error, response) => {
-        if (error) reject(error)
-        else resolve(response)
-      }
-      try {
-        const result = client[method](params, callback)
-        if (result && typeof result.then === 'function') result.then(resolve, reject)
-      } catch (error) {
-        reject(error)
-      }
-    })
+  const callUnary = (method, params) => callProjectRpc(getClient(), method, params)
 
-  const runTransfer = ({ method, params, operationToken, requireTargetPath = false }) => {
+  const withTransfer = async (operationToken, task) => {
     if (!isNonEmptyString(operationToken)) return Promise.reject(errorWithCode('project_share_operation_token_invalid'))
     if (transfers.has(operationToken)) return Promise.reject(errorWithCode('project_share_transfer_in_progress'))
-    return new Promise((resolve, reject) => {
-      let settled = false
-      let targetPath = ''
-      let stream
-      const finish = (callback, value) => {
-        if (settled) return
-        settled = true
-        transfers.delete(operationToken)
-        callback(value)
-      }
-      try {
-        stream = getClient()[method](params)
-      } catch (error) {
-        reject(error)
-        return
-      }
-      transfers.set(operationToken, {
-        stream,
-        reject: (error) => finish(reject, error),
-      })
-      stream.on('data', (data) => {
-        if (typeof data?.TargetPath === 'string' && data.TargetPath) targetPath = data.TargetPath
-        send(`${operationToken}-data`, sanitizeProgress(data))
-      })
-      stream.on('error', () => {
-        send(`${operationToken}-error`, 'project_share_transfer_failed')
-        finish(reject, errorWithCode('project_share_transfer_failed'))
-      })
-      stream.on('end', () => {
-        if (requireTargetPath && !targetPath) {
-          finish(reject, errorWithCode('project_share_export_path_missing'))
-          return
-        }
-        send(`${operationToken}-end`)
-        finish(resolve, targetPath)
-      })
-    })
+    const controller = new AbortController()
+    const cancel = () => controller.abort()
+    transfers.set(operationToken, { cancel })
+    win?.webContents?.once?.('destroyed', cancel)
+    try {
+      return await task(controller.signal)
+    } finally {
+      win?.webContents?.removeListener?.('destroyed', cancel)
+      transfers.delete(operationToken)
+    }
   }
 
   const queryProjects = async (name) => {
@@ -147,12 +114,11 @@ const registerProjectShareIPC = ({
   }
 
   const findProjectByID = async (record) => {
-    const candidates = await queryProjects('')
-    const matches = candidates.filter(
-      (project) => projectID(project) === record.localProjectId && matchesRecoveryLocation(project, record),
-    )
-    if (matches.length !== 1) throw errorWithCode('local_import_project_not_found')
-    return matches[0]
+    const project = await callUnary('QueryProjectDetail', { Id: record.localProjectId })
+    if (projectID(project) !== record.localProjectId || !matchesRecoveryLocation(project, record)) {
+      throw errorWithCode('local_import_project_not_found')
+    }
+    return project
   }
 
   const advanceRecovery = (record, status, localProjectId) =>
@@ -174,25 +140,36 @@ const registerProjectShareIPC = ({
         ChildFolderId: record.childFolderId,
         Type: record.projectType,
       })
-    } catch {
-      throw errorWithCode('local_project_name_conflict')
+    } catch (error) {
+      const message = error.details || error.message || String(error)
+      if (
+        error.code === 6 ||
+        ((!error.code || [2, 3].includes(error.code)) && /exist|duplicat|已存在|重复|冲突/i.test(message))
+      ) {
+        const conflict = errorWithCode('local_project_name_conflict')
+        conflict.message += `: ${message}`
+        throw conflict
+      }
+      throw error
     }
   }
 
   const renameImportedProject = async (record, project) => {
-    await validateFinalName(record)
     const localProjectId = projectID(project)
     if (!isPositiveInteger(localProjectId) || localProjectId !== record.localProjectId) {
       throw errorWithCode('local_import_project_not_found')
     }
-    await callUnary('UpdateProject', {
-      ...project,
-      Id: localProjectId,
-      ProjectName: record.localProjectName,
-      FolderId: record.folderId,
-      ChildFolderId: record.childFolderId,
-      Type: record.projectType,
-    })
+    if (projectName(project) !== record.localProjectName) {
+      await validateFinalName(record)
+      await callUnary('UpdateProject', {
+        ...project,
+        Id: localProjectId,
+        ProjectName: record.localProjectName,
+        FolderId: record.folderId,
+        ChildFolderId: record.childFolderId,
+        Type: record.projectType,
+      })
+    }
     const completed = await advanceRecovery(record, 'project_imported', localProjectId)
     return {
       record: completed,
@@ -272,21 +249,41 @@ const registerProjectShareIPC = ({
     return renameImportedProject(renaming, imported)
   }
 
+  let exporting = false
   ipcMain.handle('ExportProjectShareArchive', async (_event, input, operationToken) => {
     requireExactKeys(input, ['projectId', 'password'], 'project_share_export_request_invalid')
     if (!isPositiveInteger(input.projectId) || typeof input.password !== 'string') {
       throw errorWithCode('project_share_export_request_invalid')
     }
-    const targetPath = await runTransfer({
-      method: 'ExportProject',
-      params: {
-        Id: input.projectId,
-        Password: input.password,
-      },
-      operationToken,
-      requireTargetPath: true,
-    })
-    return bundleStore.importProjectArchive(targetPath)
+    if (exporting) throw new Error('已有项目环境正在导出，请等待结束')
+    exporting = true
+    try {
+      return await withTransfer(operationToken, async (signal) => {
+        const client = getClient()
+        const project = await callProjectRpc(client, 'QueryProjectDetail', { Id: input.projectId }, signal)
+        const type = projectType(project) || 'project'
+        const current = await callProjectRpc(client, 'GetCurrentProjectEx', { Type: type }, signal)
+        const isCurrent = projectID(current) === input.projectId
+        if (isCurrent) await callProjectRpc(client, 'SetCurrentProject', { Id: 0, Type: type }, signal)
+        try {
+          const targetPath = await runProjectStream(
+            client,
+            'ExportProject',
+            { Id: input.projectId, Password: input.password },
+            {
+              signal,
+              onProgress: (data) => send(`${operationToken}-data`, sanitizeProgress(data)),
+            },
+          )
+          if (!targetPath) throw errorWithCode('project_share_export_path_missing')
+          return await bundleStore.importProjectArchive(targetPath)
+        } finally {
+          if (isCurrent) await callProjectRpc(client, 'SetCurrentProject', { Id: input.projectId, Type: type })
+        }
+      })
+    } finally {
+      exporting = false
+    }
   })
 
   ipcMain.handle('StageProjectSharePlugin', (_event, input) => bundleStore.stagePlugin(input))
@@ -315,6 +312,7 @@ const registerProjectShareIPC = ({
     validateRecoveryImport(record, input)
     const resolved = await resolveImportedProject(record, false)
     if (resolved) return resolved.project
+    await validateFinalName(record)
     const filePath = await bundleStore.resolveManagedHandlePath(input.handle, 'project_archive')
     await callUnary('IsProjectNameValid', {
       ProjectName: input.localImportName,
@@ -324,20 +322,25 @@ const registerProjectShareIPC = ({
       Type: input.type,
     })
     try {
-      await runTransfer({
-        method: 'ImportProject',
-        params: {
-          LocalProjectName: input.localImportName,
-          ProjectFilePath: filePath,
-          Password: input.password,
-          FolderId: input.folderId,
-          ChildFolderId: input.childFolderId,
-          Type: input.type,
-        },
-        operationToken,
-      })
-    } catch {
-      throw errorWithCode('local_import_outcome_unknown')
+      await withTransfer(operationToken, (signal) =>
+        importProjectWithReceipt(
+          getClient(),
+          {
+            LocalProjectName: input.localImportName,
+            ProjectFilePath: filePath,
+            Password: input.password,
+            FolderId: input.folderId,
+            ChildFolderId: input.childFolderId,
+            Type: input.type,
+          },
+          { signal, onProgress: (data) => send(`${operationToken}-data`, sanitizeProgress(data)) },
+        ),
+      )
+    } catch (error) {
+      if (error.code && !['IMPORT_UNCONFIRMED', 'ENGINE_DISCONNECTED'].includes(error.code)) throw error
+      const uncertain = errorWithCode('local_import_outcome_unknown')
+      uncertain.message += `: ${error.details || error.message}`
+      throw uncertain
     }
     record = await recoveryStore.get(input.receiptId)
     const imported = await resolveImportedProject(record, true)
@@ -357,8 +360,7 @@ const registerProjectShareIPC = ({
     const transfer = transfers.get(operationToken)
     if (!transfer) return
     transfers.delete(operationToken)
-    transfer.stream.cancel?.()
-    transfer.reject(errorWithCode('project_share_transfer_cancelled'))
+    transfer.cancel()
   })
 
   ipcMain.handle('RemoveProjectShareManagedHandle', (_event, handle) => bundleStore.removeManagedHandle(handle))

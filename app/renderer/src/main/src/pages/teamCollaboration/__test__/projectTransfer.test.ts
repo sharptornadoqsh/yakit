@@ -18,7 +18,7 @@ describe('项目传输终态和重试', () => {
     ipc.invoke.mockImplementation(async (channel, _params, token) => {
       if (channel === 'ImportProject') {
         events.emit(`${token}-data`, {}, { Verbose: 'error count = 0' })
-        events.emit(`${token}-end`)
+        events.emit(`${token}-end`, {}, { ProjectId: 1, DatabasePath: '/project.db' })
       }
     })
     await expect(runProjectTransfer(ipc, { channel: 'ImportProject', params: {} })).resolves.toBe('')
@@ -35,7 +35,7 @@ describe('项目传输终态和重试', () => {
         if (mode === 'event') events.emit(`${token}-error`, {}, '文件损坏或密码错误')
         if (mode === 'rejection') return Promise.reject(new Error('文件损坏或密码错误'))
         if (mode === 'throw') throw new Error('文件损坏或密码错误')
-      } else events.emit(`${token}-end`)
+      } else events.emit(`${token}-end`, {}, { ProjectId: 1, DatabasePath: '/project.db' })
       return Promise.resolve()
     })
     for (let i = 0; i < 2; i++) {
@@ -59,25 +59,26 @@ describe('项目传输终态和重试', () => {
       token: 'old',
       signal: controller.signal,
     })
-    const rejected = expect(operation).rejects.toMatchObject({ name: 'AbortError' })
     controller.abort()
     controller.abort()
     events.emit('old-end')
-    await rejected
+    await expect(operation).rejects.toMatchObject({ name: 'AbortError' })
     expect(ipc.invoke.mock.calls.filter(([channel]) => channel === 'cancel-ImportProject')).toHaveLength(1)
     expect(events.eventNames()).toEqual([])
     const next = runProjectTransfer(ipc, { channel: 'ImportProject', params: {}, token: 'new' })
     events.emit('old-error', {}, '迟到错误')
-    events.emit('new-end')
+    events.emit('new-end', {}, { ProjectId: 1, DatabasePath: '/project.db' })
     await expect(next).resolves.toBe('')
   })
   it('超时停止引擎流并清理定时器', async () => {
     vi.useFakeTimers()
     const { ipc, events } = createIpc()
     const result = runProjectTransfer(ipc, { channel: 'ImportProject', params: {}, timeoutMs: 10 })
-    const rejected = expect(result).rejects.toThrow('超时')
+    const rejected = result.catch((error) => error)
     await vi.advanceTimersByTimeAsync(10)
-    await rejected
+    const error = await rejected
+    expect(error).toBeInstanceOf(Error)
+    expect(error.message).toContain('超时')
     expect(ipc.invoke).toHaveBeenCalledWith('cancel-ImportProject', expect.any(String))
     expect(events.eventNames()).toEqual([])
     expect(vi.getTimerCount()).toBe(0)

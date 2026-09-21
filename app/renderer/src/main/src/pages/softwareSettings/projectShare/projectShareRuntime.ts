@@ -223,6 +223,7 @@ const markRetryableFailure = async (
 
   try {
     const latest = await getRecovery(current.receiptId, dependencies)
+    if (latest.status === 'renaming_project') return
     const status = isPositiveInteger(latest.localProjectId)
       ? 'retryable_failed_after_import'
       : 'retryable_failed_before_import'

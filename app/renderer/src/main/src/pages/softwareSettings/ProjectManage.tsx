@@ -44,8 +44,10 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import { Trans } from 'react-i18next'
 import { getProjectDisplayText } from './projectBranding'
 import { ProjectShareModal } from './projectShare/ProjectShareModal'
+import { resolvePublishContext } from './projectShare/projectSharePublishContext'
 import { TransferProject } from './TransferProject'
 import { PROJECT_IMPORT_ACCEPT, validateProjectImportPath } from './projectImport'
+import { randomString } from '@/utils/randomUtil'
 import { RUIYAN_UI_POLICY } from '@/config/renyanUiPolicy'
 
 export { TransferProject } from './TransferProject'
@@ -1291,7 +1293,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
                   onClick={() => setProjectShareModal({ open: true, mode: 'share' })}
                 >
                   <RuiYanIcon name="project" />
-                  <span>完整环境密令（需引擎插件引用能力）</span>
+                  <span>完整环境发布（选择插件）</span>
                 </button>
                 <button
                   type="button"
@@ -1541,6 +1543,7 @@ const ProjectManage: React.FC<ProjectManageProp> = memo((props) => {
       )}
       <ProjectShareModal
         open={projectShareModal.open}
+        resolvePublishContext={resolvePublishContext}
         mode={projectShareModal.mode}
         localProject={
           latestProject
@@ -1892,8 +1895,33 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
     Password: '',
   })
   const importRequest = useRef(0)
+  const importInspectionToken = useRef('')
+  const cancelImportInspection = useMemoizedFn(() => {
+    if (importInspectionToken.current) {
+      void ipcRenderer.invoke('cancel-InspectProjectImportFile', importInspectionToken.current).catch(() => undefined)
+      importInspectionToken.current = ''
+    }
+  })
+  const [importError, setImportError] = useState('')
+  const [importEncrypted, setImportEncrypted] = useState<boolean>()
   const [importInfo, setImportInfo] = useState<ImportProjectProps>({
     ProjectFilePath: '',
+  })
+
+  useEffect(
+    () => () => {
+      importRequest.current += 1
+      cancelImportInspection()
+    },
+    [cancelImportInspection],
+  )
+
+  const changeImportPath = useMemoizedFn((value: string) => {
+    importRequest.current += 1
+    cancelImportInspection()
+    setImportEncrypted(undefined)
+    setImportError('')
+    setImportInfo({ ...importInfo, ProjectFilePath: value, Password: '' })
   })
 
   useEffect(() => {
@@ -1950,6 +1978,9 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
     }
     if (!visible) {
       importRequest.current += 1
+      cancelImportInspection()
+      setImportError('')
+      setImportEncrypted(undefined)
       setTransferShow({ visible: false })
       setLoading(false)
       setIsCheck(false)
@@ -1963,7 +1994,7 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
         ProjectFilePath: '',
       })
     }
-  }, [visible, isNew, isExport, project])
+  }, [visible, isNew, isExport, project, cancelImportInspection])
 
   const cascaderValue = useMemo(() => {
     if (project) {
@@ -2009,6 +2040,7 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
   })
 
   const onSubmit = useMemoizedFn(() => {
+    if (loading || transferShow.visible) return
     const v = form.getFieldsValue()
     const isHasDescription = Array.isArray(v?.Description) && v.Description.length > 0
 
@@ -2083,11 +2115,19 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
       })
     }
     if (isImport) {
+      setImportError('')
       const requestId = ++importRequest.current
       const isCurrent = () => importRequest.current === requestId
       void (async () => {
         try {
           const projectPath = validateProjectImportPath(importInfo.ProjectFilePath)
+          const inspectionToken = `import-inspect-${randomString(32)}`
+          importInspectionToken.current = inspectionToken
+          const inspection = await ipcRenderer.invoke('InspectProjectImportFile', projectPath, inspectionToken)
+          if (importInspectionToken.current === inspectionToken) importInspectionToken.current = ''
+          if (!isCurrent()) return
+          setImportEncrypted(inspection.encrypted)
+          if (inspection.encrypted && !importInfo.Password) throw new Error('该项目文件已加密，请填写密码')
           const name =
             importInfo.LocalProjectName?.trim() || (await ipcRenderer.invoke('fetch-path-file-name', projectPath))
           if (!isCurrent()) return
@@ -2103,11 +2143,19 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
           setTransferShow({
             isImport: true,
             visible: true,
-            data: { ...importInfo, ProjectFilePath: projectPath, LocalProjectName: name },
+            data: {
+              ...importInfo,
+              ProjectFilePath: projectPath,
+              LocalProjectName: name,
+              Password: inspection.encrypted ? importInfo.Password : '',
+            },
           })
         } catch (error) {
           if (!isCurrent()) return
-          failed(`导入项目失败：${error instanceof Error ? error.message : String(error)}`)
+          cancelImportInspection()
+          const message = `导入项目失败：${error instanceof Error ? error.message : String(error)}`
+          setImportError(message)
+          failed(message)
           setLoading(false)
           setTransferShow({ visible: false })
         }
@@ -2127,6 +2175,7 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
 
   const onClose = useMemoizedFn(() => {
     importRequest.current += 1
+    cancelImportInspection()
     setTransferShow({ visible: false })
     setLoading(false)
     form.resetFields()
@@ -2211,6 +2260,11 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
         )
       }
     >
+      {isImport && importError && (
+        <div role="alert" aria-label="项目导入错误">
+          {importError}
+        </div>
+      )}
       <Form
         form={form}
         style={transferShow.visible ? { display: 'none' } : {}}
@@ -2437,9 +2491,10 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
                     showUploadList={false}
                     beforeUpload={(f: any) => {
                       try {
-                        setImportInfo({ ...importInfo, ProjectFilePath: validateProjectImportPath(f?.path || '') })
+                        changeImportPath(validateProjectImportPath(f?.path || ''))
                       } catch (error) {
-                        setImportInfo({ ...importInfo, ProjectFilePath: '' })
+                        changeImportPath('')
+                        setImportError((error as Error).message)
                         failed((error as Error).message)
                       }
                       return Upload.LIST_IGNORE
@@ -2459,7 +2514,8 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
                 size="large"
                 placeholder={t('NewProjectAndFolder.inputAbsolute')}
                 value={importInfo.ProjectFilePath}
-                onChange={(e) => setImportInfo({ ...importInfo, ProjectFilePath: e.target.value })}
+                aria-label="项目文件路径"
+                onChange={(e) => changeImportPath(e.target.value)}
               />
             </Form.Item>
             <Form.Item
@@ -2480,9 +2536,18 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
             <Form.Item
               label={`${t('NewProjectAndFolder.password')} :`}
               className={styles['export-form-item-password-wrapper']}
+              help={
+                importEncrypted === false
+                  ? '文件未加密，密码不会传入引擎。'
+                  : importEncrypted
+                    ? '文件已加密，请填写密码。'
+                    : '提交时读取文件内容判断加密状态，不依据后缀判断。'
+              }
             >
               <YakitInput.Password
                 placeholder={t('NewProjectAndFolder.passwordImport')}
+                aria-label="项目归档密码"
+                disabled={importEncrypted === false}
                 value={importInfo.Password}
                 onChange={(e) => setImportInfo({ ...importInfo, Password: e.target.value })}
               />
@@ -2516,6 +2581,8 @@ export const NewProjectAndFolder: React.FC<NewProjectAndFolderProps> = memo((pro
 
       <TransferProject
         usedBy="NewProjectAndFolder"
+        embedded
+        onError={setImportError}
         {...transferShow}
         visible={visible && transferShow.visible}
         onSuccess={(type) => {

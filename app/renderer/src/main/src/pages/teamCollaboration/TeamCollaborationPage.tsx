@@ -28,6 +28,7 @@ import {
 } from '@/services/teamCollaboration'
 import { publishTeamProjectBundle, restoreTeamProjectBundle, type ProjectBundleProgress } from './teamProjectBundle'
 import { createDefaultTeamProjectBundleDependencies } from './teamProjectBundleRuntime'
+import { resolvePublishContext } from '@/pages/softwareSettings/projectShare/projectSharePublishContext'
 import { getProjectBundleManifest, type ProjectBundleManifest } from './projectBundleData'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { getRemoteHttpSettingGV } from '@/utils/envfile'
@@ -288,6 +289,12 @@ interface TeamCollaborationPageProps {
   initialLocalProjectId?: string
 }
 
+const FullProjectPublisher = React.lazy(() =>
+  import('@/pages/softwareSettings/projectShare/ProjectShareModal').then((module) => ({
+    default: module.ProjectShareModal,
+  })),
+)
+
 export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React.memo((props) => {
   const { initialLocalProjectId } = props
   const userInfo = useStore((state) => state.userInfo)
@@ -297,6 +304,7 @@ export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React
   }\u0000${authenticatedUserId}\u0000${userInfo.token}`
   synchronizeTeamPermissionSession(authenticationSessionKey)
   const [teams, setTeams] = useState<ApiEntity[]>([])
+  const [fullShareOpen, setFullShareOpen] = useState(false)
   const [permissionSnapshots, setPermissionSnapshots] = useState<ReadonlyMap<number, TeamPermissionSnapshot>>(
     () => new Map(),
   )
@@ -1749,6 +1757,15 @@ export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React
                       。发布只上传此次归档；后续本地修改需要再次手动发布，不会自动同步或双向合并。
                     </p>
                     <p>本地记录的最后成功发布时间：{publishedAt ? formatTime(publishedAt) : '暂无'}。</p>
+                    <p>
+                      普通归档仅包含项目数据库。需要携带插件源码与参数时，请使用完整环境发布；接收方通过密令下载固定版本恢复。
+                    </p>
+                    <YakitButton
+                      onClick={() => setFullShareOpen(true)}
+                      disabled={!canPublishProject || !selectedLocalProject || Boolean(actionLoading)}
+                    >
+                      发布完整环境（选择插件）
+                    </YakitButton>
                     {publishedManifest && (
                       <p>
                         远端当前归档来源：{publishedManifest.source_project.name}（来源客户端本地 ID{' '}
@@ -2196,6 +2213,18 @@ export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React
           <small>覆盖操作会先导出原项目备份；创建副本为默认选项。</small>
         </div>
       </YakitModal>
+      {fullShareOpen && selectedLocalProject && (
+        <React.Suspense fallback={<div role="status">正在加载完整环境发布</div>}>
+          <FullProjectPublisher
+            open={fullShareOpen}
+            mode="share"
+            localProject={{ id: Number(selectedLocalProjectId), name: getLocalProjectName(selectedLocalProject) }}
+            initialTarget={{ teamId: Number(selectedTeamId), projectId: Number(selectedProjectId) }}
+            resolvePublishContext={resolvePublishContext}
+            onClose={() => setFullShareOpen(false)}
+          />
+        </React.Suspense>
+      )}
     </div>
   )
 })

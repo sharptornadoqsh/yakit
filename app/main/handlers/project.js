@@ -6,6 +6,7 @@ const { createProjectShareBundleStore } = require('../projectShareBundle')
 const { registerProjectShareIPC } = require('../projectShareIPC')
 const { createProjectShareRecoveryStore } = require('../projectShareRecoveryStore')
 const { registerProjectExportHandler } = require('../projectExport')
+const { inspectProjectImportFile, importProjectWithReceipt, callProjectRpc } = require('../projectImport')
 
 module.exports = (win, getClient) => {
   const projectArchiveStore = createProjectArchiveStore()
@@ -128,15 +129,7 @@ module.exports = (win, getClient) => {
 
   // asyncIsProjectNameValid wrapper
   const asyncIsProjectNameValid = (params) => {
-    return new Promise((resolve, reject) => {
-      getClient().IsProjectNameValid(params, (err, data) => {
-        if (err) {
-          reject(err)
-          return
-        }
-        resolve(data)
-      })
-    })
+    return callProjectRpc(getClient(), 'IsProjectNameValid', params)
   }
   ipcMain.handle('IsProjectNameValid', async (e, params) => {
     return await asyncIsProjectNameValid(params)
@@ -217,9 +210,54 @@ module.exports = (win, getClient) => {
 
   const streamImportProjectMap = new Map()
   ipcMain.handle('cancel-ImportProject', handlerHelper.cancelHandler(streamImportProjectMap))
-  ipcMain.handle('ImportProject', (e, params, token) => {
-    let stream = getClient().ImportProject(params)
-    handlerHelper.registerHandler(win, stream, streamImportProjectMap, token, { terminalOnError: true })
+  const importInspectionMap = new Map()
+  ipcMain.handle('cancel-InspectProjectImportFile', handlerHelper.cancelHandler(importInspectionMap))
+  ipcMain.handle('InspectProjectImportFile', async (_event, filePath, token) => {
+    if (!token || importInspectionMap.has(token)) throw new Error('项目文件校验标识无效或重复')
+    const controller = new AbortController()
+    const cancel = () => controller.abort()
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      cancel()
+    }, 120000)
+    const owner = _event.sender || win.webContents
+    const entry = { cancel }
+    importInspectionMap.set(token, entry)
+    owner.once?.('destroyed', cancel)
+    try {
+      return await inspectProjectImportFile(filePath, { signal: controller.signal })
+    } catch (error) {
+      if (timedOut) throw new Error('项目文件内容校验超时，请检查磁盘或重新选择文件')
+      throw error
+    } finally {
+      clearTimeout(timer)
+      owner.removeListener?.('destroyed', cancel)
+      if (importInspectionMap.get(token) === entry) importInspectionMap.delete(token)
+    }
+  })
+  ipcMain.handle('ImportProject', async (e, params, token) => {
+    if (!token || streamImportProjectMap.has(token)) throw new Error('项目导入操作标识无效或重复')
+    const controller = new AbortController()
+    const entry = { cancel: () => controller.abort() }
+    const owner = e.sender || win.webContents
+    const send = (channel, value) => {
+      if (!controller.signal.aborted && !owner.isDestroyed?.()) owner.send(channel, value)
+    }
+    streamImportProjectMap.set(token, entry)
+    owner.once?.('destroyed', entry.cancel)
+    try {
+      const receipt = await importProjectWithReceipt(getClient(), params, {
+        signal: controller.signal,
+        onProgress: (progress) =>
+          send(`${token}-data`, { ...progress, Percent: Math.min(progress.Percent || 0, 0.99) }),
+      })
+      send(`${token}-end`, receipt)
+      return receipt
+    } finally {
+      owner.removeListener?.('destroyed', entry.cancel)
+      if (streamImportProjectMap.get(token) === entry) streamImportProjectMap.delete(token)
+    }
   })
 
   ipcMain.handle('InspectProjectArchive', (e, filePath) => projectArchiveStore.inspectArchive(filePath))

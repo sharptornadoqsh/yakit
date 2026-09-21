@@ -763,39 +763,10 @@
 //     }
 // }
 
-// 传输项目文件弹窗
-.transfer-project-mask {
-  width: 100vw;
-  height: 100vh;
-  position: fixed;
-  top: 0;
-  left: 0;
-  overflow: hidden;
-  background: rgba(49, 52, 63, 0.3);
-}
-.transfer-project-hidden-mask {
-  display: none;
-}
-.transfer-project-mask-body {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.project-export-modal {
-  width: 480px;
-  position: absolute;
-  top: 35%;
-  left: calc(50% - 240px);
-}
-.project-import-modal {
-  width: 720px;
-  position: absolute;
-  top: 35%;
-  left: calc(50% - 360px);
-}
-
 .modal-transfer-project {
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
   box-sizing: border-box;
   background: var(--Colors-Use-Neutral-Bg-Hover);
   border: 1px solid var(--Colors-Use-Neutral-Border);

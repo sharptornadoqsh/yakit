@@ -14,7 +14,13 @@ vi.mock('@/i18n/useI18nNamespaces', () => ({ useI18nNamespaces: () => ({ t: mock
 vi.mock('@/components/yakitUI/YakitButton/YakitButton', () => ({
   YakitButton: ({ children, onClick }) => <button onClick={onClick}>{children}</button>,
 }))
-vi.mock('antd', () => ({ Progress: ({ percent }) => <div data-testid="progress">{percent}</div> }))
+vi.mock('antd', () => ({
+  Progress: ({ percent }) => <div data-testid="progress">{percent}</div>,
+  ConfigProvider: ({ children }) => <>{children}</>,
+}))
+vi.mock('@/components/renyanUI/RuiYanUI.module.scss', () => ({
+  default: new Proxy({}, { get: (_target, name) => name }),
+}))
 vi.mock('../icon', () => ({ ProjectExportSvgIcon: () => null, ProjectImportSvgIcon: () => null }))
 vi.mock('../ProjectManage.module.scss', () => ({ default: new Proxy({}, { get: (_target, name) => name }) }))
 
@@ -73,7 +79,7 @@ describe('项目传输进度组件恢复', () => {
       fireEvent.click(screen.getByRole('button', { name: '重新导入' }))
     }
     await act(async () => {
-      events.emit(`${token}-end`)
+      events.emit(`${token}-end`, {}, { ProjectId: 1, DatabasePath: '/project.db' })
     })
     expect(mocks.success).toHaveBeenCalledTimes(1)
     expect(mocks.success).toHaveBeenCalledWith('isImport')
@@ -98,7 +104,7 @@ describe('项目传输进度组件恢复', () => {
     })
     expect(mocks.success).not.toHaveBeenCalled()
     await act(async () => {
-      events.emit(`${token}-end`)
+      events.emit(`${token}-end`, {}, { ProjectId: 1, DatabasePath: '/project.db' })
     })
     expect(mocks.success).toHaveBeenCalledTimes(1)
   })

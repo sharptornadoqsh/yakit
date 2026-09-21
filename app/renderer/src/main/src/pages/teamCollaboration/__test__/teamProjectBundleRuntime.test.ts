@@ -195,7 +195,7 @@ describe('项目导入导出流适配', () => {
         return { fileName: 'original.yakitproject', filePath: 'D:/backup/original.yakitproject', size: 9, sha256: 'a' }
       }
       if (channel === 'ImportProject') {
-        queueMicrotask(() => ipc.emit(`${token}-end`))
+        queueMicrotask(() => ipc.emit(`${token}-end`, { ProjectId: 92, DatabasePath: '/project.db' }))
         return
       }
       if (channel === 'GetProjects') {
@@ -245,7 +245,7 @@ describe('项目导入导出流适配', () => {
         importCount += 1
         queueMicrotask(() => {
           if (importCount === 1) ipc.emit(`${token}-error`, '团队归档无效')
-          else ipc.emit(`${token}-end`)
+          else ipc.emit(`${token}-end`, { ProjectId: 93, DatabasePath: '/project.db' })
         })
         return
       }

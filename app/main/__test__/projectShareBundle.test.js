@@ -1,3 +1,4 @@
+// @vitest-environment node
 import crypto from 'crypto'
 import fs from 'fs'
 import http from 'http'
@@ -223,6 +224,76 @@ describe('v2 项目分享 IPC', () => {
     }
   }
 
+  it('名称预检保留断开错误，不误报为同名冲突', async () => {
+    const ipcMain = createIPCMain()
+    const record = { ...createRecoveryFixture(), status: 'importing_project' }
+    const disconnected = Object.assign(new Error('引擎已断开'), { code: 14 })
+    registerProjectShareIPC({
+      ipcMain,
+      win: { webContents: { send: vi.fn() } },
+      getClient: () => ({
+        GetProjects: (_params, _options, callback) => callback(null, { Projects: [] }),
+        IsProjectNameValid: (_params, _options, callback) => callback(disconnected),
+      }),
+      recoveryStore: { get: async () => record },
+      bundleStore: {},
+      getClientId: () => 'desktop-client',
+    })
+    await expect(
+      ipcMain.handlers.get('ImportProjectShareArchive')(
+        {},
+        {
+          receiptId: 9,
+          handle: record.managedHandles[0].handle,
+          localImportName: record.localImportName,
+          finalLocalProjectName: record.localProjectName,
+          password: '',
+          folderId: 0,
+          childFolderId: 0,
+          type: 'project',
+        },
+        'operation',
+      ),
+    ).rejects.toMatchObject({ code: 14, message: '引擎已断开' })
+  })
+
+  it.each(['project_imported', 'renaming_project'])(
+    '本地项目按 ID 对账，不依赖前一百项列表，已重命名时不重复写入：%s',
+    async (status) => {
+      const ipcMain = createIPCMain()
+      const record = { ...createRecoveryFixture(), status, localProjectId: 41 }
+      const client = {
+        GetProjects: vi.fn((_params, _options, callback) => callback(null, { Projects: [] })),
+        QueryProjectDetail: vi.fn((_params, _options, callback) =>
+          callback(null, {
+            Id: 41,
+            ProjectName: record.localProjectName,
+            Type: 'project',
+            FolderId: 0,
+            ChildFolderId: 0,
+          }),
+        ),
+      }
+      registerProjectShareIPC({
+        ipcMain,
+        win: { webContents: { send: vi.fn() } },
+        getClient: () => client,
+        recoveryStore: {
+          get: async () => record,
+          upsert: async ({ record: next, expectedRevision }) => ({ ...next, revision: expectedRevision + 1 }),
+        },
+        bundleStore: {},
+        getClientId: () => 'desktop-client',
+      })
+      await expect(ipcMain.handlers.get('ResolveProjectShareImportedProject')({}, 9)).resolves.toEqual({
+        localProjectId: 41,
+        localProjectName: record.localProjectName,
+      })
+      expect(client.QueryProjectDetail).toHaveBeenCalled()
+      expect(client.GetProjects).not.toHaveBeenCalled()
+    },
+  )
+
   it('复用真实导出流但不向 Renderer 泄露 TargetPath', async () => {
     const ipcMain = createIPCMain()
     const stream = new EventEmitter()
@@ -252,11 +323,14 @@ describe('v2 项目分享 IPC', () => {
       releaseHandle: vi.fn(),
     }
     const webContents = { send: vi.fn() }
+    const exportProject = vi.fn(() => stream)
     registerProjectShareIPC({
       ipcMain,
       win: { webContents },
       getClient: () => ({
-        ExportProject: vi.fn(() => stream),
+        ExportProject: exportProject,
+        QueryProjectDetail: (_params, _options, callback) => callback(null, { Id: 17, Type: 'project' }),
+        GetCurrentProjectEx: (_params, _options, callback) => callback(null, { Id: 18 }),
       }),
       bundleStore,
       recoveryStore,
@@ -268,12 +342,15 @@ describe('v2 项目分享 IPC', () => {
       { projectId: 17, password: '' },
       'export-operation',
     )
+    await vi.waitFor(() => expect(exportProject).toHaveBeenCalledTimes(1))
     stream.emit('data', {
       TargetPath: 'D:\\secret\\project.yakitproject',
       Percent: 50,
       Verbose: '正在导出',
     })
     stream.emit('end')
+    stream.emit('status', { code: 0 })
+    stream.emit('close')
     await expect(pending).resolves.toMatchObject({
       handle: '718c897f-17e3-4d07-8fc0-71f9cd1a84de',
     })
@@ -349,6 +426,15 @@ describe('v2 项目分享 IPC', () => {
     const ipcMain = createIPCMain()
     const stream = new EventEmitter()
     stream.cancel = vi.fn()
+    const localFile = path.join(createTemporaryDirectory(), 'project.db')
+    const database = Buffer.alloc(4096)
+    database.write('SQLite format 3\0')
+    database.writeUInt16BE(4096, 16)
+    database[18] = database[19] = 1
+    database[21] = 64
+    database[22] = database[23] = 32
+    database.writeUInt32BE(1, 28)
+    fs.writeFileSync(localFile, database)
     let recovery = {
       ...createRecoveryFixture(),
       status: 'importing_project',
@@ -370,7 +456,7 @@ describe('v2 项目分享 IPC', () => {
       releaseHandle: vi.fn(),
     }
     const bundleStore = {
-      resolveManagedHandlePath: vi.fn(async () => 'D:\\managed\\project.yakitproject'),
+      resolveManagedHandlePath: vi.fn(async () => localFile),
       importProjectArchive: vi.fn(),
       stagePlugin: vi.fn(),
       createBundle: vi.fn(),
@@ -382,13 +468,13 @@ describe('v2 项目分享 IPC', () => {
       removeManagedHandle: vi.fn(),
     }
     const client = {
-      IsProjectNameValid: vi.fn((_params, callback) => callback(null, {})),
+      IsProjectNameValid: vi.fn((...args) => args.at(-1)(null, {})),
       ImportProject: vi.fn(() => stream),
       GetProjects: vi
         .fn()
-        .mockImplementationOnce((_params, callback) => callback(null, { Projects: [] }))
-        .mockImplementation((_params, callback) =>
-          callback(null, {
+        .mockImplementationOnce((...args) => args.at(-1)(null, { Projects: [] }))
+        .mockImplementation((...args) =>
+          args.at(-1)(null, {
             Projects: [
               {
                 Id: 41,
@@ -397,11 +483,12 @@ describe('v2 项目分享 IPC', () => {
                 ChildFolderId: 0,
                 Type: 'project',
                 Description: '',
+                DatabasePath: localFile,
               },
             ],
           }),
         ),
-      UpdateProject: vi.fn((params, callback) => callback(null, params)),
+      UpdateProject: vi.fn((params, _options, callback) => callback(null, params)),
     }
     registerProjectShareIPC({
       ipcMain,
@@ -429,6 +516,8 @@ describe('v2 项目分享 IPC', () => {
     )
     await vi.waitFor(() => expect(client.ImportProject).toHaveBeenCalledTimes(1))
     stream.emit('end')
+    stream.emit('status', { code: 0 })
+    stream.emit('close')
 
     await expect(pending).resolves.toEqual({
       localProjectId: 41,
@@ -436,7 +525,7 @@ describe('v2 项目分享 IPC', () => {
     })
     expect(client.ImportProject).toHaveBeenCalledWith({
       LocalProjectName: '__yakit_share_9_0123456789abcdef0123456789abcdef',
-      ProjectFilePath: 'D:\\managed\\project.yakitproject',
+      ProjectFilePath: localFile,
       Password: '',
       FolderId: 0,
       ChildFolderId: 0,
@@ -451,6 +540,7 @@ describe('v2 项目分享 IPC', () => {
         Id: 41,
         ProjectName: '本地项目',
       }),
+      expect.objectContaining({ deadline: expect.any(Number) }),
       expect.any(Function),
     )
   })

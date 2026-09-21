@@ -156,10 +156,14 @@ export const getProjectShareErrorCode = (error: unknown): string => {
   if (!error || typeof error !== 'object') return ''
   const candidate = error as {
     code?: unknown
+    message?: unknown
     response?: { data?: { code?: unknown; error?: { code?: unknown } } }
   }
   const code = candidate.response?.data?.error?.code ?? candidate.response?.data?.code ?? candidate.code
-  return typeof code === 'string' ? code : ''
+  if (typeof code === 'string') return code
+  if (typeof candidate.message !== 'string') return ''
+  const message = candidate.message.replace(/^Error invoking remote method '[^']+': /, '').replace(/^Error: /, '')
+  return message.match(/^((?:project_share|project_bundle|local_import|local_project)_[a-z_]+)(?::|$)/)?.[1] || ''
 }
 
 const assertPositiveInteger = (value: number, code: string) => {

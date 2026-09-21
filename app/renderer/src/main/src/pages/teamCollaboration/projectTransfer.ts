@@ -76,8 +76,15 @@ export const runProjectTransfer = (ipc: ProjectTransferIpc, input: RunProjectTra
       }
     }
     const onError = (_event: unknown, error: unknown) => fail(error)
-    const onEnd = () => {
+    const onEnd = (_event?: unknown, receipt?: { ProjectId?: number; DatabasePath?: string }) => {
       if (settled) return
+      if (
+        input.channel === 'ImportProject' &&
+        (!Number.isSafeInteger(receipt?.ProjectId) || Number(receipt?.ProjectId) <= 0 || !receipt?.DatabasePath)
+      ) {
+        fail('导入结束但缺少已核对的项目收据，请检查引擎版本和本地项目列表')
+        return
+      }
       if (input.requireTargetPath && !targetPath) {
         fail('项目导出结束但未返回归档路径')
         return
