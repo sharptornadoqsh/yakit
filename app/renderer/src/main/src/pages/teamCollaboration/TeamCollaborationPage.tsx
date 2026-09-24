@@ -23,6 +23,7 @@ import {
   listTestData,
   listTestResults,
   type CollaborationTeam,
+  type CreateTeamProjectInput,
   type CurrentCollaborationUser,
   updateProjectSnapshot,
 } from '@/services/teamCollaboration'
@@ -32,6 +33,7 @@ import { resolvePublishContext } from '@/pages/softwareSettings/projectShare/pro
 import { getProjectBundleManifest, type ProjectBundleManifest } from './projectBundleData'
 import { getRemoteValue, setRemoteValue } from '@/utils/kv'
 import { getRemoteHttpSettingGV } from '@/utils/envfile'
+import { randomString } from '@/utils/randomUtil'
 import {
   acceptTeamPermissionMemberVersion,
   buildTeamPermissionSnapshots,
@@ -1237,7 +1239,11 @@ export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React
     setActionLoading('create-project')
     setErrorMessage('')
     try {
-      await callApi(createTeamProject as ApiFunction, selectedTeamId, { name })
+      const input: CreateTeamProjectInput = {
+        project_key: `project-${Date.now()}-${randomString(20).toLowerCase()}`,
+        name,
+      }
+      await createTeamProject(selectedTeamId, input)
       setProjectName('')
       await loadTeamContext(selectedTeamId)
     } catch (error) {

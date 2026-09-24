@@ -350,6 +350,146 @@ describe('团队协作页面', () => {
     } as never)
   })
 
+  describe('创建团队项目请求', () => {
+    beforeEach(async () => {
+      const actual =
+        await vi.importActual<typeof import('@/services/teamCollaboration')>('@/services/teamCollaboration')
+      vi.mocked(createTeamProject).mockImplementation(actual.createTeamProject)
+      vi.mocked(getMe).mockResolvedValue(
+        createMeResponse([createMembership({ permissions: ['project.read', 'project.manage'] })]),
+      )
+      vi.mocked(listTeamProjects).mockResolvedValue({ ok: true, data: [] })
+      vi.mocked(getProjectSync)
+        .mockReset()
+        .mockResolvedValue({ data: { version: 1, snapshot: {} } } as never)
+      networkMocks.axiosApi.mockImplementation(async ({ method, url, data }) => {
+        if (method !== 'post' || url !== 'v2/teams/1/projects') throw new Error('意外的创建项目请求')
+        const projectKey =
+          typeof data?.project_key === 'string'
+            ? data.project_key
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9-]/g, '')
+                .replace(/^-+|-+$/g, '')
+            : ''
+        if (!projectKey || typeof data?.name !== 'string' || !data.name.trim()) {
+          return {
+            code: 400,
+            data: { ok: false, error: { code: 'invalid_body', message: '项目标识和名称为必填项' } },
+          }
+        }
+        return { code: 201, data: { ok: true, data: { id: 22, ...data, project_key: projectKey } } }
+      })
+    })
+
+    afterEach(() => {
+      vi.mocked(createTeamProject).mockReset()
+      networkMocks.axiosApi.mockReset()
+      vi.restoreAllMocks()
+    })
+
+    const openProjectCreation = async () => {
+      render(<TeamCollaborationPage />)
+      await waitFor(() => expect(listTeamProjects).toHaveBeenCalledWith('1'))
+      await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).not.toBeDisabled())
+    }
+
+    const expectCreateRequest = (callNumber = 1) => {
+      expect(networkMocks.axiosApi).toHaveBeenNthCalledWith(callNumber, {
+        method: 'post',
+        url: 'v2/teams/1/projects',
+        data: { project_key: expect.stringMatching(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), name: '测试123' },
+      })
+    }
+
+    test('中文名称生成合法非空标识，真实请求同时携带标识和去除首尾空白的名称', async () => {
+      await openProjectCreation()
+      fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: ' \t测试123　' } })
+      fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+
+      await waitFor(() => expect(networkMocks.axiosApi).toHaveBeenCalledTimes(1))
+      expectCreateRequest()
+      await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).toHaveValue(''))
+      expect(screen.queryByText('项目标识和名称为必填项')).not.toBeInTheDocument()
+    })
+
+    test('同一时刻两次创建同名独立项目使用不同标识', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(1790000000000)
+      await openProjectCreation()
+      for (let callNumber = 1; callNumber <= 2; callNumber += 1) {
+        fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: '测试123' } })
+        fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+        await waitFor(() => expect(networkMocks.axiosApi).toHaveBeenCalledTimes(callNumber))
+        expectCreateRequest(callNumber)
+        await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).toHaveValue(''))
+      }
+
+      const [firstRequest, secondRequest] = networkMocks.axiosApi.mock.calls.map(([request]) => request.data)
+      expect(secondRequest.project_key).not.toBe(firstRequest.project_key)
+    })
+
+    test.each(['', '   ', '\t　\n'])('空白名称 %j 不发送创建请求', async (name) => {
+      await openProjectCreation()
+      fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: name } })
+      expect(screen.getByRole('button', { name: '创建团队项目' })).toBeDisabled()
+      fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+
+      expect(createTeamProject).not.toHaveBeenCalled()
+      expect(networkMocks.axiosApi).not.toHaveBeenCalled()
+      expect(listTeamProjects).toHaveBeenCalledTimes(1)
+    })
+
+    test('服务端失败展示错误并保留原始输入，重试成功后清空输入', async () => {
+      networkMocks.axiosApi.mockResolvedValueOnce({
+        code: 500,
+        data: { ok: false, error: { code: 'database_error', message: '创建团队项目失败，请稍后重试' } },
+      })
+      await openProjectCreation()
+      fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: ' 测试123 ' } })
+      fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+
+      expect(await screen.findByText('创建团队项目失败，请稍后重试')).toBeInTheDocument()
+      expectCreateRequest()
+      expect(screen.getByPlaceholderText('输入项目名称')).toHaveValue(' 测试123 ')
+      expect(listTeamProjects).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: '创建团队项目' })).not.toBeDisabled()
+
+      fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+      await waitFor(() => expect(networkMocks.axiosApi).toHaveBeenCalledTimes(2))
+      expectCreateRequest(2)
+      await waitFor(() => expect(screen.getByPlaceholderText('输入项目名称')).toHaveValue(''))
+      expect(screen.queryByText('创建团队项目失败，请稍后重试')).not.toBeInTheDocument()
+    })
+
+    test('创建成功后重新读取当前团队项目列表并展示新增项目', async () => {
+      await openProjectCreation()
+      vi.mocked(listTeamProjects).mockResolvedValueOnce({
+        data: [{ id: 22, name: '测试123', version: 1 }],
+      } as never)
+      fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: '测试123' } })
+      fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+
+      expect(await screen.findByText('测试123')).toBeInTheDocument()
+      expectCreateRequest()
+      expect(listTeamProjects).toHaveBeenCalledTimes(2)
+      expect(listTeamProjects).toHaveBeenLastCalledWith('1')
+      expect(screen.getByPlaceholderText('输入项目名称')).toHaveValue('')
+    })
+
+    test('缺少项目管理权限时保留禁用状态且不发送请求', async () => {
+      vi.mocked(getMe).mockResolvedValue(createMeResponse([createMembership({ permissions: ['project.read'] })]))
+      render(<TeamCollaborationPage />)
+      await waitFor(() => expect(listTeamProjects).toHaveBeenCalledWith('1'))
+      expect(screen.getByPlaceholderText('输入项目名称')).toBeDisabled()
+      fireEvent.change(screen.getByPlaceholderText('输入项目名称'), { target: { value: '测试123' } })
+      expect(screen.getByRole('button', { name: '创建团队项目' })).toBeDisabled()
+      fireEvent.click(screen.getByRole('button', { name: '创建团队项目' }))
+
+      expect(createTeamProject).not.toHaveBeenCalled()
+      expect(networkMocks.axiosApi).not.toHaveBeenCalled()
+    })
+  })
+
   test('展示团队项目上下文，并允许在冲突后重试同步', async () => {
     render(<TeamCollaborationPage />)
 
