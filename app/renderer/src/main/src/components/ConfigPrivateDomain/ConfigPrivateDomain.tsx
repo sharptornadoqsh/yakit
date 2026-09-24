@@ -24,6 +24,7 @@ import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import useAIGlobalConfig from '@/pages/ai-re-act/hooks/useAIGlobalConfig'
 import { YakitAlert } from '../yakitUI/YakitAlert/YakitAlert'
 import { isStrongPassword } from '@/utils/passwordPolicy'
+import { WebsiteGV } from '@/enums/website'
 
 interface OnlineProfileProps {
   BaseUrl: string
@@ -227,10 +228,17 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
       if (!setting) return
       const value = JSONParseLog(setting, { page: 'ConfigPrivateDomain', fun: 'getHttpSetting' })
       const { pwd: storedPassword, ...safeValue } = value
-      setDefaultHttpUrl(safeValue.BaseUrl)
       if (storedPassword) {
         setRemoteValue(getRemoteHttpSettingGV(), JSON.stringify(safeValue))
       }
+      if (
+        enterpriseLogin &&
+        !safeValue.IsCompany &&
+        safeValue.BaseUrl?.replace(/\/$/, '') === WebsiteGV.OfficialWebsite.replace(/\/$/, '')
+      ) {
+        safeValue.BaseUrl = ''
+      }
+      setDefaultHttpUrl(safeValue.BaseUrl)
       form.setFieldsValue(safeValue)
       setFormValue({ ...safeValue, pwd: '' })
     })
@@ -281,6 +289,7 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
       <Form
         {...(pageMode ? { layout: 'vertical' as const } : layout)}
         form={form}
+        initialValues={{ BaseUrl: '' }}
         name="control-hooks"
         onFinish={(v) => onFinish(v)}
         size={pageMode ? 'middle' : 'small'}
@@ -294,6 +303,7 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
             ref={httpHistoryRef}
             cacheHistoryDataKey={getRemoteConfigBaseUrlGV()}
             initValue={defaultHttpUrl}
+            isCacheDefaultValue={!enterpriseLogin}
             placeholder={t('ConfigPrivateDomain.enterPrivateDomain')}
             defaultOpen={!enterpriseLogin}
           />
