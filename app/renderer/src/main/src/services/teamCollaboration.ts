@@ -624,13 +624,23 @@ const rethrowV2Error = (url: string, error: unknown): never => {
   throw error
 }
 
-const getV2 = <P extends Record<string, unknown>, R>(url: string, params: P) =>
-  NetWorkApi<P, R>({ method: 'get', url, params }).catch((error) => rethrowV2Error(url, error))
+export interface TeamShareRequestContext {
+  diyHome: string
+  headers: { Authorization: string }
+}
 
-const writeV2 = <P, R>(method: 'post' | 'patch' | 'put' | 'delete', url: string, data?: P) =>
-  NetWorkApi<P, R>({ method, url, data }).catch((error) => rethrowV2Error(url, error))
+const getV2 = <P extends Record<string, unknown>, R>(url: string, params: P, context?: TeamShareRequestContext) =>
+  NetWorkApi<P, R>({ ...context, method: 'get', url, params }).catch((error) => rethrowV2Error(url, error))
 
-export const getMe = () => getV2<Record<string, never>, V2Response<CurrentCollaborationUser>>('v2/me', {})
+const writeV2 = <P, R>(
+  method: 'post' | 'patch' | 'put' | 'delete',
+  url: string,
+  data?: P,
+  context?: TeamShareRequestContext,
+) => NetWorkApi<P, R>({ ...context, method, url, data }).catch((error) => rethrowV2Error(url, error))
+
+export const getMe = (context?: TeamShareRequestContext) =>
+  getV2<Record<string, never>, V2Response<CurrentCollaborationUser>>('v2/me', {}, context)
 
 export const listTeams = (params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<CollaborationTeam[]>>('v2/teams', params)
@@ -738,11 +748,17 @@ export const getProjectSync = (teamId: V2Identifier, projectId: V2Identifier, si
 export const listTestData = (teamId: V2Identifier, projectId: V2Identifier, params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<TestDataRecord[]>>(`v2/teams/${teamId}/projects/${projectId}/test-data`, params)
 
-export const createTestData = (teamId: V2Identifier, projectId: V2Identifier, data: CreateTestDataInput) =>
+export const createTestData = (
+  teamId: V2Identifier,
+  projectId: V2Identifier,
+  data: CreateTestDataInput,
+  context?: TeamShareRequestContext,
+) =>
   writeV2<CreateTestDataInput, V2Response<TestDataRecord>>(
     'post',
     `v2/teams/${teamId}/projects/${projectId}/test-data`,
     data,
+    context,
   )
 
 export const getTestData = (teamId: V2Identifier, projectId: V2Identifier, dataId: V2Identifier) =>
@@ -772,11 +788,17 @@ export const deleteTestData = (teamId: V2Identifier, projectId: V2Identifier, da
 export const listTestResults = (teamId: V2Identifier, projectId: V2Identifier, params: V2ListQuery = {}) =>
   getV2<V2ListQuery, V2Response<TestResultRecord[]>>(`v2/teams/${teamId}/projects/${projectId}/test-results`, params)
 
-export const createTestResult = (teamId: V2Identifier, projectId: V2Identifier, data: CreateTestResultInput) =>
+export const createTestResult = (
+  teamId: V2Identifier,
+  projectId: V2Identifier,
+  data: CreateTestResultInput,
+  context?: TeamShareRequestContext,
+) =>
   writeV2<CreateTestResultInput, V2Response<TestResultRecord>>(
     'post',
     `v2/teams/${teamId}/projects/${projectId}/test-results`,
     data,
+    context,
   )
 
 export const getTestResult = (teamId: V2Identifier, projectId: V2Identifier, resultId: V2Identifier) =>

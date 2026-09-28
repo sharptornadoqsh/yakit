@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/store'
+import { TeamRecordBatchPanel } from './TeamRecordBatchPanel'
 import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { YakitEmpty } from '@/components/yakitUI/YakitEmpty/YakitEmpty'
 import { YakitInput } from '@/components/yakitUI/YakitInput/YakitInput'
@@ -1786,7 +1787,11 @@ export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React
                           placeholder="选择本地项目"
                           aria-label="选择本地项目"
                           onChange={(value) => setSelectedLocalProjectId(`${value}`)}
-                          disabled={!canPublishProject || localProjects.length === 0 || Boolean(actionLoading)}
+                          disabled={
+                            (!canPublishProject && !canWriteTestData) ||
+                            localProjects.length === 0 ||
+                            Boolean(actionLoading)
+                          }
                         >
                           {localProjects.map((project) => (
                             <YakitSelect.Option key={getId(project)} value={getId(project)}>
@@ -1799,7 +1804,7 @@ export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React
                           disabled={!canPublishProject || !selectedLocalProject}
                           loading={actionLoading === 'publish-project-bundle'}
                         >
-                          发布本地项目 → 团队
+                          发布项目归档
                         </YakitButton>
                       </div>
                       <div className={styles['create-row']}>
@@ -1815,10 +1820,30 @@ export const TeamCollaborationPage: React.FC<TeamCollaborationPageProps> = React
                           disabled={!canReadProject || !localCopyName.trim()}
                           loading={actionLoading === 'download-project-bundle'}
                         >
-                          下载为本地副本
+                          恢复项目归档为本地副本
                         </YakitButton>
                       </div>
                     </div>
+                  </section>
+
+                  <section className={styles['panel']}>
+                    <h2>业务记录共享 · 手动补传</h2>
+                    <p>
+                      仅有项目归档时，优先选择原本地项目并共享流量/漏洞；若仅剩远端归档，请先恢复项目归档为独立本地副本（不要覆盖当前工作项目），打开该副本后再选择并共享。原归档保持不变，归档分片不是业务记录。
+                    </p>
+                    <TeamRecordBatchPanel
+                      teamId={Number(selectedTeamId)}
+                      projectId={Number(selectedProjectId)}
+                      localProjectId={Number(selectedLocalProjectId)}
+                      localProjectName={getLocalProjectName(selectedLocalProject)}
+                      baseUrl={onlineBaseUrl}
+                      userId={authenticatedUserId}
+                      token={userInfo.token || ''}
+                      onShared={() => void loadSync(selectedTeamId, selectedProjectId)}
+                      canShareHTTP={canWriteTestData}
+                      canShareRisk={canWriteTestData && canWriteTestResult}
+                      disabled={!selectedLocalProject || !onlineBaseUrl || Boolean(actionLoading) || !userInfo.isLogin}
+                    />
                   </section>
 
                   <section className={`${styles['panel']} ${styles['sync-panel']}`}>

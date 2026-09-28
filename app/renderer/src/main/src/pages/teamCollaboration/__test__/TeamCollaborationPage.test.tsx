@@ -1922,7 +1922,7 @@ describe('团队协作页面', () => {
     expect((await screen.findAllByText('供应链评估')).length).toBeGreaterThan(0)
 
     fireEvent.change(screen.getByPlaceholderText('本地副本名称'), { target: { value: '供应链评估' } })
-    fireEvent.click(screen.getByRole('button', { name: '下载为本地副本' }))
+    fireEvent.click(screen.getByRole('button', { name: '恢复项目归档为本地副本' }))
 
     expect(await screen.findByRole('dialog', { name: '本地存在同名项目' })).toBeInTheDocument()
     expect(restoreTeamProjectBundle).not.toHaveBeenCalled()
@@ -1930,7 +1930,7 @@ describe('团队协作页面', () => {
     expect(screen.queryByRole('dialog', { name: '本地存在同名项目' })).not.toBeInTheDocument()
     expect(restoreTeamProjectBundle).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: '下载为本地副本' }))
+    fireEvent.click(screen.getByRole('button', { name: '恢复项目归档为本地副本' }))
     fireEvent.click(screen.getByRole('button', { name: '创建副本' }))
 
     await waitFor(() => expect(restoreTeamProjectBundle).toHaveBeenCalledTimes(1))
@@ -1945,7 +1945,7 @@ describe('团队协作页面', () => {
     )
 
     fireEvent.change(screen.getByPlaceholderText('本地副本名称'), { target: { value: '供应链评估' } })
-    fireEvent.click(screen.getByRole('button', { name: '下载为本地副本' }))
+    fireEvent.click(screen.getByRole('button', { name: '恢复项目归档为本地副本' }))
     fireEvent.click(await screen.findByRole('button', { name: '覆盖本地副本' }))
 
     await waitFor(() => expect(restoreTeamProjectBundle).toHaveBeenCalledTimes(2))
@@ -2262,7 +2262,7 @@ describe('团队协作页面', () => {
     expect(await screen.findByText(/目标服务：https:\/\/team.example.test/)).toHaveTextContent('远端 ID 21')
     expect(screen.getByText(/本地项目：111/)).toHaveTextContent('本地 ID 78')
     expect(publishTeamProjectBundle).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '发布本地项目 → 团队' }))
+    fireEvent.click(screen.getByRole('button', { name: '发布项目归档' }))
     await waitFor(() =>
       expect(publishTeamProjectBundle).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -2278,4 +2278,61 @@ describe('团队协作页面', () => {
     fireEvent.change(screen.getByRole('combobox', { name: '选择本地项目' }), { target: { value: '77' } })
     expect(publishTeamProjectBundle).toHaveBeenCalledTimes(1)
   })
+
+  test('结构化共享必须显式选择内容，项目不一致时停止且不发布归档', async () => {
+    const membership = createMembership({ permissions: ['project.read', 'test_data.write', 'test_result.write'] })
+    vi.mocked(getMe).mockResolvedValue(createMeResponse([membership]))
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ project: { version: 4, snapshot: '{}' } } as never)
+    const invoke = vi.fn(async (channel: string) => {
+      if (channel === 'GetProjects') return { Projects: [{ Id: 77, ProjectName: '指定本地项目', Type: 'project' }] }
+      if (channel === 'GetCurrentProjectEx') return { Id: 88 }
+      throw new Error('unexpected read')
+    })
+    Object.defineProperty(window, 'require', { configurable: true, value: () => ({ ipcRenderer: { invoke } }) })
+    render(<TeamCollaborationPage initialLocalProjectId="77" />)
+    const entry = await screen.findByRole('button', { name: '共享流量/漏洞到团队' })
+    await waitFor(() => expect(entry).not.toBeDisabled())
+    expect(screen.getByLabelText('选择本地项目')).not.toBeDisabled()
+    fireEvent.click(entry)
+    expect(screen.getByRole('button', { name: '确认逐条共享' })).toBeDisabled()
+    expect(invoke).not.toHaveBeenCalledWith('QueryHTTPFlows', expect.anything())
+    fireEvent.click(screen.getByRole('checkbox', { name: '该本地项目的全部 HTTP 流量' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认逐条共享' }))
+    expect(await screen.findByText(/所选本地项目 77 与引擎当前项目 88 不一致/)).toBeInTheDocument()
+    expect(createTestData).not.toHaveBeenCalled()
+    expect(createTestResult).not.toHaveBeenCalled()
+    expect(publishTeamProjectBundle).not.toHaveBeenCalled()
+    expect(restoreTeamProjectBundle).not.toHaveBeenCalled()
+    expect(screen.getByText(/若仅剩远端归档/)).toBeInTheDocument()
+  })
+
+  test('批量分页读取期间退出账号停止旧任务，不发送共享记录', async () => {
+    vi.mocked(getMe).mockResolvedValue(
+      createMeResponse([createMembership({ permissions: ['project.read', 'test_data.write'] })]),
+    )
+    vi.mocked(getProjectSync)
+      .mockReset()
+      .mockResolvedValue({ project: { version: 4, snapshot: '{}' } } as never)
+    const page = createDeferred<unknown>()
+    const invoke = vi.fn(async (channel: string) => {
+      if (channel === 'GetProjects') return { Projects: [{ Id: 77, ProjectName: '指定本地项目', Type: 'project' }] }
+      if (channel === 'GetCurrentProjectEx') return { Id: 77 }
+      if (channel === 'QueryHTTPFlows') return page.promise
+    })
+    Object.defineProperty(window, 'require', { configurable: true, value: () => ({ ipcRenderer: { invoke } }) })
+    render(<TeamCollaborationPage initialLocalProjectId="77" />)
+    const entry = await screen.findByRole('button', { name: '共享流量/漏洞到团队' })
+    await waitFor(() => expect(entry).not.toBeDisabled())
+    fireEvent.click(entry)
+    fireEvent.click(screen.getByRole('checkbox', { name: '该本地项目的全部 HTTP 流量' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认逐条共享' }))
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('QueryHTTPFlows', expect.anything()))
+    act(() => useStore.setState({ userInfo: { ...useStore.getState().userInfo, isLogin: false, token: '' } }))
+    await act(async () => page.resolve({ Total: 1, Data: [{ Id: 101 }] }))
+    expect(createTestData).not.toHaveBeenCalled()
+    expect(invoke).not.toHaveBeenCalledWith('GetHTTPFlowById', expect.anything())
+  })
+
 })

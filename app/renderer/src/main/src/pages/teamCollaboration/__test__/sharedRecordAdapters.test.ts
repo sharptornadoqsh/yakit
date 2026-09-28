@@ -393,3 +393,35 @@ describe('共享记录严格解析', () => {
     expect(risk.risk_key).toBe(RISK_KEY)
   })
 })
+
+
+describe('批量共享的完整报文读取', () => {
+  test('超过表格预览长度的二进制请求响应按 all/base64 原样读取', async () => {
+    const bytes = Uint8Array.from({ length: 128 * 1024 }, (_, i) => i % 256)
+    const invoke = vi.fn(async () => ({ EncodedText: encodeBase64(bytes) }))
+    const value = await readFullHTTPFlowBytes(707, invoke)
+    expect(Array.from(value.request)).toEqual(Array.from(bytes))
+    expect(Array.from(value.response)).toEqual(Array.from(bytes))
+    expect(invoke.mock.calls).toHaveLength(2)
+    expect(invoke).toHaveBeenNthCalledWith(1, 'EncodeHTTPPacketContent', {
+      HTTPFlowId: 707,
+      IsRequest: true,
+      Position: 'all',
+      EncodingType: 'base64',
+    })
+    expect(invoke).toHaveBeenNthCalledWith(2, 'EncodeHTTPPacketContent', {
+      HTTPFlowId: 707,
+      IsRequest: false,
+      Position: 'all',
+      EncodingType: 'base64',
+    })
+  })
+
+  test('读取错误保留原因用于区分项目切换与数据读取失败', async () => {
+    const cause = new Error('project changed')
+    await expect(readFullHTTPFlowBytes(707, vi.fn().mockRejectedValue(cause))).rejects.toMatchObject({
+      code: 'http_flow_raw_bytes_unavailable',
+      cause,
+    })
+  })
+})

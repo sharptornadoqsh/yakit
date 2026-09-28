@@ -1,3 +1,4 @@
+import { getRemoteValue } from '@/utils/kv'
 import React from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { CurrentCollaborationUser } from '@/services/teamCollaboration'
@@ -16,6 +17,11 @@ import {
   prepareSharedRisk,
 } from '../sharedRecordAdapters'
 import { MAX_SHARED_RECORD_CONTENT_BYTES, decodeBase64Strict } from '../binaryPayload'
+
+vi.mock('@/utils/envfile', () => ({ getRemoteHttpSettingGV: () => 'team-setting' }))
+vi.mock('@/utils/kv', () => ({
+  getRemoteValue: vi.fn(async () => JSON.stringify({ BaseUrl: 'https://team.example.test' })),
+}))
 
 var storeUserInfo = {
   isLogin: true,
@@ -251,6 +257,7 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+  vi.mocked(getRemoteValue).mockResolvedValue(JSON.stringify({ BaseUrl: 'https://team.example.test' }))
   storeUserInfo = { isLogin: true, user_id: 7, token: 'token-a' }
   getMeMock.mockReset()
   createTestDataMock.mockReset()
@@ -333,13 +340,19 @@ describe('分享到团队项目 Modal', () => {
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1))
     expect(getMeMock).toHaveBeenCalledTimes(2)
-    expect(createTestDataMock).toHaveBeenCalledWith(1, 10, {
-      name: preparedHTTP.name,
-      type: 'http_flow',
-      content: preparedHTTP.content,
-      deduplication_key: `http-flow:${preparedHTTP.flowKey}`,
-      source_client_id: preparedHTTP.sourceClientId,
-    })
+    expect(createTestDataMock).toHaveBeenCalledWith(
+      1,
+      10,
+      {
+        name: preparedHTTP.name,
+        type: 'http_flow',
+        content: preparedHTTP.content,
+        deduplication_key: `http-flow:${preparedHTTP.flowKey}`,
+        source_client_id: preparedHTTP.sourceClientId,
+        metadata: preparedHTTP.summary,
+      },
+      { diyHome: 'https://team.example.test', headers: { Authorization: 'token-a' } },
+    )
     expect(createTestResultMock).not.toHaveBeenCalled()
   })
 
@@ -357,15 +370,21 @@ describe('分享到团队项目 Modal', () => {
     expect(createTestDataMock.mock.invocationCallOrder[0]).toBeLessThan(
       createTestResultMock.mock.invocationCallOrder[0],
     )
-    expect(createTestResultMock).toHaveBeenCalledWith(1, 10, {
-      test_data_id: 707,
-      name: preparedRisk.name,
-      type: 'risk',
-      severity: preparedRisk.summary.severity,
-      content: preparedRisk.content,
-      deduplication_key: `risk:${preparedRisk.riskKey}`,
-      source_client_id: preparedRisk.sourceClientId,
-    })
+    expect(createTestResultMock).toHaveBeenCalledWith(
+      1,
+      10,
+      {
+        test_data_id: 707,
+        name: preparedRisk.name,
+        type: 'risk',
+        severity: preparedRisk.summary.severity,
+        content: preparedRisk.content,
+        deduplication_key: `risk:${preparedRisk.riskKey}`,
+        source_client_id: preparedRisk.sourceClientId,
+        metadata: preparedRisk.summary,
+      },
+      { diyHome: 'https://team.example.test', headers: { Authorization: 'token-a' } },
+    )
   })
 
   test('HTTP 写入失败时绝不写 Risk', async () => {
@@ -626,6 +645,7 @@ describe('分享到团队项目 Modal', () => {
     )
     await screen.findByRole('option', { name: '蓝队项目' })
     fireEvent.click(screen.getByRole('button', { name: '分享' }))
+    vi.mocked(getRemoteValue).mockResolvedValue(JSON.stringify({ BaseUrl: 'https://team.example.test' }))
     storeUserInfo = { isLogin: true, user_id: 8, token: 'token-b' }
     view.rerender(
       <ShareToTeamProjectModal visible={false} prepared={httpShare} onCancel={vi.fn()} onSuccess={onSuccess} />,
@@ -676,5 +696,21 @@ describe('分享到团队项目 Modal', () => {
     await act(async () => flowWrite.resolve({ data: makeHTTPRecord() }))
 
     expect(createTestResultMock).not.toHaveBeenCalled()
+  })
+
+  test('提交关联流量后服务地址变化时停止漏洞写入', async () => {
+    getMeMock.mockResolvedValue({ data: createCurrentUser() })
+    createTestDataMock.mockImplementation(async () => {
+      vi.mocked(getRemoteValue).mockResolvedValue(JSON.stringify({ BaseUrl: 'https://other.test' }))
+      return { data: makeHTTPRecord() }
+    })
+    const onSuccess = vi.fn()
+    render(<ShareToTeamProjectModal visible prepared={riskShare} onCancel={vi.fn()} onSuccess={onSuccess} />)
+    await screen.findByRole('option', { name: '蓝队项目' })
+    fireEvent.click(screen.getByRole('button', { name: '分享' }))
+    await screen.findByText('共享上下文已变化，请关闭后重新选择')
+    expect(createTestDataMock).toHaveBeenCalledTimes(1)
+    expect(createTestResultMock).not.toHaveBeenCalled()
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 })

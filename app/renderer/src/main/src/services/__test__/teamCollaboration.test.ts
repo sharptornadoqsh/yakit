@@ -94,6 +94,39 @@ describe('team collaboration service', () => {
     mocks.NetWorkApi.mockResolvedValue({ ok: true, data: [] })
   })
 
+  it('逐条共享固定目标服务和账号，不受后续全局设置影响', async () => {
+    const context = { diyHome: 'https://team.example.test', headers: { Authorization: 'account-a' } }
+    await getMe(context)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({ ...context, method: 'get', url: 'v2/me', params: {} })
+    const flow = {
+      name: 'HTTP Flow 12',
+      type: 'http_flow',
+      content: '{"schema":"yakit.shared-http-flow/v1"}',
+      deduplication_key: 'http-flow:key',
+    }
+    await createTestData(1, 10, flow, context)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      ...context,
+      method: 'post',
+      url: 'v2/teams/1/projects/10/test-data',
+      data: flow,
+    })
+    const risk = {
+      name: 'Risk 13',
+      type: 'risk',
+      content: '{"schema":"yakit.shared-risk/v1"}',
+      test_data_id: 707,
+      severity: 'high',
+    }
+    await createTestResult(1, 10, risk, context)
+    expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({
+      ...context,
+      method: 'post',
+      url: 'v2/teams/1/projects/10/test-results',
+      data: risk,
+    })
+  })
+
   it('uses params for v2 read requests', async () => {
     await getMe()
     expect(mocks.NetWorkApi).toHaveBeenLastCalledWith({ method: 'get', url: 'v2/me', params: {} })

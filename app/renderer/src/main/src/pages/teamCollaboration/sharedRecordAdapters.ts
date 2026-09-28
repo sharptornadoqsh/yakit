@@ -275,8 +275,11 @@ export const readFullHTTPFlowBytes = async (
       request: decodeBase64Strict(requestEncoded),
       response: decodeBase64Strict(responseEncoded),
     }
-  } catch {
-    throw new SharedRecordError('http_flow_raw_bytes_unavailable', '无法读取完整 HTTP 请求与响应原始字节')
+  } catch (cause) {
+    throw Object.assign(
+      new SharedRecordError('http_flow_raw_bytes_unavailable', '无法读取完整 HTTP 请求与响应原始字节'),
+      { cause },
+    )
   }
 }
 
