@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { Form, Tooltip } from 'antd'
 import './ConfigPrivateDomain.scss'
-import { NetWorkApi } from '@/services/fetch'
+import { passwordApi } from '@/services/passwordTransport'
 import { failed, success } from '@/utils/notification'
 import { loginOut } from '@/utils/login'
 import { useMemoizedFn, useGetState } from 'ahooks'
@@ -19,7 +19,7 @@ import { YakitAutoCompleteRefProps } from '../yakitUI/YakitAutoComplete/YakitAut
 import { getRemoteConfigBaseUrlGV, getRemoteHttpSettingGV, isEnpriTrace } from '@/utils/envfile'
 import { apiSystemConfig, useUploadInfoByEnpriTrace } from '../layout/utils'
 import { JSONParseLog, shouldWarnAboutRemoteHttpUrl } from '@/utils/tool'
-import { yakitAuth, yakitCodec, yakitProfile, yakitUILayout } from '@/services/electronBridge'
+import { yakitAuth, yakitProfile, yakitUILayout } from '@/services/electronBridge'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
 import useAIGlobalConfig from '@/pages/ai-re-act/hooks/useAIGlobalConfig'
 import { YakitAlert } from '../yakitUI/YakitAlert/YakitAlert'
@@ -85,13 +85,11 @@ export const ConfigPrivateDomain: React.FC<ConfigPrivateDomainProps> = React.mem
   const loginUser = useMemoizedFn(async () => {
     const { user_name, pwd } = getFormValue()
     try {
-      const md5Res = await yakitCodec.run({ Type: 'md5', Text: pwd, Params: [], ScriptName: '' })
-      const res = await NetWorkApi<API.UrmLoginRequest, API.UserData>({
-        method: 'post',
+      const res = await passwordApi<API.UrmLoginRequest, API.UserData>({
         url: 'urm/login',
         data: {
           user_name: user_name.trim(),
-          pwd: md5Res.Result,
+          pwd,
         },
       })
       const data = await yakitAuth.companySignIn({ ...res })

@@ -2,7 +2,7 @@ import React, { ReactNode, useEffect, useRef, useState } from 'react'
 import { Form, Input, Button } from 'antd'
 import { warn, failed, success } from '@/utils/notification'
 import { useDebounceFn, useMemoizedFn } from 'ahooks'
-import { NetWorkApi } from '@/services/fetch'
+import { passwordApi } from '@/services/passwordTransport'
 import { API } from '@/services/swagger/resposeType'
 import { loginOut, refreshToken } from '@/utils/login'
 import { UserInfoProps, yakitDynamicStatus } from '@/store'
@@ -34,8 +34,7 @@ const SetPassword: React.FC<SetPasswordProps> = (props) => {
     if (getFieldValue('confirm_pwd') !== getFieldValue('pwd')) {
       warn(t('SetPassword.passwordMismatch'))
     } else {
-      NetWorkApi<API.UpUserInfoRequest, API.ActionSucceeded>({
-        method: 'post',
+      passwordApi<API.UpUserInfoRequest, API.ActionSucceeded>({
         url: 'urm/up/userinfo',
         data: {
           old_pwd,

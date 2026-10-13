@@ -629,6 +629,10 @@ interface YakitBridge {
   }
   network: {
     axiosApi: (params: AxiosBridgeParams) => Promise<AxiosResponseProps<AxiosResponseInfoProps>>
+    passwordApi: (params: {
+      url: string
+      data: Record<string, unknown>
+    }) => Promise<AxiosResponseProps<AxiosResponseInfoProps>>
     logoutDynamicControl: (params: LogoutDynamicControlParams) => Promise<unknown>
     killDynamicControl: () => Promise<unknown>
     exitDynamicControlPage: () => Promise<unknown>

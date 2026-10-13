@@ -91,6 +91,7 @@ process.on('loaded', function () {
     },
     network: {
       axiosApi: (params) => invoke('axios-api', params),
+      passwordApi: (params) => invoke('password-api', params),
       logoutDynamicControl: (params) => invoke('lougin-out-dynamic-control', params),
       killDynamicControl: () => invoke('kill-dynamic-control'),
       exitDynamicControlPage: () => invoke('lougin-out-dynamic-control-page'),
