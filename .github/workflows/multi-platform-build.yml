@@ -546,7 +546,42 @@ jobs:
           PACKAGE_TARGET: windows-x64
           PACKAGE_SIGNED: ${{ inputs.sign_installers }}
           INCLUDE_ENGINE: ${{ inputs.include_engine }}
-        run: node packageScript/script/create-renyan-build-metadata.js
+        run: |
+          if [ "${THE_LEGACY}" != "true" ]; then
+            node packageScript/script/create-renyan-build-metadata.js
+          else
+            node <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const { createBuildMetadata, calculateSha256, parseBoolean, writeWorkflowValue } = require('./packageScript/script/create-renyan-build-metadata')
+
+          async function run() {
+            const result = await createBuildMetadata({
+              edition: process.env.PACKAGE_EDITION,
+              target: process.env.PACKAGE_TARGET,
+              signed: parseBoolean(process.env.PACKAGE_SIGNED),
+              includeEngine: parseBoolean(process.env.INCLUDE_ENGINE),
+            })
+            const manifest = result.manifest
+            const fileName = manifest.artifactFile.replace(/-(windows|linux)-(x64|arm64)\.(exe|AppImage)$/, '-$1-legacy-$2.$3')
+            if (fileName === manifest.artifactFile) throw new Error('兼容安装文件的名称不符合预期')
+            const artifactPath = path.join(path.dirname(result.artifactPath), fileName)
+            fs.copyFileSync(result.artifactPath, artifactPath, fs.constants.COPYFILE_EXCL)
+            if (await calculateSha256(artifactPath) !== manifest.artifactSha256) throw new Error('兼容安装文件复制后摘要不一致')
+            manifest.artifactFile = fileName
+            manifest.legacy = true
+            fs.writeFileSync(result.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+            fs.writeFileSync(result.checksumPath, `${manifest.artifactSha256}  ${fileName}\n`, 'utf8')
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'artifact_path', path.relative(process.cwd(), artifactPath).replace(/\\/g, '/'))
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'artifact_container', `${result.artifactContainer}-legacy`)
+            console.log(`兼容安装文件：${fileName}`)
+          }
+          run().catch((error) => {
+            console.error(error.message)
+            process.exitCode = 1
+          })
+          NODE
+          fi
 
       - name: 上传 RuiYan Windows x64 产物
         uses: actions/upload-artifact@v7
@@ -666,7 +701,42 @@ jobs:
           PACKAGE_TARGET: linux-x64
           PACKAGE_SIGNED: 'false'
           INCLUDE_ENGINE: ${{ inputs.include_engine }}
-        run: node packageScript/script/create-renyan-build-metadata.js
+        run: |
+          if [ "${THE_LEGACY}" != "true" ]; then
+            node packageScript/script/create-renyan-build-metadata.js
+          else
+            node <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const { createBuildMetadata, calculateSha256, parseBoolean, writeWorkflowValue } = require('./packageScript/script/create-renyan-build-metadata')
+
+          async function run() {
+            const result = await createBuildMetadata({
+              edition: process.env.PACKAGE_EDITION,
+              target: process.env.PACKAGE_TARGET,
+              signed: parseBoolean(process.env.PACKAGE_SIGNED),
+              includeEngine: parseBoolean(process.env.INCLUDE_ENGINE),
+            })
+            const manifest = result.manifest
+            const fileName = manifest.artifactFile.replace(/-(windows|linux)-(x64|arm64)\.(exe|AppImage)$/, '-$1-legacy-$2.$3')
+            if (fileName === manifest.artifactFile) throw new Error('兼容安装文件的名称不符合预期')
+            const artifactPath = path.join(path.dirname(result.artifactPath), fileName)
+            fs.copyFileSync(result.artifactPath, artifactPath, fs.constants.COPYFILE_EXCL)
+            if (await calculateSha256(artifactPath) !== manifest.artifactSha256) throw new Error('兼容安装文件复制后摘要不一致')
+            manifest.artifactFile = fileName
+            manifest.legacy = true
+            fs.writeFileSync(result.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+            fs.writeFileSync(result.checksumPath, `${manifest.artifactSha256}  ${fileName}\n`, 'utf8')
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'artifact_path', path.relative(process.cwd(), artifactPath).replace(/\\/g, '/'))
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'artifact_container', `${result.artifactContainer}-legacy`)
+            console.log(`兼容安装文件：${fileName}`)
+          }
+          run().catch((error) => {
+            console.error(error.message)
+            process.exitCode = 1
+          })
+          NODE
+          fi
 
       - name: 上传 RuiYan Linux x64 产物
         uses: actions/upload-artifact@v7
@@ -786,7 +856,42 @@ jobs:
           PACKAGE_TARGET: linux-arm64
           PACKAGE_SIGNED: 'false'
           INCLUDE_ENGINE: ${{ inputs.include_engine }}
-        run: node packageScript/script/create-renyan-build-metadata.js
+        run: |
+          if [ "${THE_LEGACY}" != "true" ]; then
+            node packageScript/script/create-renyan-build-metadata.js
+          else
+            node <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const { createBuildMetadata, calculateSha256, parseBoolean, writeWorkflowValue } = require('./packageScript/script/create-renyan-build-metadata')
+
+          async function run() {
+            const result = await createBuildMetadata({
+              edition: process.env.PACKAGE_EDITION,
+              target: process.env.PACKAGE_TARGET,
+              signed: parseBoolean(process.env.PACKAGE_SIGNED),
+              includeEngine: parseBoolean(process.env.INCLUDE_ENGINE),
+            })
+            const manifest = result.manifest
+            const fileName = manifest.artifactFile.replace(/-(windows|linux)-(x64|arm64)\.(exe|AppImage)$/, '-$1-legacy-$2.$3')
+            if (fileName === manifest.artifactFile) throw new Error('兼容安装文件的名称不符合预期')
+            const artifactPath = path.join(path.dirname(result.artifactPath), fileName)
+            fs.copyFileSync(result.artifactPath, artifactPath, fs.constants.COPYFILE_EXCL)
+            if (await calculateSha256(artifactPath) !== manifest.artifactSha256) throw new Error('兼容安装文件复制后摘要不一致')
+            manifest.artifactFile = fileName
+            manifest.legacy = true
+            fs.writeFileSync(result.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+            fs.writeFileSync(result.checksumPath, `${manifest.artifactSha256}  ${fileName}\n`, 'utf8')
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'artifact_path', path.relative(process.cwd(), artifactPath).replace(/\\/g, '/'))
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'artifact_container', `${result.artifactContainer}-legacy`)
+            console.log(`兼容安装文件：${fileName}`)
+          }
+          run().catch((error) => {
+            console.error(error.message)
+            process.exitCode = 1
+          })
+          NODE
+          fi
 
       - name: 上传 RuiYan Linux arm64 产物
         uses: actions/upload-artifact@v7
@@ -813,6 +918,7 @@ jobs:
       group: renyan-github-release-${{ github.repository }}-qsh
       cancel-in-progress: false
     env:
+      LEGACY_ARTIFACT_NAMES: ${{ inputs.legacy && !startsWith(inputs.target, 'macos-') }}
       PACKAGE_EDITION: ${{ inputs.edition }}
       REQUESTED_TARGET: ${{ inputs.target }}
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
@@ -863,12 +969,125 @@ jobs:
           path: downloaded-artifacts
           merge-multiple: true
 
+      - name: 准备兼容版文件名适配
+        if: ${{ inputs.legacy && !startsWith(inputs.target, 'macos-') }}
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/renyan-legacy-release.cjs" <<'NODE'
+          const fs = require('fs')
+          const path = require('path')
+          const { isDeepStrictEqual } = require('util')
+          const root = process.cwd()
+          const release = require(path.join(root, 'packageScript/script/renyan-release'))
+          const { createArtifactIdentity, calculateSha256, writeWorkflowValue } = require(path.join(root, 'packageScript/script/create-renyan-build-metadata'))
+          const { writeContextOutputs } = require(path.join(root, 'packageScript/script/publish-renyan-release'))
+          const publicName = (name) => name.replace(/-(windows|linux)-(x64|arm64)\.(exe|AppImage)$/, '-$1-legacy-$2.$3')
+
+          async function prepare() {
+            const context = release.validateReleaseContext()
+            const downloadedDirectory = path.resolve(process.env.DOWNLOADED_ARTIFACTS_DIRECTORY)
+            const workDirectory = path.resolve(process.env.RELEASE_WORK_DIRECTORY)
+            const canonicalDirectory = `${workDirectory}-canonical-downloads`
+            const expected = context.successfulTargets.map((target) => {
+              const { artifactName } = createArtifactIdentity({ edition: context.edition, target, version: context.packageVersion })
+              return { canonical: artifactName, public: publicName(artifactName) }
+            })
+            const actualNames = fs.readdirSync(downloadedDirectory).sort()
+            if (!isDeepStrictEqual(actualNames, expected.map((item) => item.public).sort())) {
+              throw new Error('兼容版下载附件缺失或包含非预期文件')
+            }
+            for (const item of expected) {
+              const stats = fs.lstatSync(path.join(downloadedDirectory, item.public))
+              if (!stats.isFile() || stats.isSymbolicLink() || stats.size === 0) throw new Error(`兼容安装文件无效：${item.public}`)
+            }
+            fs.mkdirSync(canonicalDirectory)
+            for (const item of expected) {
+              fs.copyFileSync(path.join(downloadedDirectory, item.public), path.join(canonicalDirectory, item.canonical), fs.constants.COPYFILE_EXCL)
+            }
+            const result = await release.prepareReleaseAssets({
+              context,
+              downloadedDirectory: canonicalDirectory,
+              assetsDirectory: path.resolve(process.env.RELEASE_ASSETS_DIRECTORY),
+              workDirectory,
+            })
+            await release.validatePreparedPlan(result.planPath)
+            writeContextOutputs(context, process.env.GITHUB_OUTPUT)
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'release_plan_path', path.relative(root, result.planPath).replace(/\\/g, '/'))
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'release_asset_count', result.assetPaths.length)
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'release_build_info_path', path.relative(root, result.buildInfoPath).replace(/\\/g, '/'))
+            return result
+          }
+
+          async function publish() {
+            if (!process.env.GH_TOKEN) throw new Error('缺少 GitHub Actions 提供的 GH_TOKEN')
+            const plan = await release.validatePreparedPlan(path.resolve(process.env.RELEASE_PLAN_PATH))
+            const context = release.validateReleaseContext({ buildTime: plan.context.buildTime })
+            if (!isDeepStrictEqual(context, plan.context)) throw new Error('当前发布上下文与已准备的 Release 计划不一致')
+            if (!isDeepStrictEqual(plan.files.map((file) => file.target), context.successfulTargets)) {
+              throw new Error('兼容版发布计划的目标不完整')
+            }
+            const publicDirectory = fs.mkdtempSync(path.join(path.dirname(process.env.RELEASE_PLAN_PATH), 'legacy-public-'))
+            const files = plan.files.map((file) => ({ ...file, fileName: publicName(file.fileName) }))
+            const assetPaths = []
+            for (let index = 0; index < files.length; index += 1) {
+              const file = files[index]
+              const installerPath = path.join(publicDirectory, file.fileName)
+              fs.copyFileSync(path.join(plan.assetsDirectory, plan.files[index].fileName), installerPath, fs.constants.COPYFILE_EXCL)
+              if (fs.statSync(installerPath).size !== file.size || await calculateSha256(installerPath) !== file.sha256) {
+                throw new Error(`公开安装文件复制后内容不一致：${file.fileName}`)
+              }
+              const checksumPath = `${installerPath}.sha256`
+              fs.writeFileSync(checksumPath, `${file.sha256}  ${file.fileName}\n`, { encoding: 'utf8', flag: 'wx' })
+              assetPaths.push(installerPath, checksumPath)
+            }
+            const buildInfoPath = path.join(publicDirectory, path.basename(plan.buildInfoPath))
+            fs.writeFileSync(buildInfoPath, `${JSON.stringify(release.createReleaseMetadata(context, files), null, 2)}\n`, { encoding: 'utf8', flag: 'wx' })
+            assetPaths.push(buildInfoPath)
+            const notesPath = path.join(publicDirectory, 'release-notes.md')
+            fs.writeFileSync(notesPath, release.createReleaseNotes(context, files), { encoding: 'utf8', flag: 'wx' })
+            const publicPlan = { ...plan, files, assetsDirectory: publicDirectory, assetPaths, buildInfoPath, notesPath }
+            const options = { cwd: root, env: process.env }
+            const tagCommit = release.resolveRemoteTagCommit(context.repository, context.releaseTag, release.executeGh, options)
+            const existingRelease = release.fetchReleaseWithAssets(context.repository, context.releaseTag, release.executeGh, options)
+            const operation = release.decideReleaseOperation({
+              tagCommit,
+              release: existingRelease,
+              gitSha: context.gitSha,
+              assetNames: assetPaths.map((filePath) => path.basename(filePath)),
+              overwriteReleaseAssets: context.overwriteReleaseAssets,
+            })
+            release.printAuditSummary(context, files)
+            const args = operation.kind === 'upload-existing'
+              ? release.buildUploadReleaseArguments(publicPlan, operation.clobber)
+              : release.buildCreateReleaseArguments(publicPlan, operation.kind === 'create-existing-tag')
+            release.executeGh(args, options)
+            return operation
+          }
+
+          if (require.main === module) {
+            const command = process.argv[2]
+            Promise.resolve().then(() => {
+              if (command === 'prepare') return prepare()
+              if (command === 'publish') return publish()
+              throw new Error(`不支持的兼容版发布命令：${command}`)
+            }).catch((error) => {
+              console.error(error.message)
+              process.exitCode = 1
+            })
+          }
+          module.exports = { prepare, publish }
+          NODE
+
       - name: 校验并准备 Release 附件
         id: release
         shell: bash
         run: |
           set -euo pipefail
-          node packageScript/script/publish-renyan-release.js prepare
+          if [ "${LEGACY_ARTIFACT_NAMES}" = "true" ]; then
+            node "$RUNNER_TEMP/renyan-legacy-release.cjs" prepare
+          else
+            node packageScript/script/publish-renyan-release.js prepare
+          fi
 
       - name: 创建或更新 GitHub Release
         shell: bash
@@ -876,4 +1095,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          node packageScript/script/publish-renyan-release.js publish
+          if [ "${LEGACY_ARTIFACT_NAMES}" = "true" ]; then
+            node "$RUNNER_TEMP/renyan-legacy-release.cjs" publish
+          else
+            node packageScript/script/publish-renyan-release.js publish
+          fi
