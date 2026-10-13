@@ -16,6 +16,11 @@ on:
           - linux-x64
           - linux-arm64
           - all
+      legacy:
+        description: Windows/Linux 旧系统兼容模式（Electron 22.3.27）；macOS 保持默认
+        required: false
+        type: boolean
+        default: false
       edition:
         description: 选择社区版、企业版或企业版免许可证客户端
         required: true
@@ -81,7 +86,7 @@ env:
   RUIYAN_CHROME_EXTENSION_SHA256: f3a19aeb5bcd5cbcb94d6d648147b6e173dd1ed6db753f91882d58f3e6a20b41
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.target }}-${{ inputs.edition }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.target }}-${{ inputs.edition }}-${{ inputs.legacy }}
   cancel-in-progress: ${{ !inputs.publish_release }}
 
 jobs:
@@ -416,6 +421,7 @@ jobs:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      THE_LEGACY: ${{ inputs.legacy }}
       RENYAN_PACKAGE_ARCHITECTURE: x64
     steps:
       - name: 验证 RuiYan 构建分支
@@ -446,6 +452,11 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
+      - name: 配置旧系统兼容运行时
+        if: ${{ inputs.legacy }}
+        shell: bash
+        run: yarn add --dev --exact electron@22.3.27
+
       - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
@@ -472,7 +483,27 @@ jobs:
           REQUESTED_ENGINE_VERSION: ${{ inputs.engine_version }}
           ENGINE_ASSET: yak_windows_amd64.exe
           DEFER_ENGINE_ARCHIVE: 'false'
-        run: node packageScript/script/prepare-renyan-engine.js prepare
+        run: |
+          if [ "${THE_LEGACY}" != "true" ]; then
+            node packageScript/script/prepare-renyan-engine.js prepare
+          else
+            node <<'NODE'
+          const { prepareEngine } = require('./packageScript/script/prepare-renyan-engine')
+          const { writeWorkflowValue } = require('./packageScript/script/create-renyan-build-metadata')
+          prepareEngine({
+            asset: process.env.ENGINE_ASSET,
+            requestedVersion: process.env.REQUESTED_ENGINE_VERSION,
+            fetcher: (url) => fetch(url.replace('/yak_windows_amd64.exe', '/yak_windows_legacy_amd64.exe')),
+          }).then(({ engineVersion }) => {
+            console.log(`最终兼容引擎版本：${engineVersion}`)
+            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'engine_version', engineVersion)
+            writeWorkflowValue(process.env.GITHUB_ENV, 'ENGINE_VERSION', engineVersion)
+          }).catch((error) => {
+            console.error(error.message)
+            process.exitCode = 1
+          })
+          NODE
+          fi
 
       - name: 生成 RuiYan Windows x64 安装文件
         shell: bash
@@ -534,6 +565,7 @@ jobs:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      THE_LEGACY: ${{ inputs.legacy }}
       RENYAN_PACKAGE_ARCHITECTURE: x64
     steps:
       - name: 验证 RuiYan 构建分支与签名能力
@@ -569,6 +601,11 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 配置旧系统兼容运行时
+        if: ${{ inputs.legacy }}
+        shell: bash
+        run: yarn add --dev --exact electron@22.3.27
 
       - name: 校验仓库内置浏览器扩展
         shell: bash
@@ -648,6 +685,7 @@ jobs:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
+      THE_LEGACY: ${{ inputs.legacy }}
       RENYAN_PACKAGE_ARCHITECTURE: arm64
     steps:
       - name: 验证 RuiYan 构建分支与签名能力
@@ -683,6 +721,11 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 配置旧系统兼容运行时
+        if: ${{ inputs.legacy }}
+        shell: bash
+        run: yarn add --dev --exact electron@22.3.27
 
       - name: 校验仓库内置浏览器扩展
         shell: bash
@@ -795,6 +838,18 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22.12.0
+
+      - name: 隔离旧系统兼容版 Release 标签
+        if: ${{ inputs.legacy && !startsWith(inputs.target, 'macos-') }}
+        shell: bash
+        run: |
+          node <<'NODE'
+          const { resolveReleaseTag } = require('./packageScript/script/renyan-release')
+          const { writeWorkflowValue } = require('./packageScript/script/create-renyan-build-metadata')
+          const tag = resolveReleaseTag(process.env.RELEASE_TAG_INPUT)
+          const legacyTag = resolveReleaseTag(tag.endsWith('-legacy') ? tag : `${tag}-legacy`)
+          writeWorkflowValue(process.env.GITHUB_ENV, 'RELEASE_TAG_INPUT', legacyTag)
+          NODE
 
       - name: 校验 Release 发布上下文
         shell: bash

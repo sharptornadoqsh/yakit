@@ -49,6 +49,7 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(workflow.name).toBe('RuiYan Multi-Platform Package')
     expect(Object.keys(workflow.on.workflow_dispatch.inputs)).toEqual([
       'target',
+      'legacy',
       'edition',
       'include_engine',
       'engine_version',
@@ -63,6 +64,7 @@ describe('睿眼多平台安装文件工作流', () => {
     expect([...new Set([...source.matchAll(/inputs\.([a-z_]+)/g)].map((match) => match[1]))].sort()).toEqual(
       [
         'target',
+        'legacy',
         'edition',
         'include_engine',
         'engine_version',
@@ -101,6 +103,11 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(workflow.on.workflow_dispatch.inputs.edition).toMatchObject({
       default: 'community',
       options: ['community', 'enterprise', 'enterprise-no-license'],
+    })
+    expect(workflow.on.workflow_dispatch.inputs.legacy).toMatchObject({
+      type: 'boolean',
+      required: false,
+      default: false,
     })
     expect(workflow.on.workflow_dispatch.inputs.include_engine).toMatchObject({
       type: 'boolean',
@@ -175,7 +182,22 @@ describe('睿眼多平台安装文件工作流', () => {
     expect(source).not.toContain('build-renders-simple-enterprise')
     expect(source).not.toContain('build-renders-irify')
     expect(source).not.toContain('build-renders-memfit')
-    expect(source).not.toContain('yarn add')
+    const legacyBuildJobs = ['build-windows-x64', 'build-linux-x64', 'build-linux-arm64']
+    Object.entries(workflow.jobs).forEach(([jobName, job]) => {
+      const dependencyChanges = job.steps.filter((step) => /\byarn\s+add\b/.test(step.run || ''))
+      if (legacyBuildJobs.includes(jobName)) {
+        expect(job.env.THE_LEGACY).toBe('${{ inputs.legacy }}')
+        expect(dependencyChanges).toHaveLength(1)
+        expect(dependencyChanges[0]).toMatchObject({
+          if: '${{ inputs.legacy }}',
+          shell: 'bash',
+          run: 'yarn add --dev --exact electron@22.3.27',
+        })
+      } else {
+        expect(job.env?.THE_LEGACY).toBeUndefined()
+        expect(dependencyChanges).toHaveLength(0)
+      }
+    })
     expect(source).not.toContain('http://')
     expect(source).not.toContain('yakit-chrome-extension')
     expect(source).not.toContain('git push')
@@ -262,7 +284,15 @@ describe('睿眼多平台安装文件工作流', () => {
         ['images/ruiyan-icon.svg', 'product/brand/renyan-icon.svg'],
       ]
       expectedAssets.forEach(([entryName, sourcePath]) => {
-        expect(fs.readFileSync(extractedPath(entryName)).equals(fs.readFileSync(path.resolve(sourcePath)))).toBe(true)
+        const archivedAsset = fs.readFileSync(extractedPath(entryName))
+        const sourceAsset = fs.readFileSync(path.resolve(sourcePath))
+        if (path.extname(entryName) === '.svg') {
+          expect(archivedAsset.toString('utf8').replace(/\r\n/g, '\n')).toBe(
+            sourceAsset.toString('utf8').replace(/\r\n/g, '\n'),
+          )
+        } else {
+          expect(archivedAsset.equals(sourceAsset)).toBe(true)
+        }
       })
     } finally {
       fs.rmSync(extractRoot, { recursive: true, force: true })
