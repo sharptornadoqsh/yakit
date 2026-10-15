@@ -1,6 +1,8 @@
 // @vitest-environment node
 import Module, { createRequire } from 'module'
 import { createServer } from 'http'
+import fs from 'fs'
+import vm from 'vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
@@ -12,6 +14,77 @@ const baseURL = 'https://enterprise.example.test'
 const decrypt = (value) => sm2.doDecrypt(value.slice(2), keyPair.privateKey, 1)
 
 afterEach(() => vi.restoreAllMocks())
+
+const loadWithCrypto = (crypto) => {
+  const module = { exports: {} }
+  vm.runInNewContext(fs.readFileSync(require.resolve('../passwordTransport'), 'utf8'), {
+    module,
+    require: (name) => {
+      if (name === 'crypto') return crypto
+      if (name === 'sm-crypto') {
+        crypto.getRandomValues(new Uint8Array(32))
+        return { sm2 }
+      }
+      throw new Error(`Unexpected module: ${name}`)
+    },
+  })
+  return module.exports
+}
+
+describe('password random source compatibility', () => {
+  it('preserves the native function and descriptor without reading webcrypto', () => {
+    const native = vi.fn((array) => array)
+    const crypto = { getRandomValues: native }
+    Object.defineProperty(crypto, 'webcrypto', {
+      get: () => {
+        throw new Error('Native runtimes must not access the fallback')
+      },
+    })
+    const descriptor = Object.getOwnPropertyDescriptor(crypto, 'getRandomValues')
+    expect(loadWithCrypto(crypto).requestPasswordApi).toBeTypeOf('function')
+    expect(crypto.getRandomValues).toBe(native)
+    expect(Object.getOwnPropertyDescriptor(crypto, 'getRandomValues')).toEqual(descriptor)
+    expect(native).toHaveBeenCalledTimes(1)
+  })
+
+  it('binds the missing API to webcrypto before loading sm-crypto and remains idempotent', () => {
+    const webcrypto = {
+      getRandomValues: vi.fn(function (array) {
+        expect(this).toBe(webcrypto)
+        array.fill(17)
+        return array
+      }),
+    }
+    const crypto = { webcrypto }
+    expect(loadWithCrypto(crypto).requestPasswordApi).toBeTypeOf('function')
+    const installed = crypto.getRandomValues
+    const array = new Uint8Array(32)
+    expect(installed(array)).toBe(array)
+    expect([...array]).toEqual(Array(32).fill(17))
+    loadWithCrypto(crypto)
+    expect(crypto.getRandomValues).toBe(installed)
+    expect(webcrypto.getRandomValues).toHaveBeenCalledTimes(3)
+  })
+
+  it.each([{}, { webcrypto: {} }, { webcrypto: { getRandomValues: null } }])(
+    'keeps dependency failure visible when no supported random source exists: %j',
+    (crypto) => {
+      expect(() => loadWithCrypto(crypto)).toThrow(/getRandomValues/)
+      expect(crypto.getRandomValues).toBeUndefined()
+    },
+  )
+
+  it('propagates a random source failure instead of accepting an uninitialized pool', () => {
+    const crypto = {
+      webcrypto: {
+        getRandomValues() {
+          throw new Error('Random source failure')
+        },
+      },
+    }
+    expect(() => loadWithCrypto(crypto)).toThrow('Random source failure')
+  })
+})
 
 describe('桌面密码 SM2 提交', () => {
   it('原始 UTF8 密码保留空白与大小写，并使用带 04 前缀的 C1C3C2', async () => {

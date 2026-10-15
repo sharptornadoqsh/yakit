@@ -1,3 +1,10 @@
+const crypto = require('crypto')
+
+// sm-crypto reads the Node crypto module, not globalThis.crypto.
+if (typeof crypto.getRandomValues !== 'function' && typeof crypto.webcrypto?.getRandomValues === 'function') {
+  crypto.getRandomValues = crypto.webcrypto.getRandomValues.bind(crypto.webcrypto)
+}
+
 const { sm2 } = require('sm-crypto')
 
 const passwordFields = {

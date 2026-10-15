@@ -578,6 +578,6 @@ module.exports = {
       require(path.join(__dirname, `./utils/${item}`)).registerNewIPC(win, getClient, ipcEventPre)
     })
 
-    require('./handlers/portScan2')(win, getClient, ipcEventPre)
+    require('./handlers/portScan2').registerNewIPC(win, getClient, ipcEventPre)
   },
 }
