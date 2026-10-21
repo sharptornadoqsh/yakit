@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "1.4.8-beta3",
+  "revision": "win7-loader-r1",
+  "sourceRepository": "yaklang/yaklang",
+  "sourceCommit": "9b5f61cf4e69e74d2db157989de7e787b5cad4da",
+  "replaceEngineSha256": [
+    "090ad62c2a1f1be9b426235bf7f627cd62c99d3affff5fbc7c5713295feffc6e"
+  ],
+  "go": {
+    "version": "1.22.12",
+    "url": "https://go.dev/dl/go1.22.12.windows-amd64.zip",
+    "sha256": "2ceda04074eac51f4b0b85a9fcca38bcd49daee24bed9ea1f29958a8e22673a6"
+  },
+  "compiler": {
+    "version": "14.2.0",
+    "url": "https://github.com/brechtsanders/winlibs_mingw/releases/download/14.2.0posix-12.0.0-ucrt-r3/winlibs-x86_64-posix-seh-gcc-14.2.0-mingw-w64ucrt-12.0.0-r3.zip",
+    "sha256": "88868d745b807f083a117ff69348d8bc021ad7389aa503379dbed1866efcaeb9"
+  },
+  "ucrt": {
+    "package": "Microsoft.Windows.SDK.CPP",
+    "version": "10.0.19041.5",
+    "url": "https://api.nuget.org/v3-flatcontainer/microsoft.windows.sdk.cpp/10.0.19041.5/microsoft.windows.sdk.cpp.10.0.19041.5.nupkg",
+    "sha512": "6kRappwcPle+pBqSYbbKuTSSD/w5994cXUegff77U3mqyf5oEojwwGC4WliEsjn4E22aiVLC/vxpuCKNqgdxRg==",
+    "directory": "c/Redist/10.0.19041.0/ucrt/DLLs/x64",
+    "fileCount": 42
+  },
+  "upstreamPatches": [
+    "693def151adff1af707d82d28f55dba81ceb08e1.diff",
+    "7c1157f9544922e96945196b47b95664b1e39108.diff",
+    "48042aa09c2f878c4faa576948b07fe625c4707a.diff"
+  ]
+}

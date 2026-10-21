@@ -10,7 +10,7 @@ const sourceRoot = path.resolve(process.env.STARTUP_PORT_TEST_ROOT || '.')
 const handlerPath = path.join(sourceRoot, 'app/main/handlers/newEngineStatus.js')
 const nodeRequire = createRequire(handlerPath)
 
-function createHarness(onSpawn) {
+function createHarness(onSpawn, windowsLegacy = false) {
   const handlers = new Map()
   const children = []
   const processEvents = new EventEmitter()
@@ -18,6 +18,8 @@ function createHarness(onSpawn) {
   const send = vi.fn()
   const callback = vi.fn()
   const assertLocalPortAvailable = vi.fn().mockResolvedValue(undefined)
+  const prepareWindowsLegacyEngine = vi.fn().mockResolvedValue(undefined)
+  const engineLog = vi.fn()
   const spawn = vi.fn((command, args, options) => {
     const child = new EventEmitter()
     child.stdout = new EventEmitter()
@@ -33,8 +35,17 @@ function createHarness(onSpawn) {
     electron: { ipcMain: { handle: (name, handler) => handlers.set(name, handler) } },
     child_process: { spawn, exec: vi.fn() },
     '../state': { GLOBAL_YAK_SETTING: {} },
-    '../filePath': { getLocalYaklangEngine: () => '/fixture/yak', getYakitHome: () => '/fixture/data' },
-    '../logFile': { engineLogOutputFileAndUI: vi.fn(), engineLogOutputUI: vi.fn() },
+    '../filePath': {
+      getLocalYaklangEngine: () => '/fixture/yak',
+      getYakitHome: () => '/fixture/data',
+      loadExtraFilePath: (file) => `/fixture/${file}`,
+    },
+    '../logFile': { engineLogOutputFileAndUI: engineLog, engineLogOutputUI: vi.fn() },
+    '../engineLifecycle': { isWindowsLegacy: () => windowsLegacy },
+    '../windowsLegacyEngine': {
+      ...nodeRequire('../windowsLegacyEngine'),
+      prepareWindowsLegacyEngine,
+    },
     '../defaultDatabase': { getDefaultDatabaseEnvironment },
     '../localEnginePort': {
       ...createRequire(path.resolve('app/main/localEnginePort.js'))('./localEnginePort'),
@@ -79,6 +90,8 @@ function createHarness(onSpawn) {
     processEvents,
     getDefaultDatabaseEnvironment,
     assertLocalPortAvailable,
+    prepareWindowsLegacyEngine,
+    engineLog,
   }
 }
 
@@ -94,6 +107,96 @@ const occupiedCheck = (child, port) =>
   })
 const successfulCheck = (child, port) => completeCheck(child, { ok: true, port, secret: 'fixture-secret' })
 const params = (port = 9011) => ({ port, version: 'yakit', softwareVersion: 'yakit', password: 'fixture-secret' })
+
+describe('Windows legacy 引擎失败证据', () => {
+  it.each([
+    [3221225781, '', 'dll_load_error', '0xC0000135'],
+    [-1073741515, '', 'dll_load_error', '0xC0000135'],
+    [2, 'fatal error: advapi32.dll not found\nruntime: panic before malloc heap initialized', 'runtime_init_error', '0x00000002'],
+    [1, '', 'engine_exit', '0x00000001'],
+    [0, '', 'engine_exit', '0x00000000'],
+  ])('保留退出码 %s 及错误类别', async (code, stderr, status, exitHex) => {
+    const harness = createHarness(({ child }) => {
+      child.stderr.emit('data', stderr)
+      child.emit('close', code)
+    }, true)
+    const result = await harness.handlers.get('check-allow-secret-local-yaklang-engine')(null, params())
+    expect(result).toMatchObject({ ok: false, status, exitCode: code, exitHex, stage: 'capability-check' })
+    expect(harness.prepareWindowsLegacyEngine).toHaveBeenCalledTimes(1)
+    expect(result.message).not.toMatch(/杀软/)
+  })
+
+  it('成功 JSON 后异常退出仍然失败', async () => {
+    const harness = createHarness(({ child }) => {
+      child.stdout.emit('data', '<json-check>{"ok":true,"secret":"private-value"}</json-check>')
+      child.emit('close', 2)
+    }, true)
+    const result = await harness.handlers.get('check-allow-secret-local-yaklang-engine')(null, params())
+    expect(result).toMatchObject({ ok: false, status: 'engine_exit', exitCode: 2 })
+    expect(JSON.stringify(harness.engineLog.mock.calls)).not.toContain('private-value')
+  })
+
+  it('超时结束请求并记录故障阶段', async () => {
+    const harness = createHarness(undefined, true)
+    const pending = harness.handlers.get('check-allow-secret-local-yaklang-engine')(null, params())
+    await vi.advanceTimersByTimeAsync(60001)
+    expect(await pending).toMatchObject({ ok: false, status: 'timeout', stage: 'capability-check' })
+    expect(harness.children[0].kill).toHaveBeenCalled()
+  })
+
+  it('部署失败时不启动任何引擎进程', async () => {
+    const harness = createHarness(undefined, true)
+    harness.prepareWindowsLegacyEngine.mockRejectedValue(new Error('运行库摘要不匹配'))
+    expect(await harness.handlers.get('check-allow-secret-local-yaklang-engine')(null, params())).toMatchObject({
+      ok: false,
+      status: 'deployment_error',
+      stage: 'deployment',
+    })
+    expect(harness.spawn).not.toHaveBeenCalled()
+  })
+
+  it('部署期间取消后不再创建进程', async () => {
+    const harness = createHarness(undefined, true)
+    let finish
+    harness.prepareWindowsLegacyEngine.mockImplementation(() => new Promise((resolve) => (finish = resolve)))
+    const pending = harness.handlers.get('check-allow-secret-local-yaklang-engine')(null, params())
+    await vi.advanceTimersByTimeAsync(0)
+    harness.handlers.get('cancel-all-tasks')()
+    finish()
+    expect(await pending).toMatchObject({ ok: false, status: 'cancelled' })
+    expect(harness.spawn).not.toHaveBeenCalled()
+  })
+
+  it('真正启动失败的结果和日志隐藏本次密码', async () => {
+    const harness = createHarness(({ child }) => {
+      child.stderr.emit('data', 'fatal error: fixture-secret')
+      child.emit('close', 2)
+    }, true)
+    const result = await harness.handlers.get('start-secret-local-yaklang-engine')(null, params())
+    expect(result).toMatchObject({ ok: false, status: 'runtime_init_error', stage: 'engine-start' })
+    expect(JSON.stringify(result)).not.toContain('fixture-secret')
+    expect(JSON.stringify(harness.engineLog.mock.calls)).not.toContain('fixture-secret')
+  })
+
+  it('普通分支维持原分类且不触发 legacy 部署', async () => {
+    const harness = createHarness(({ child }) => child.emit('close', 3221225781))
+    expect(await harness.handlers.get('check-allow-secret-local-yaklang-engine')(null, params())).toMatchObject({
+      ok: false,
+      status: 'antivirus_blocked',
+    })
+    expect(harness.prepareWindowsLegacyEngine).not.toHaveBeenCalled()
+  })
+
+  it('完整能力检查成功，日志不包含临时密码', async () => {
+    const harness = createHarness(({ child, args }) => successfulCheck(child, portFromArgs(args)), true)
+    expect(await harness.handlers.get('check-allow-secret-local-yaklang-engine')(null, params())).toMatchObject({
+      ok: true,
+      status: 'success',
+      json: { port: 9011, secret: 'fixture-secret' },
+    })
+    expect(JSON.stringify(harness.engineLog.mock.calls)).not.toContain('fixture-secret')
+  })
+})
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => {

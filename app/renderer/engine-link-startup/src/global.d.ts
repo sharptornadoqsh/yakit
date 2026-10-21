@@ -97,6 +97,7 @@ interface EngineCompatibilityArtifact {
 }
 
 interface EngineLifecycleInfo {
+  windowsLegacy?: boolean
   installed: boolean
   recovery: { recovered: boolean; source: string }
   bundled: { exists: boolean; trusted: boolean; version: string; status: string }
@@ -186,6 +187,7 @@ interface YakitBridge {
     setRemoteKeyWithTTL: (key: string, value: string, ttl: number) => Promise<unknown>
   }
   system: {
+    windowsLegacy?: boolean
     fetchSystemName: () => Promise<System>
     fetchCpuArch: () => Promise<Architecture>
     isDev: () => Promise<boolean>

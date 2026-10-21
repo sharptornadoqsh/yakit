@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('yakitBridge', {
     setRemoteKeyWithTTL: (key, value, ttl) => invokePrefixed('SetKey', { Key: key, Value: value, TTL: ttl }),
   },
   system: {
+    windowsLegacy: process.platform === 'win32' && process.versions.electron?.startsWith('22.') === true,
     fetchSystemName: () => invokePrefixed('fetch-system-name'),
     fetchCpuArch: () => invokePrefixed('fetch-cpu-arch'),
     isDev: () => invokePrefixed('is-dev'),

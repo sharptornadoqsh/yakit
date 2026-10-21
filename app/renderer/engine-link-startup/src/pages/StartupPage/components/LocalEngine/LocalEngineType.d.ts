@@ -62,6 +62,12 @@ export interface ExecResult {
   ok: boolean
   status: string
   message: string
+  windowsLegacy?: boolean
+  stage?: string
+  exitCode?: number | null
+  exitHex?: string
+  stderr?: string
+  signal?: string | null
   port?: number
 }
 

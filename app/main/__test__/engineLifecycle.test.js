@@ -2,6 +2,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import AdmZip from 'adm-zip'
+import crypto from 'crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   atomicInstallEngine,
@@ -13,7 +14,112 @@ import {
   recoverInterruptedEngineInstall,
   selectBundledEngineArchivePath,
   verifyFileSha256,
+  isWindowsLegacy,
 } from '../engineLifecycle'
+import { deployWindowsLegacyBundle } from '../windowsLegacyEngine'
+
+describe('Windows legacy 完整集合部署', () => {
+  let root
+  let archivePath
+  let directory
+  let artifact
+  const hash = (value) => crypto.createHash('sha256').update(value).digest('hex')
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-legacy-bundle-'))
+    directory = path.join(root, 'yak-engine')
+    fs.mkdirSync(directory)
+    archivePath = path.join(root, 'bundle.zip')
+    const names = ['yak.exe', 'ucrtbase.dll', ...Array.from({ length: 41 }, (_, index) => `api-ms-win-fixture-${index}.dll`)]
+    artifact = { files: names.map((name) => ({ name, sha256: hash(`new-${name}`) })), replaceEngineSha256: [hash('known-old')] }
+    const zip = new AdmZip()
+    for (const name of names) {
+      zip.addFile(`bins/${name === 'yak.exe' ? 'yak_windows_amd64.exe' : name}`, Buffer.from(`new-${name}`))
+    }
+    zip.writeZip(archivePath)
+    artifact.archiveSha256 = hash(fs.readFileSync(archivePath))
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    fs.rmSync(root, { recursive: true, force: true })
+  })
+  const deploy = (extra = {}) => deployWindowsLegacyBundle({ archivePath, artifact, directory, ...extra })
+
+  it('首次安装完整集合，重复启动不再写入', async () => {
+    expect(await deploy()).toMatchObject({ changed: true, engineReplaced: true })
+    for (const file of artifact.files) {
+      expect(hash(fs.readFileSync(path.join(directory, file.name)))).toBe(file.sha256)
+    }
+    expect(await deploy()).toEqual({ changed: false, engineReplaced: false })
+    fs.unlinkSync(path.join(directory, 'ucrtbase.dll'))
+    expect(await deploy()).toMatchObject({ changed: true, engineReplaced: false })
+  })
+
+  it.each(['known-old', 'user-selected'])('已有引擎 %s 不跳过运行库部署', async (existing) => {
+    fs.writeFileSync(path.join(directory, 'yak.exe'), existing)
+    fs.writeFileSync(path.join(directory, 'business.db'), 'keep')
+    await deploy()
+    expect(fs.readFileSync(path.join(directory, 'yak.exe'), 'utf8')).toBe(
+      existing === 'known-old' ? 'new-yak.exe' : existing,
+    )
+    expect(fs.readFileSync(path.join(directory, 'ucrtbase.dll'), 'utf8')).toBe('new-ucrtbase.dll')
+    expect(fs.readFileSync(path.join(directory, 'business.db'), 'utf8')).toBe('keep')
+  })
+
+  it.each(['file', 'hash', 'archive', 'entry'])('集合错误 %s 在替换前终止', async (fault) => {
+    fs.writeFileSync(path.join(directory, 'yak.exe'), 'known-old')
+    if (fault === 'file') artifact.files.pop()
+    if (fault === 'hash') artifact.files[1].sha256 = '0'.repeat(64)
+    if (fault === 'archive') artifact.archiveSha256 = '0'.repeat(64)
+    if (fault === 'entry') {
+      const zip = new AdmZip(archivePath)
+      zip.deleteFile('bins/ucrtbase.dll')
+      zip.writeZip(archivePath)
+      artifact.archiveSha256 = hash(fs.readFileSync(archivePath))
+    }
+    await expect(deploy()).rejects.toThrow()
+    expect(fs.readFileSync(path.join(directory, 'yak.exe'), 'utf8')).toBe('known-old')
+    expect(fs.existsSync(path.join(directory, 'ucrtbase.dll'))).toBe(false)
+  })
+
+  it('替换中断后恢复整套旧文件，再次部署成功', async () => {
+    fs.writeFileSync(path.join(directory, 'yak.exe'), 'known-old')
+    fs.writeFileSync(path.join(directory, 'ucrtbase.dll'), 'old-ucrt')
+    const rename = fs.renameSync.bind(fs)
+    let failed = false
+    vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (!failed && String(from).endsWith('ucrtbase.dll') && String(from).includes('.legacy-stage-')) {
+        failed = true
+        throw new Error('模拟写入中断')
+      }
+      return rename(from, to)
+    })
+    await expect(deploy()).rejects.toThrow('模拟写入中断')
+    expect(fs.readFileSync(path.join(directory, 'yak.exe'), 'utf8')).toBe('known-old')
+    expect(fs.readFileSync(path.join(directory, 'ucrtbase.dll'), 'utf8')).toBe('old-ucrt')
+    expect(await deploy()).toMatchObject({ changed: true })
+  })
+
+  it('重启后恢复遗留事务，不依赖上一次进程内状态', async () => {
+    const stage = '.legacy-stage-fixture'
+    fs.mkdirSync(path.join(directory, stage))
+    fs.writeFileSync(path.join(directory, stage, 'yak.exe.previous'), 'user-selected')
+    fs.writeFileSync(path.join(directory, 'yak.exe'), 'partial-new')
+    fs.writeFileSync(path.join(directory, '.legacy-install.json'), JSON.stringify({
+      stage,
+      files: [{ name: 'yak.exe', existed: true }, { name: 'ucrtbase.dll', existed: false }],
+    }))
+    await deploy()
+    expect(fs.readFileSync(path.join(directory, 'yak.exe'), 'utf8')).toBe('user-selected')
+    expect(fs.existsSync(path.join(directory, '.legacy-install.json'))).toBe(false)
+  })
+
+  it('仅 Windows Electron 22 属于兼容运行时', () => {
+    expect(isWindowsLegacy('win32', '22.3.27')).toBe(true)
+    expect(isWindowsLegacy('win32', '27.0.0')).toBe(false)
+    expect(isWindowsLegacy('linux', '22.3.27')).toBe(false)
+    expect(isWindowsLegacy('darwin', '22.3.27')).toBe(false)
+  })
+})
 
 describe('引擎文件安装事务', () => {
   let temporaryDirectory

@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { configureApplicationIdentity, productConfig } from '../product'
 import { supportedAssets } from '../../../packageScript/script/prepare-renyan-engine'
 import packageJson from '../../../package.json'
+import { inspectStartupLogs, ownedDescendants } from '../../../packageScript/script/verify-windows-legacy-startup'
+import { createEngineLogWriter } from '../windowsLegacyEngine'
 
 const directories = []
 const verifierPath = path.resolve('packageScript/script/verify-renyan-package.js')
@@ -21,6 +23,59 @@ const targets = [
   ['macos-x64', 'darwin', 'x64'],
   ['macos-arm64', 'darwin', 'arm64'],
 ]
+
+describe('Windows legacy 严格验包判据', () => {
+  const ready = [
+    '[engineLinkWin] did-finish-load',
+    '[engineLinkWin] ready-to-show',
+    '[mainWin] did-finish-load',
+    '[mainWin] ready-to-show',
+  ].join('\n')
+  const registered = `${ready}\n[engineLinkWin] registerNewIPC completed\n[Main] registerIPC completed`
+  const connected = '检查随机密码模式结束，退出码: 0\n随机密码模式检查通过\nEcho 测试通过'
+
+  it('窗口加载不是引擎成功', () => {
+    expect(inspectStartupLogs(ready, '')).toBe(false)
+    expect(inspectStartupLogs(registered, '')).toBe(false)
+    expect(inspectStartupLogs(registered, connected)).toBe(true)
+  })
+
+  it.each([
+    '检查随机密码模式结束，退出码: 3221225781',
+    '检查随机密码模式结束，退出码: -1073741515',
+    'fatal error: advapi32.dll not found',
+    'runtime: panic before malloc heap initialized',
+    '检查随机密码模式超时',
+    '引擎未完成启动便已退出',
+  ])('窗口加载且引擎失败时拒绝通过：%s', (failure) => {
+    expect(() => inspectStartupLogs(registered, `${connected}\n${failure}`)).toThrow()
+  })
+
+  it('IPC 注册失败不能被窗口日志覆盖', () => {
+    expect(() => inspectStartupLogs(`${registered}\n[Main] registerIPC error`, connected)).toThrow()
+  })
+
+  it('进程归属限定于本次根 PID，不选择其他同名引擎', () => {
+    const processes = [
+      { ProcessId: 11, ParentProcessId: 1 },
+      { ProcessId: 13, ParentProcessId: 12 },
+      { ProcessId: 12, ParentProcessId: 11 },
+      { ProcessId: 99, ParentProcessId: 1 },
+    ]
+    expect(ownedDescendants(11, processes).map((process) => process.ProcessId)).toEqual([11, 13, 12])
+  })
+
+  it('分块输出保留诊断日志而不泄露临时密码', () => {
+    const messages = []
+    const writer = createEngineLogWriter((line) => messages.push(line), 'private-password')
+    writer.push('启动引擎\n<json-check>{"sec')
+    writer.push('ret":"private-secret"}</json-check>\ngrpc --local-password private-')
+    writer.push('password\nfatal error: advapi32.dll not found')
+    writer.flush()
+    expect(messages.join('\n')).toContain('advapi32.dll not found')
+    expect(messages.join('\n')).not.toMatch(/private-secret|private-password/)
+  })
+})
 
 const loadModule = (file, mocks, processMock) => {
   const module = { exports: {} }
@@ -36,6 +91,32 @@ const loadModule = (file, mocks, processMock) => {
   })
   return module.exports
 }
+
+describe('Windows legacy 验包数据隔离', () => {
+  it.each([
+    ['win32', '22.3.27', 'true', true],
+    ['win32', '22.3.27', 'false', false],
+    ['win32', '27.0.0', 'true', false],
+    ['linux', '22.3.27', 'true', false],
+  ])('平台 %s、Electron %s、Actions=%s 的目录契约', (platform, electron, actions, isolated) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-identity-'))
+    directories.push(root)
+    const profile = path.join(root, 'verification-profile')
+    const identity = loadModule(path.resolve('app/main/product.js'), {}, {
+      platform,
+      versions: { electron },
+      env: { GITHUB_ACTIONS: actions, RENYAN_PACKAGE_VERIFY_USER_DATA: profile },
+    })
+    const app = {
+      getPath: () => root,
+      setPath: vi.fn(),
+      setName: vi.fn(),
+      setAppUserModelId: vi.fn(),
+    }
+    identity.configureApplicationIdentity(app, platform)
+    expect(app.setPath).toHaveBeenCalledWith('userData', isolated ? profile : path.join(root, productConfig.defaultDataDirectory))
+  })
+})
 
 const createHarness = (platform = 'win32', architecture = 'x64', behavior = 'ready') => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-package-startup-'))

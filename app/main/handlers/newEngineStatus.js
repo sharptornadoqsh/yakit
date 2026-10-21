@@ -7,6 +7,13 @@ const { runSpecialDetectionActivation } = require('../specialDetectionActivation
 const { engineLogOutputFileAndUI, engineLogOutputUI } = require('../logFile')
 const { getDefaultDatabaseEnvironment } = require('../defaultDatabase')
 const { isLocalPortConflict, assertLocalPortAvailable, runWithLocalPortRetry } = require('../localEnginePort')
+const { isWindowsLegacy } = require('../engineLifecycle')
+const {
+  prepareWindowsLegacyEngine,
+  classifyEngineFailure,
+  createEngineLogWriter,
+  redactEngineOutput,
+} = require('../windowsLegacyEngine')
 
 // 引擎连接过程中涉及到能中断的执行任务
 const runningTasks = new Map()
@@ -37,8 +44,22 @@ module.exports = {
 
     let currentCheckId = 0 // 全局任务标识
     /** check校验 */
-    const asyncAllowSecretLocal = async (win, params) => {
+    const asyncAllowSecretLocal = async (win, params, isRequestCurrent = () => true) => {
       const checkId = ++currentCheckId // 本次任务唯一 ID
+      const windowsLegacy = isWindowsLegacy()
+      if (windowsLegacy) {
+        try {
+          await prepareWindowsLegacyEngine({
+            command: getLocalYaklangEngine(),
+            archivePath: loadExtraFilePath('bins/yak.zip'),
+          })
+        } catch (error) {
+          throw { status: 'deployment_error', stage: 'deployment', message: error.message }
+        }
+        if (checkId !== currentCheckId || !isRequestCurrent()) {
+          throw { status: 'cancelled', message: '本地引擎检查已取消' }
+        }
+      }
 
       return new Promise((resolve, reject) => {
         try {
@@ -59,6 +80,8 @@ module.exports = {
 
           let stdout = ''
           let stderr = ''
+          const stdoutLog = windowsLegacy && createEngineLogWriter((line) => engineLogOutputFileAndUI(win, line))
+          const stderrLog = windowsLegacy && createEngineLogWriter((line) => engineLogOutputFileAndUI(win, line))
           let killed = false
           let successDetected = false
           const taskKey = 'check_' + checkId
@@ -92,25 +115,32 @@ module.exports = {
           const timeoutId = setTimeout(() => {
             if (checkId !== currentCheckId || successDetected || killed) return
             killFun(true)
+            if (windowsLegacy) {
+              stdoutLog.flush()
+              stderrLog.flush()
+            }
             engineLogOutputFileAndUI(win, `----- 检查随机密码模式超时 (${LOCAL_ENGINE_CHECK_TIMEOUT_MS / 1000}s) -----`)
             reject({
               status: 'timeout',
               message: `检查随机密码模式超时 (${LOCAL_ENGINE_CHECK_TIMEOUT_MS / 1000}s)`,
+              ...(windowsLegacy ? { stage: 'capability-check', stderr: redactEngineOutput(stderr) } : {}),
             })
           }, LOCAL_ENGINE_CHECK_TIMEOUT_MS)
 
           subprocess.stdout.on('data', (data) => {
             if (checkId !== currentCheckId) return // 已过期任务不打印
             const output = data.toString('utf-8')
-            stdout += output
-            engineLogOutputFileAndUI(win, output)
+            stdout = windowsLegacy ? (stdout + output).slice(-65536) : stdout + output
+            if (windowsLegacy) stdoutLog.push(output)
+            else engineLogOutputFileAndUI(win, output)
           })
 
           subprocess.stderr.on('data', (data) => {
             if (checkId !== currentCheckId) return
             const output = data.toString('utf-8')
-            stderr += output
-            engineLogOutputFileAndUI(win, output)
+            stderr = windowsLegacy ? (stderr + output).slice(-65536) : stderr + output
+            if (windowsLegacy) stderrLog.push(output)
+            else engineLogOutputFileAndUI(win, output)
           })
 
           subprocess.on('error', (error) => {
@@ -122,12 +152,24 @@ module.exports = {
             reject({ status: 'process_error', message: error.message })
           })
 
-          subprocess.on('close', (code) => {
+          subprocess.on('close', (code, signal) => {
             if (checkId !== currentCheckId || killed) return
             cleanTask()
             clearTimeout(timeoutId)
+            if (windowsLegacy) {
+              stdoutLog.flush()
+              stderrLog.flush()
+            }
             const combinedOutput = (stdout + stderr).trim()
             engineLogOutputFileAndUI(win, `----- 检查随机密码模式结束，退出码: ${code} -----`)
+            if (windowsLegacy && code !== 0) {
+              const failure = classifyEngineFailure({ code, signal, stderr })
+              // Preserve the existing structured port/database error handling.
+              if (!combinedOutput.includes('<json-') || /fatal error:|panic before malloc/i.test(stderr)) {
+                engineLogOutputFileAndUI(win, failure.message)
+                return reject(failure)
+              }
+            }
 
             // 提取 JSON
             const match = combinedOutput.match(/<json-[\w-]+>([\s\S]*?)<\/json-[\w-]+>/)
@@ -140,7 +182,7 @@ module.exports = {
               }
             }
 
-            if (json && json.ok === true) {
+            if (json && json.ok === true && (!windowsLegacy || code === 0)) {
               successDetected = true
               engineLogOutputFileAndUI(win, `----- 随机密码模式检查通过 -----`)
               return resolve({ status: 'success', json })
@@ -213,6 +255,12 @@ module.exports = {
               return reject({ status: 'old_version', message: '旧版本无法支持某些参数' })
             }
 
+            if (windowsLegacy) {
+              const failure = classifyEngineFailure({ code, signal, stderr })
+              engineLogOutputFileAndUI(win, failure.message)
+              return reject(failure)
+            }
+
             if (!json && !stdout && !stderr) {
               engineLogOutputFileAndUI(win, `----- 检查失败：可能被杀软或防火墙拦截或无法找到引擎 -----`)
               return reject({
@@ -240,7 +288,8 @@ module.exports = {
       try {
         const result = await runWithLocalPortRetry({
           port: params.port,
-          operation: (port) => asyncAllowSecretLocal(win, { ...params, port }),
+          operation: (port) =>
+            asyncAllowSecretLocal(win, { ...params, port }, () => requestId === currentCheckRequestId),
           onRetry: reportPortRetry,
           isCurrent: () => requestId === currentCheckRequestId,
         })
@@ -252,6 +301,16 @@ module.exports = {
           status: safeError.status,
           message: safeError.message,
           json: safeError.json || null,
+          ...(isWindowsLegacy()
+            ? {
+                windowsLegacy: true,
+                stage: safeError.stage || 'capability-check',
+                exitCode: safeError.exitCode,
+                exitHex: safeError.exitHex,
+                stderr: safeError.stderr,
+                signal: safeError.signal,
+              }
+            : {}),
         }
       }
     })
@@ -621,9 +680,23 @@ module.exports = {
 
     let currentStartId = 0 // 全局启动任务标识
     /** 启动引擎 */
-    const asyncStartSecretLocalYakEngineServer = async (win, params) => {
+    const asyncStartSecretLocalYakEngineServer = async (win, params, isRequestCurrent = () => true) => {
       const checkId = ++currentStartId
       const { version, port, password, isEnpriTraceAgent, softwareVersion } = params
+      const windowsLegacy = isWindowsLegacy()
+      if (windowsLegacy) {
+        try {
+          await prepareWindowsLegacyEngine({
+            command: getLocalYaklangEngine(),
+            archivePath: loadExtraFilePath('bins/yak.zip'),
+          })
+        } catch (error) {
+          throw { status: 'deployment_error', stage: 'deployment', message: error.message }
+        }
+        if (checkId !== currentStartId || !isRequestCurrent()) {
+          throw { status: 'cancelled', message: '本地引擎启动已取消' }
+        }
+      }
 
       return new Promise((resolve, reject) => {
         engineLogOutputFileAndUI(win, `----- 启动本地引擎进程 (Random Local Password, Port: ${port})  -----`)
@@ -641,7 +714,10 @@ module.exports = {
           const resultParams = isEnpriTraceAgent ? [...grpcParams, '--disable-output'] : grpcParams
 
           const command = getLocalYaklangEngine()
-          engineLogOutputFileAndUI(win, `启动命令: ${command} ${resultParams.join(' ')}`)
+          engineLogOutputFileAndUI(
+            win,
+            `启动命令: ${command} ${windowsLegacy ? redactEngineOutput(resultParams.join(' ')) : resultParams.join(' ')}`,
+          )
 
           const defaltEnv = { ...process.env, YAKIT_HOME: getYakitHome() }
           localEngineEnvironment = { ...defaltEnv, ...getDefaultDatabaseEnvironment(softwareVersion, version) }
@@ -659,6 +735,10 @@ module.exports = {
           let successDetected = false
           let killed = false
           let processEnded = false
+          const stdoutLog =
+            windowsLegacy && createEngineLogWriter((line) => engineLogOutputFileAndUI(win, line), password)
+          const stderrLog =
+            windowsLegacy && createEngineLogWriter((line) => engineLogOutputFileAndUI(win, line), password)
           const taskKey = 'start_' + checkId
           let cleaned = false
           let pollIntervalId = null
@@ -770,8 +850,9 @@ module.exports = {
           subprocess.stdout.on('data', (data) => {
             if (checkId !== currentStartId) return
             const output = data.toString('utf-8')
-            stdout += output
-            engineLogOutputFileAndUI(win, output)
+            stdout = windowsLegacy ? (stdout + output).slice(-65536) : stdout + output
+            if (windowsLegacy) stdoutLog.push(output)
+            else engineLogOutputFileAndUI(win, output)
 
             const regex = /<json-f97f966eb7f8ba8fdb63e4d29109c058>(.*?)<json-f97f966eb7f8ba8fdb63e4d29109c058>/
 
@@ -792,8 +873,9 @@ module.exports = {
           subprocess.stderr.on('data', (data) => {
             if (checkId !== currentStartId) return
             const output = data.toString('utf-8')
-            stderr += output
-            engineLogOutputFileAndUI(win, output)
+            stderr = windowsLegacy ? (stderr + output).slice(-65536) : stderr + output
+            if (windowsLegacy) stderrLog.push(output)
+            else engineLogOutputFileAndUI(win, output)
           })
 
           process.once('exit', onProcessExit)
@@ -810,9 +892,18 @@ module.exports = {
             reject({ status: isLocalPortConflict(err) ? 'port_occupied' : 'process_error', message: err.message })
           })
 
-          subprocess.on('close', async (code) => {
+          subprocess.on('close', async (code, signal) => {
             processEnded = true
+            if (windowsLegacy) {
+              stdoutLog.flush()
+              stderrLog.flush()
+            }
             process.removeListener('exit', onProcessExit)
+            if (windowsLegacy && checkId === currentStartId && successDetected && !killed) {
+              const failure = classifyEngineFailure({ code, signal, stderr, stage: 'engine-running', secret: password })
+              engineLogOutputFileAndUI(win, failure.message)
+              win.webContents.send('start-yaklang-engine-error', failure.message)
+            }
             if (checkId !== currentStartId || killed || successDetected) return
             cleanup()
             cleanTask()
@@ -830,6 +921,9 @@ module.exports = {
             reject({
               status: portOccupied ? 'port_occupied' : 'exit',
               message: `引擎进程提前退出 (${code})${detail ? `：${detail.slice(-2000)}` : ''}`,
+              ...(windowsLegacy && !portOccupied
+                ? classifyEngineFailure({ code, signal, stderr, stage: 'engine-start', secret: password })
+                : {}),
             })
           })
         } catch (e) {
@@ -848,7 +942,11 @@ module.exports = {
           operation: async (port) => {
             await assertLocalPortAvailable(port)
             if (requestId !== currentStartRequestId) throw { status: 'cancelled', message: '本地引擎启动已取消' }
-            return asyncStartSecretLocalYakEngineServer(win, { ...params, port })
+            return asyncStartSecretLocalYakEngineServer(
+              win,
+              { ...params, port },
+              () => requestId === currentStartRequestId,
+            )
           },
           onRetry: reportPortRetry,
           isCurrent: () => requestId === currentStartRequestId,
@@ -860,6 +958,16 @@ module.exports = {
           ok: false,
           status: safeError.status,
           message: safeError.message,
+          ...(isWindowsLegacy()
+            ? {
+                windowsLegacy: true,
+                stage: safeError.stage || 'engine-start',
+                exitCode: safeError.exitCode,
+                exitHex: safeError.exitHex,
+                stderr: safeError.stderr,
+                signal: safeError.signal,
+              }
+            : {}),
         }
       }
     })

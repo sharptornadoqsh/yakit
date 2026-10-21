@@ -6,6 +6,10 @@ const StreamZip = require('node-stream-zip')
 const compatibilityManifest = require('../../product/engine-compatibility.json')
 const packageJson = require('../../package.json')
 
+const isWindowsLegacy = (platform = process.platform, electronVersion = process.versions?.electron) =>
+  platform === 'win32' &&
+  (electronVersion ? electronVersion.startsWith('22.') : process.env.THE_LEGACY === 'true')
+
 const normalizeSha256 = (value) => {
   const normalized = `${value || ''}`.trim().toLowerCase()
   return /^[a-f0-9]{64}$/.test(normalized) ? normalized : ''
@@ -270,9 +274,15 @@ const getCompatibilityEntry = ({
   clientVersion = packageJson.version,
   platform = process.platform,
   architecture = process.arch,
+  legacy = isWindowsLegacy(platform),
 } = {}) => {
   const client = compatibilityManifest.clientVersions.find((item) => item.clientVersion === clientVersion)
   if (!client) return undefined
+  if (platform === 'win32' && architecture === 'x64' && legacy) {
+    const entry = client.windowsLegacy
+    if (!entry?.artifact) return undefined
+    return { clientVersion, compatibilityGate: client.compatibilityGate, ...entry }
+  }
   const artifact = client.artifacts.find((item) => item.platform === platform && item.architecture === architecture)
   if (!artifact) return undefined
   return {
@@ -293,6 +303,7 @@ module.exports = {
   extractArchiveEntry,
   extractAndVerifyEngineArchive,
   getCompatibilityEntry,
+  isWindowsLegacy,
   normalizeSha256,
   recoverInterruptedEngineInstall,
   selectBundledEngineArchivePath,

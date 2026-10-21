@@ -100,8 +100,10 @@ const verifyPackage = async ({
   includeEngine,
   signed = false,
   native = true,
+  legacy = false,
 }) => {
   const info = resolvePackage(root, target)
+  const strictWindowsLegacy = legacy && target === 'windows-x64' && includeEngine
   let userData
   if (native) {
     assert.equal(process.platform, info.platform, 'Package verification requires the target operating system')
@@ -113,10 +115,12 @@ const verifyPackage = async ({
           ? path.join(os.homedir(), 'Library/Application Support')
           : process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
     userData = appData && path.join(appData, product.defaultDataDirectory)
-    assert.ok(
-      userData && !fs.existsSync(userData),
-      'Native package verification requires a clean RuiYan profile on a disposable build account',
-    )
+    if (!strictWindowsLegacy) {
+      assert.ok(
+        userData && !fs.existsSync(userData),
+        'Native package verification requires a clean RuiYan profile on a disposable build account',
+      )
+    }
   }
   const asset = Object.keys(supportedAssets).find((name) => {
     const mapping = supportedAssets[name]
@@ -132,17 +136,30 @@ const verifyPackage = async ({
   }
   assert.equal(readJson('package.json').version, packageJson.version, 'Packaged client version mismatch')
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-package-verification-'))
+  let legacyArtifact
+  if (strictWindowsLegacy) userData = path.join(temporary, 'profile')
   try {
     if (includeEngine) {
       const manifest = readJson('product/engine-compatibility.json')
       const client = manifest.clientVersions.find((entry) => entry.clientVersion === packageJson.version)
-      const artifact = client?.artifacts.find(
-        (entry) => entry.platform === info.platform && entry.architecture === info.architecture,
-      )
+      const artifact = strictWindowsLegacy
+        ? client?.windowsLegacy?.artifact
+        : client?.artifacts.find((entry) => entry.platform === info.platform && entry.architecture === info.architecture)
       assert.ok(artifact, 'Packaged engine compatibility entry missing')
       assert.equal(artifact.archiveEntry, `bins/${asset}`, 'Packaged engine entry mismatch')
       assert.equal(artifact.packagedArchive, 'bins/yak.zip', 'Packaged engine archive path mismatch')
       const engine = path.join(temporary, info.platform === 'win32' ? 'yak.exe' : 'yak')
+      if (strictWindowsLegacy) {
+        const { deployWindowsLegacyBundle } = require('../../app/main/windowsLegacyEngine')
+        assert.equal(artifact.legacy, true, 'Windows legacy 专用工件标志缺失')
+        await deployWindowsLegacyBundle({
+          archivePath: path.join(info.contents, artifact.packagedArchive),
+          artifact,
+          directory: temporary,
+          forceEngine: true,
+        })
+        legacyArtifact = artifact
+      }
       const verification = await extractAndVerifyEngineArchive({
         archivePath: path.join(info.contents, artifact.packagedArchive),
         archiveSha256: artifact.archiveSha256,
@@ -154,8 +171,18 @@ const verifyPackage = async ({
       verifyEngineBinary(engine, asset)
       if (native) {
         if (info.platform !== 'win32') fs.chmodSync(engine, 0o755)
-        const version = execFileSync(engine, ['version'], { encoding: 'utf8', timeout: 30000, windowsHide: true })
-        assert.ok(version.includes(client.recommendedEngineVersion), `Unexpected engine version: ${version}`)
+        const version = execFileSync(engine, ['version'], {
+          encoding: 'utf8',
+          timeout: 30000,
+          windowsHide: true,
+          ...(strictWindowsLegacy
+            ? { cwd: temporary, env: { ...process.env, YAKIT_HOME: path.join(temporary, 'engine-data') } }
+            : {}),
+        })
+        const expectedVersion = strictWindowsLegacy
+          ? client.windowsLegacy.recommendedEngineVersion
+          : client.recommendedEngineVersion
+        assert.ok(version.includes(expectedVersion), `Unexpected engine version: ${version}`)
       }
     }
     if (native) {
@@ -185,7 +212,19 @@ const verifyPackage = async ({
       assert.equal(runtime.arch, info.architecture)
       assert.equal(runtime.electron, packageJson.devDependencies.electron)
       delete env.ELECTRON_RUN_AS_NODE
-      await verifyRendererStartup(info.executable, env, userData)
+      if (strictWindowsLegacy) {
+        assert.equal(runtime.electron, '22.3.27')
+        const { verifyWindowsLegacyStartup } = require('./verify-windows-legacy-startup')
+        await verifyWindowsLegacyStartup(
+          info.executable,
+          env,
+          userData,
+          legacyArtifact,
+          path.join(root, 'reports/windows-legacy-host.json'),
+        )
+      } else {
+        await verifyRendererStartup(info.executable, env, userData)
+      }
     }
     return { target, architecture: info.architecture, includeEngine, native }
   } finally {
@@ -198,6 +237,7 @@ if (require.main === module) {
     target: process.env.PACKAGE_TARGET,
     includeEngine: parseBoolean(process.env.INCLUDE_ENGINE),
     signed: parseBoolean(process.env.PACKAGE_SIGNED || 'false'),
+    legacy: parseBoolean(process.env.THE_LEGACY || 'false'),
   })
     .then((result) => console.log(`Package verification passed: ${JSON.stringify(result)}`))
     .catch((error) => {

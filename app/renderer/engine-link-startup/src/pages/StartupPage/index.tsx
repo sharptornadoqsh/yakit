@@ -50,7 +50,8 @@ import emiter from '@/utils/eventBus/eventBus'
 import { YaklangEngineWatchDog } from './components/YaklangEngineWatchDog'
 import { useTheme } from '@/hooks/useTheme'
 import { StartupSplash } from './components/StartupSplash'
-import { yakitApp, yakitEngine } from '@/utils/electronBridge'
+import { EngineLifecyclePanel } from './components/EngineLifecyclePanel'
+import { yakitApp, yakitEngine, yakitSystem } from '@/utils/electronBridge'
 import { useYakitStatus } from '@/hooks/useYakitStatus'
 import styles from './index.module.scss'
 import {
@@ -75,7 +76,7 @@ export const StartupPage: React.FC = () => {
   /** 操作系统 */
   const [system, setSystem] = useState<System>('Darwin')
   /** 本地引擎自检输出日志 */
-  const [, setCheckLog] = useState<string[]>(['正在进行环境检查...'])
+  const [checkLog, setCheckLog] = useState<string[]>(['正在进行环境检查...'])
   const [engineLifecycle, dispatchEngineLifecycle] = useReducer(engineLifecycleReducer, initialEngineLifecycleState)
   const transitionEngineLifecycle = useMemoizedFn(
     (
@@ -454,7 +455,7 @@ export const StartupPage: React.FC = () => {
 
   // #region 初始化界面操作
   // 手动重连时按钮的loading
-  const [, setRestartLoading] = useState<boolean>(false)
+  const [restartLoading, setRestartLoading] = useState<boolean>(false)
   const setTimeoutLoading = useMemoizedFn((setLoading: (v: boolean) => any, time = 2000) => {
     setLoading(true)
     setTimeout(() => {
@@ -651,6 +652,12 @@ export const StartupPage: React.FC = () => {
   useEffect(() => {
     const offStartEngineError = yakitEngine.onStartYaklangEngineError((error: string) => {
       setCheckLog((arr) => arr.concat([`${error}`]))
+      if (yakitSystem.windowsLegacy) {
+        setEngineLink(false)
+        setKeepalive(false)
+        setRestartLoading(false)
+        safeSetYakitStatus('error')
+      }
       transitionEngineLifecycle('recoverable-error', '本地引擎启动失败，可重试或查看日志', { error })
     })
     return () => {
@@ -931,10 +938,30 @@ export const StartupPage: React.FC = () => {
     },
   )
 
+  const showLegacyFailure =
+    yakitSystem.windowsLegacy === true &&
+    !isRemoteEngine &&
+    !engineLink &&
+    (['recoverable-error', 'error', 'incompatible', 'missing'].includes(engineLifecycle.state) ||
+      ['antivirus_blocked', 'database_error', 'skipAgreement_Install'].includes(yakitStatus))
+
   return (
     <div className={styles['startup-wrapper']}>
       <div className={styles['startup-header-drap']} style={{ height: DragHeaderHeight }}></div>
-      <StartupSplash theme={theme} />
+      {showLegacyFailure ? (
+        <EngineLifecyclePanel
+          lifecycle={{ ...engineLifecycle, state: 'recoverable-error', message: '本地引擎启动失败' }}
+          yakitStatus={yakitStatus}
+          logs={checkLog}
+          busy={restartLoading}
+          buildInEngineVersion={buildInEngineVersion}
+          countdown={0}
+          onAction={handleOperations}
+          recoveryOnly
+        />
+      ) : (
+        <StartupSplash theme={theme} />
+      )}
       <div className={styles['startup-operation-layer']} aria-hidden="true">
         <YaklangEngineWatchDog
           credential={credential}

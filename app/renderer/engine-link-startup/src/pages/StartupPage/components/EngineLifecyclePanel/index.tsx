@@ -12,7 +12,8 @@ interface EngineLifecyclePanelProps {
   buildInEngineVersion: string
   countdown: number
   onAction: (type: YaklangEngineMode | YakitStatusType, extra?: LoadingClickExtra) => void
-  onManualInstall: () => void
+  onManualInstall?: () => void
+  recoveryOnly?: boolean
 }
 
 const stateLabels: Record<EngineLifecycleState['state'], string> = {
@@ -49,8 +50,9 @@ const errorStatuses: YakitStatusType[] = [
 ]
 
 export const EngineLifecyclePanel: React.FC<EngineLifecyclePanelProps> = React.memo((props) => {
-  const { lifecycle, yakitStatus, logs, busy, buildInEngineVersion, countdown, onAction, onManualInstall } = props
-  const showMissingActions = missingStatuses.includes(yakitStatus) || lifecycle.state === 'missing'
+  const { lifecycle, yakitStatus, logs, busy, buildInEngineVersion, countdown, onAction, onManualInstall, recoveryOnly } =
+    props
+  const showMissingActions = !recoveryOnly && (missingStatuses.includes(yakitStatus) || lifecycle.state === 'missing')
   const showRecoveryActions =
     errorStatuses.includes(yakitStatus) ||
     yakitStatus === 'old_version' ||
@@ -62,6 +64,10 @@ export const EngineLifecyclePanel: React.FC<EngineLifecyclePanelProps> = React.m
   const visibleLogs = useMemo(() => logs.filter(Boolean).slice(-4), [logs])
 
   const retry = () => {
+    if (recoveryOnly) {
+      onAction('check_timeout')
+      return
+    }
     if (yakitStatus === 'database_error' || yakitStatus === 'fix_database_timeout') {
       onAction(yakitStatus)
       return
@@ -110,7 +116,7 @@ export const EngineLifecyclePanel: React.FC<EngineLifecyclePanelProps> = React.m
       </div>
 
       <div className={styles['action-grid']}>
-        {(showMissingActions || showRecoveryActions) && (
+        {!recoveryOnly && (showMissingActions || showRecoveryActions) && (
           <button
             type="button"
             className={styles['primary-action']}
@@ -120,17 +126,17 @@ export const EngineLifecyclePanel: React.FC<EngineLifecyclePanelProps> = React.m
             安装引擎
           </button>
         )}
-        {(showMissingActions || showRecoveryActions) && (
+        {!recoveryOnly && (showMissingActions || showRecoveryActions) && (
           <button type="button" disabled={busy} onClick={() => onAction('remote')}>
             选择远程引擎
           </button>
         )}
-        {(showMissingActions || showRecoveryActions) && (
+        {!recoveryOnly && onManualInstall && (showMissingActions || showRecoveryActions) && (
           <button type="button" disabled={busy} onClick={onManualInstall}>
             手工安装
           </button>
         )}
-        {yakitStatus === 'old_version' && buildInEngineVersion && (
+        {(recoveryOnly || yakitStatus === 'old_version') && buildInEngineVersion && (
           <button
             type="button"
             className={styles['primary-action']}
@@ -145,7 +151,7 @@ export const EngineLifecyclePanel: React.FC<EngineLifecyclePanelProps> = React.m
             重试启动
           </button>
         )}
-        {(yakitStatus === 'database_error' || yakitStatus === 'fix_database_timeout') && (
+        {!recoveryOnly && (yakitStatus === 'database_error' || yakitStatus === 'fix_database_timeout') && (
           <button type="button" className={styles['primary-action']} disabled={busy} onClick={retry}>
             修复数据库
           </button>

@@ -97,6 +97,13 @@ export const LocalEngine: React.FC<LocalEngineProps> = memo(
 
         allowSecretLocalJson.current = null
         switch (result.status) {
+          case 'dll_load_error':
+          case 'runtime_init_error':
+          case 'engine_exit':
+          case 'deployment_error':
+            setLog([result.message || 'Windows legacy 引擎启动失败，请查看诊断日志'])
+            setYakitStatus('allow-secret-error')
+            break
           case 'timeout':
           case 'call_error':
             setLog(['本地引擎能力检查超时，可重试或查看日志', result.message].filter(Boolean))

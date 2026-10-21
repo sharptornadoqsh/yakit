@@ -37,7 +37,15 @@ const getExecutableName = (platform = process.platform) =>
 const resolveUserDataPath = (appDataPath) => path.join(appDataPath, productConfig.defaultDataDirectory)
 
 const configureApplicationIdentity = (electronApp, platform = process.platform) => {
-  const userDataPath = resolveUserDataPath(electronApp.getPath('appData'))
+  const verificationProfile =
+    platform === 'win32' &&
+    process.versions?.electron?.startsWith('22.') &&
+    process.env.GITHUB_ACTIONS === 'true' &&
+    process.env.RENYAN_PACKAGE_VERIFY_USER_DATA
+  if (verificationProfile && !path.isAbsolute(verificationProfile)) {
+    throw new Error('验包数据目录必须是绝对路径')
+  }
+  const userDataPath = verificationProfile || resolveUserDataPath(electronApp.getPath('appData'))
   fs.mkdirSync(userDataPath, { recursive: true })
   electronApp.setName(productConfig.displayName)
   electronApp.setPath('userData', userDataPath)

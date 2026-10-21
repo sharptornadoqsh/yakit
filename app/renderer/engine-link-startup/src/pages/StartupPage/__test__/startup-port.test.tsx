@@ -1,10 +1,10 @@
 import React from 'react'
 import '@testing-library/jest-dom/vitest'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StartupPage } from '../index'
 import * as grpc from '../grpc'
-import { yakitApp, yakitEngine } from '@/utils/electronBridge'
+import { yakitApp, yakitEngine, yakitSystem } from '@/utils/electronBridge'
 import { getLocalValue, setLocalValue } from '@/utils/kv'
 import { LocalGVS } from '@/enums/yakitGV'
 import { RemoteEngine } from '../components/RemoteEngine/RemoteEngine'
@@ -52,6 +52,7 @@ vi.mock('../grpc', () => ({
   isEngineConnectionAlive: vi.fn(),
 }))
 vi.mock('@/utils/electronBridge', () => ({
+  yakitSystem: { windowsLegacy: false },
   yakitEngine: {
     getEngineLifecycleInfo: vi.fn(),
     getCurrentYak: vi.fn(),
@@ -72,6 +73,7 @@ vi.mock('@/utils/electronBridge', () => ({
 describe('启动页面端口与恢复集成', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    yakitSystem.windowsLegacy = false
     vi.useFakeTimers()
     vi.mocked(getLocalValue).mockResolvedValue(undefined)
     vi.mocked(setLocalValue).mockResolvedValue(undefined)
@@ -137,6 +139,39 @@ describe('启动页面端口与恢复集成', () => {
     const listener = vi.mocked(yakitApp.onFromMainWindow).mock.calls.at(-1)![0]
     act(() => listener({ yakitStatus } as any))
   }
+
+  it.each(['dll_load_error', 'runtime_init_error', 'engine_exit', 'timeout', 'deployment_error'])(
+    'Windows legacy 错误 %s 结束动画并提供可操作重试',
+    async (status) => {
+      yakitSystem.windowsLegacy = true
+      vi.mocked(grpc.grpcCheckAllowSecretLocal).mockResolvedValue({
+        ok: false,
+        status,
+        message: '能力检查失败，退出码 0xC0000135',
+        json: null,
+      })
+      render(<StartupPage />)
+      await advance()
+      expect(screen.queryByText('睿眼自动化渗透系统正在启动')).not.toBeInTheDocument()
+      expect(screen.getByText(/退出码 0xC0000135/)).toBeInTheDocument()
+      const retry = screen.getByRole('button', { name: '重试启动' })
+      expect(retry).not.toBeDisabled()
+      expect(screen.getByRole('button', { name: '打开诊断日志' })).toBeInTheDocument()
+      fireEvent.click(retry)
+      await advance()
+      expect(grpc.grpcCheckAllowSecretLocal).toHaveBeenCalledTimes(2)
+      expect(yakitApp.completeEngineLink).not.toHaveBeenCalled()
+    },
+  )
+
+  it('Windows legacy 正常路径保持原启动页', async () => {
+    yakitSystem.windowsLegacy = true
+    render(<StartupPage />)
+    expectBrandedSplashOnly()
+    await advance()
+    expect(yakitApp.completeEngineLink).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: '重试启动' })).not.toBeInTheDocument()
+  })
 
   it.each(['port_occupied', 'unexpected', 'timeout', 'database_error'])(
     '能力检查错误 %s 保持品牌启动页并保留外部重试',

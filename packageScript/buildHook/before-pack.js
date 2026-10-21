@@ -27,6 +27,7 @@ const validateBundledEngine = async (platform, architecture) => {
     clientVersion: packageJson.version,
     platform,
     architecture,
+    legacy: platform === 'win32' && process.env.THE_LEGACY === 'true',
   })
   if (!compatibility) throw new Error(`兼容清单缺少 ${platform}/${architecture} 工件`)
 

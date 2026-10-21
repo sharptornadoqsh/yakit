@@ -46,7 +46,9 @@ const {
   recoverInterruptedEngineInstall,
   selectBundledEngineArchivePath,
   verifyFileSha256,
+  isWindowsLegacy,
 } = require('../engineLifecycle')
+const { prepareWindowsLegacyEngine } = require('../windowsLegacyEngine')
 
 const getUserChromeDataDir = () => path.join(getYakitHome(), 'chrome-profile')
 const authMeta = []
@@ -286,6 +288,23 @@ const restoreVerifiedBundledEngine = async (win) => {
   if (!bundled.trusted) {
     throw new Error('当前平台的预置引擎摘要尚未验证')
   }
+  if (isWindowsLegacy()) {
+    emitEngineLifecycleStage(win, 'installing', '正在部署 Windows legacy 引擎及完整运行库')
+    try {
+      const result = await prepareWindowsLegacyEngine({
+        command: getLatestYakLocalEngine(),
+        archivePath: bundled.archivePath,
+        forceEngine: true,
+      })
+      fs.writeFileSync(path.join(getYakitHome(), 'engine-sha256.txt'), `${bundled.engineSha256}\n`, 'utf8')
+      return result
+    } catch (error) {
+      emitEngineLifecycleStage(win, 'recoverable-error', 'Windows legacy 部署失败，已保留恢复记录', {
+        error: error.message,
+      })
+      throw error
+    }
+  }
 
   const extractedPath = path.join(getYaklangEngineDir(), 'yak.bundled.download')
   try {
@@ -359,6 +378,7 @@ const getEngineLifecycleInfo = async () => {
   const bundled = getBundledEngineInfo()
   return {
     installed: fs.existsSync(targetPath),
+    windowsLegacy: isWindowsLegacy(),
     recovery,
     bundled: {
       exists: bundled.exists,

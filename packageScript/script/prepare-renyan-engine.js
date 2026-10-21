@@ -6,6 +6,7 @@ const { pipeline } = require('stream/promises')
 const AdmZip = require('adm-zip')
 const packageJson = require('../../package.json')
 const compatibilityManifest = require('../../product/engine-compatibility.json')
+const windowsLegacyLock = require('../../product/windows-legacy-engine.json')
 
 const repositoryRoot = path.resolve(__dirname, '../..')
 const engineBaseUrl = 'https://yaklang.oss-accelerate.aliyuncs.com/yak/'
@@ -217,8 +218,90 @@ const prepareEngine = async ({
   }
 }
 
+const prepareWindowsLegacyArchive = async ({ directory, root = repositoryRoot, requestedVersion }) => {
+  if (requestedVersion && requestedVersion !== windowsLegacyLock.engineVersion) {
+    throw new Error(`Windows legacy 固定引擎版本为 ${windowsLegacyLock.engineVersion}`)
+  }
+  const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'build.json'), 'utf8'))
+  if (
+    metadata.sourceCommit !== windowsLegacyLock.sourceCommit ||
+    metadata.engineVersion !== windowsLegacyLock.engineVersion ||
+    metadata.revision !== windowsLegacyLock.revision ||
+    metadata.go?.sha256 !== windowsLegacyLock.go.sha256 ||
+    metadata.compiler?.sha256 !== windowsLegacyLock.compiler.sha256 ||
+    metadata.ucrt?.version !== windowsLegacyLock.ucrt.version ||
+    metadata.ucrt?.sha512 !== windowsLegacyLock.ucrt.sha512
+  ) {
+    throw new Error('Windows legacy 构建来源与锁定清单不一致')
+  }
+  const { validateFiles } = require('../../app/main/windowsLegacyEngine')
+  const files = validateFiles(metadata)
+  const asset = 'yak_windows_amd64.exe'
+  const paths = getEnginePaths(asset, root)
+  const zip = new AdmZip()
+  for (const file of files) {
+    const source = path.join(directory, file.name)
+    if ((await calculateSha256(source)) !== file.sha256) throw new Error(`Windows legacy 文件摘要不匹配：${file.name}`)
+    verifyEngineBinary(source, asset)
+    zip.addFile(`bins/${file.name === 'yak.exe' ? asset : file.name}`, fs.readFileSync(source))
+  }
+  fs.mkdirSync(path.dirname(paths.archivePath), { recursive: true })
+  zip.writeZip(paths.archivePath)
+  const archiveSha256 = await calculateSha256(paths.archivePath)
+  const engineSha256 = files.find((file) => file.name === 'yak.exe').sha256
+  const verification = {
+    ...metadata,
+    legacy: true,
+    asset,
+    platform: 'win32',
+    architecture: 'x64',
+    archivePath: normalizePath(path.relative(root, paths.archivePath)),
+    archiveSha256,
+    packagedEngineSha256: engineSha256,
+    verifiedAt: new Date().toISOString(),
+    win7Verification: 'pending',
+  }
+  fs.writeFileSync(paths.verificationPath, `${JSON.stringify(verification, null, 2)}\n`, 'utf8')
+  const manifestPath = path.join(root, 'product/engine-compatibility.json')
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+  const client = manifest.clientVersions.find((item) => item.clientVersion === packageJson.version)
+  if (!client) throw new Error('兼容清单缺少当前客户端版本')
+  client.windowsLegacy = {
+    recommendedEngineVersion: metadata.engineVersion,
+    revision: metadata.revision,
+    sourceCommit: metadata.sourceCommit,
+    win7Verification: 'pending',
+    artifact: {
+      platform: 'win32',
+      architecture: 'x64',
+      legacy: true,
+      sourceArchive: verification.archivePath,
+      packagedArchive: 'bins/yak.zip',
+      archiveEntry: `bins/${asset}`,
+      archiveSha256,
+      engineSha256,
+      files,
+      replaceEngineSha256: windowsLegacyLock.replaceEngineSha256,
+      status: 'built-pending-win7-verification',
+    },
+  }
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  fs.writeFileSync(path.join(root, 'bins/engine-version.txt'), `${metadata.engineVersion}\n`, 'utf8')
+  return { engineVersion: metadata.engineVersion, ...paths, verification }
+}
+
 const run = async () => {
   const command = process.argv[2]
+  if (command === 'prepare-windows-legacy') {
+    const result = await prepareWindowsLegacyArchive({
+      directory: process.env.WINDOWS_LEGACY_BUNDLE,
+      requestedVersion: process.env.REQUESTED_ENGINE_VERSION,
+    })
+    writeWorkflowValue(process.env.GITHUB_OUTPUT, 'engine_version', result.engineVersion)
+    writeWorkflowValue(process.env.GITHUB_ENV, 'ENGINE_VERSION', result.engineVersion)
+    console.log(`Windows legacy 工件：${result.engineVersion}，SHA256=${result.verification.packagedEngineSha256}`)
+    return
+  }
   const asset = process.env.ENGINE_ASSET
   if (!asset) throw new Error('缺少 ENGINE_ASSET')
 
@@ -263,6 +346,7 @@ module.exports = {
   parseBoolean,
   parseSha256,
   prepareEngine,
+  prepareWindowsLegacyArchive,
   resolveEngineVersion,
   supportedAssets,
   verifyEngineBinary,

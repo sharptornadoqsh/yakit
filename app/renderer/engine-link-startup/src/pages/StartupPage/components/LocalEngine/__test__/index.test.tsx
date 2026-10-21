@@ -179,6 +179,10 @@ describe('本地引擎离线启动', () => {
     ['build_yak_error', 'skipAgreement_Install'],
     ['dial_error', 'skipAgreement_Install'],
     ['unexpected', 'allow-secret-error'],
+    ['dll_load_error', 'allow-secret-error'],
+    ['runtime_init_error', 'allow-secret-error'],
+    ['engine_exit', 'allow-secret-error'],
+    ['deployment_error', 'allow-secret-error'],
   ])('将能力状态 %s 映射为可恢复界面状态 %s', async (status, expectedStatus) => {
     ;(grpcCheckAllowSecretLocal as any).mockResolvedValue({ ok: false, status, message: 'detail', json: null })
     renderComponent()
@@ -186,6 +190,7 @@ describe('本地引擎离线启动', () => {
 
     expect(props.setYakitStatus).toHaveBeenCalledWith(expectedStatus)
     expect(props.onLinkEngine).not.toHaveBeenCalled()
+    expect(props.setRestartLoading).toHaveBeenCalledWith(false)
   })
 
   it('能力检查异常时提供恢复界面', async () => {

@@ -19,7 +19,10 @@ import {
   parseSha256,
   resolveEngineVersion,
   prepareEngine,
+  prepareWindowsLegacyArchive,
 } from '../../../packageScript/script/prepare-renyan-engine'
+import windowsLegacyLock from '../../../product/windows-legacy-engine.json'
+import { patchRuntime, patchSyscall, patchDll, replaceOnce } from '../../../packageScript/script/patch-windows-legacy-go'
 import { extractAndVerifyEngineArchive, normalizeSha256 } from '../engineLifecycle'
 import compatibilityManifest from '../../../product/engine-compatibility.json'
 import { verifyPackage } from '../../../packageScript/script/verify-renyan-package'
@@ -418,6 +421,105 @@ const createEngineRoot = () => {
   fs.writeFileSync(path.join(root, 'product/engine-compatibility.json'), JSON.stringify(compatibilityManifest))
   return root
 }
+
+describe('Windows legacy 确定性构建与归档', () => {
+  it('专用回归和构建只挂载 Windows legacy 条件', () => {
+    const workflow = parseYaml(fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8'))
+    const windows = workflow.jobs['build-windows-x64']
+    const checkout = windows.steps.find((step) => step.name === '检出固定 Windows legacy 引擎源码')
+    expect(checkout.if).toBe('${{ inputs.legacy && inputs.include_engine }}')
+    expect(checkout.with.ref).toBe(windowsLegacyLock.sourceCommit)
+    expect(checkout.with.repository).toBe(windowsLegacyLock.sourceRepository)
+    const prepare = windows.steps.find((step) => step.id === 'engine')
+    expect(prepare.run).toContain('prepare-renyan-engine.js prepare-windows-legacy')
+    expect(prepare.run).toContain('prepare-renyan-engine.js prepare\n')
+    for (const name of ['build-macos-x64', 'build-macos-arm64', 'build-linux-x64', 'build-linux-arm64']) {
+      expect(JSON.stringify(workflow.jobs[name])).not.toMatch(/windows-legacy|win7-loader/)
+    }
+  })
+
+  it.each(['success', 'missing', 'hash', 'version', 'source'])('专用归档状态：%s', async (mode) => {
+    const root = createEngineRoot()
+    try {
+      const directory = path.join(root, 'bundle')
+      fs.mkdirSync(directory)
+      const bytes = engineFixture('win32', 'x64')
+      const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+      const names = ['yak.exe', 'ucrtbase.dll', ...Array.from({ length: 41 }, (_, index) => `api-ms-win-fixture-${index}.dll`)]
+      const metadata = {
+        sourceCommit: windowsLegacyLock.sourceCommit,
+        engineVersion: windowsLegacyLock.engineVersion,
+        revision: windowsLegacyLock.revision,
+        go: windowsLegacyLock.go,
+        compiler: windowsLegacyLock.compiler,
+        ucrt: windowsLegacyLock.ucrt,
+        files: names.map((name) => ({ name, sha256 })),
+      }
+      for (const name of names) fs.writeFileSync(path.join(directory, name), bytes)
+      if (mode === 'missing') fs.unlinkSync(path.join(directory, 'ucrtbase.dll'))
+      if (mode === 'hash') fs.appendFileSync(path.join(directory, 'ucrtbase.dll'), 'changed')
+      if (mode === 'source') metadata.sourceCommit = '0'.repeat(40)
+      fs.writeFileSync(path.join(directory, 'build.json'), JSON.stringify(metadata))
+      const original = JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))
+      const promise = prepareWindowsLegacyArchive({
+        root,
+        directory,
+        requestedVersion: mode === 'version' ? 'latest' : windowsLegacyLock.engineVersion,
+      })
+      if (mode !== 'success') {
+        await expect(promise).rejects.toThrow()
+        expect(JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))).toEqual(original)
+        return
+      }
+      const result = await promise
+      expect(result.verification).toMatchObject({ legacy: true, win7Verification: 'pending', packagedEngineSha256: sha256 })
+      const manifest = JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))
+      const { windowsLegacy, ...unchanged } = manifest.clientVersions[0]
+      const { windowsLegacy: ignored, ...baseline } = original.clientVersions[0]
+      expect(unchanged).toEqual(baseline)
+      expect(windowsLegacy.artifact.files).toHaveLength(43)
+      expect(new AdmZip(result.archivePath).getEntries()).toHaveLength(43)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('加载补丁校验唯一上下文，同时覆盖 runtime 与 syscall', () => {
+    expect(() => replaceOnce('missing', 'old', 'new')).toThrow()
+    expect(() => replaceOnce('old old', 'old', 'new')).toThrow()
+    const runtime = [
+      '//go:cgo_import_dynamic runtime._GetSystemDirectoryA GetSystemDirectoryA%2 "kernel32.dll"',
+      '\t_GetSystemDirectoryA,',
+      'func windowsLoadSystemLib(name []uint16) uintptr {',
+      '\treturn stdcall3(_LoadLibraryExW, uintptr(unsafe.Pointer(&name[0])), 0, _LOAD_LIBRARY_SEARCH_SYSTEM32)',
+      '}',
+      'func loadOptionalSyscalls() {',
+      '}',
+    ].join('\n')
+    const patched = patchRuntime(runtime)
+    expect(patched).toContain('AddDllDirectory\\000')
+    expect(patched).toContain("legacySysDirectory[n] = '\\\\'")
+    expect(patched).toContain('var absoluteName [_MAX_PATH + 1]uint16')
+    expect(() => patchRuntime(patched)).toThrow()
+    const syscall = [
+      'func syscall_loadsystemlibrary(filename *uint16) (handle, err uintptr) {',
+      '\t}{filename, 0, _LOAD_LIBRARY_SEARCH_SYSTEM32}',
+      '\tc.args = uintptr(noescape(unsafe.Pointer(&args)))',
+      '\tKeepAlive(filename)',
+      '}',
+    ].join('\n')
+    expect(patchSyscall(syscall)).toContain('args.flags = 0')
+    expect(patchSyscall(syscall)).toContain('if !windowsCanSearchSystem32')
+    expect(patchSyscall(syscall)).not.toContain('var absoluteName')
+    const dll = [
+      'func loadsystemlibrary(filename *uint16) (handle uintptr, err Errno)',
+      '\tif sysdll.IsSystemDLL[name] {',
+      '\t\th, e = loadsystemlibrary(namep)',
+    ].join('\n')
+    expect(patchDll(dll)).toContain('loadsystemlibrary(namep, absoluteFilepath)')
+    expect(patchDll(dll)).toContain('GetSystemDirectoryW')
+  })
+})
 
 describe('Cross-platform package regression', () => {
   it.each(engineCases)(

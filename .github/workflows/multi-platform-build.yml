@@ -416,13 +416,14 @@ jobs:
     name: RuiYan Windows x64 Package
     if: ${{ inputs.target == 'windows-x64' || inputs.target == 'all' }}
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: ${{ inputs.legacy && 120 || 60 }}
     env:
       CI: ''
       NODE_OPTIONS: --max_old_space_size=4096
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
       THE_LEGACY: ${{ inputs.legacy }}
       RENYAN_PACKAGE_ARCHITECTURE: x64
+      WINDOWS_LEGACY_BUNDLE: ${{ runner.temp }}/ruiyan-windows-legacy-bundle
     steps:
       - name: 验证 RuiYan 构建分支
         shell: bash
@@ -457,6 +458,65 @@ jobs:
         shell: bash
         run: yarn add --dev --exact electron@22.3.27
 
+      - name: Windows legacy 启动与平台隔离回归
+        if: ${{ inputs.legacy }}
+        shell: bash
+        env:
+          THE_LEGACY: 'false'
+        run: |
+          yarn test:vitest --run --threads=false \
+            app/main/__test__/renyanPackaging.test.js \
+            app/main/__test__/packageStartupVerification.test.js \
+            app/main/__test__/engineLifecycle.test.js \
+            app/main/handlers/__test__/newEngineStatus.test.js \
+            app/main/__test__/passwordTransport.test.js \
+            app/main/__test__/ipcRegistration.test.js \
+            app/renderer/engine-link-startup/src/pages/StartupPage/components/LocalEngine/__test__/index.test.tsx \
+            app/renderer/engine-link-startup/src/pages/StartupPage/components/EngineLifecyclePanel/__test__/index.test.tsx \
+            app/renderer/engine-link-startup/src/pages/StartupPage/__test__/engineLifecycle.test.ts \
+            app/renderer/engine-link-startup/src/pages/StartupPage/__test__/startup-port.test.tsx
+
+      - name: Windows legacy 源码语法与启动页类型检查
+        if: ${{ inputs.legacy }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/packageScript/script/build-windows-legacy-engine.ps1", [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw ($errors | Out-String) }
+          foreach ($file in @(
+            'app/main/windowsLegacyEngine.js',
+            'app/main/handlers/newEngineStatus.js',
+            'packageScript/script/patch-windows-legacy-go.js',
+            'packageScript/script/prepare-renyan-engine.js',
+            'packageScript/script/verify-windows-legacy-startup.js',
+            'packageScript/script/verify-renyan-package.js'
+          )) { node --check $file }
+          yarn --cwd app/renderer/engine-link-startup tsc --noEmit -p tsconfig.json
+
+      - name: 检出固定 Windows legacy 引擎源码
+        if: ${{ inputs.legacy && inputs.include_engine }}
+        uses: actions/checkout@v7
+        with:
+          repository: yaklang/yaklang
+          ref: 9b5f61cf4e69e74d2db157989de7e787b5cad4da
+          path: .Codex/windows-legacy-engine-source
+          persist-credentials: false
+
+      - name: 构建固定 Windows legacy 引擎与运行库
+        if: ${{ inputs.legacy && inputs.include_engine }}
+        timeout-minutes: 60
+        shell: pwsh
+        env:
+          REQUESTED_ENGINE_VERSION: ${{ inputs.engine_version }}
+        run: |
+          ./packageScript/script/build-windows-legacy-engine.ps1 `
+            -Source "${{ github.workspace }}/.Codex/windows-legacy-engine-source" `
+            -Output "$env:WINDOWS_LEGACY_BUNDLE"
+
       - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
@@ -487,22 +547,7 @@ jobs:
           if [ "${THE_LEGACY}" != "true" ]; then
             node packageScript/script/prepare-renyan-engine.js prepare
           else
-            node <<'NODE'
-          const { prepareEngine } = require('./packageScript/script/prepare-renyan-engine')
-          const { writeWorkflowValue } = require('./packageScript/script/create-renyan-build-metadata')
-          prepareEngine({
-            asset: process.env.ENGINE_ASSET,
-            requestedVersion: process.env.REQUESTED_ENGINE_VERSION,
-            fetcher: (url) => fetch(url.replace('/yak_windows_amd64.exe', '/yak_windows_legacy_amd64.exe')),
-          }).then(({ engineVersion }) => {
-            console.log(`最终兼容引擎版本：${engineVersion}`)
-            writeWorkflowValue(process.env.GITHUB_OUTPUT, 'engine_version', engineVersion)
-            writeWorkflowValue(process.env.GITHUB_ENV, 'ENGINE_VERSION', engineVersion)
-          }).catch((error) => {
-            console.error(error.message)
-            process.exitCode = 1
-          })
-          NODE
+            node packageScript/script/prepare-renyan-engine.js prepare-windows-legacy
           fi
 
       - name: 生成 RuiYan Windows x64 安装文件
@@ -589,6 +634,25 @@ jobs:
           path: ${{ steps.metadata.outputs.artifact_path }}
           archive: false
           if-no-files-found: error
+          retention-days: ${{ inputs.retention_days }}
+
+      - name: 上传 Windows legacy 构建及宿主检查证据
+        if: ${{ always() && inputs.legacy }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: RuiYan-windows-legacy-evidence
+          path: |
+            reports/junit.xml
+            reports/windows-legacy-host.json
+            release/build-manifest.json
+            release/SHA256SUMS.txt
+            bins/yak_windows_amd64.zip.verified.json
+            ${{ env.WINDOWS_LEGACY_BUNDLE }}/build.json
+            ${{ env.WINDOWS_LEGACY_BUNDLE }}/go-build-info.txt
+            ${{ env.WINDOWS_LEGACY_BUNDLE }}/loader-probe.txt
+            ${{ env.WINDOWS_LEGACY_BUNDLE }}/imports.json
+            ${{ env.WINDOWS_LEGACY_BUNDLE }}/yak.exe.sha256.txt
+          if-no-files-found: warn
           retention-days: ${{ inputs.retention_days }}
 
   build-linux-x64:
