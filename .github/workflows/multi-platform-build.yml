@@ -423,7 +423,6 @@ jobs:
       INCLUDE_ENGINE: ${{ inputs.include_engine }}
       THE_LEGACY: ${{ inputs.legacy }}
       RENYAN_PACKAGE_ARCHITECTURE: x64
-      WINDOWS_LEGACY_BUNDLE: ${{ runner.temp }}/ruiyan-windows-legacy-bundle
     steps:
       - name: 验证 RuiYan 构建分支
         shell: bash
@@ -432,6 +431,13 @@ jobs:
             echo "只允许从 qsh 分支构建睿眼安装文件" >&2
             exit 1
           fi
+
+      - name: 初始化 Windows legacy 临时目录
+        if: ${{ inputs.legacy }}
+        shell: pwsh
+        run: |
+          $bundle = (Join-Path $env:RUNNER_TEMP 'ruiyan-windows-legacy-bundle').Replace('\', '/')
+          "WINDOWS_LEGACY_BUNDLE=$bundle" >> $env:GITHUB_ENV
 
       - name: 检出 RuiYan 源码
         uses: actions/checkout@v7

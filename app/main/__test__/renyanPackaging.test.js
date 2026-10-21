@@ -423,6 +423,28 @@ const createEngineRoot = () => {
 }
 
 describe('Windows legacy 确定性构建与归档', () => {
+  it('临时目录在步骤执行时初始化，不在 job env 中引用 runner 上下文', () => {
+    const workflow = parseYaml(fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8'))
+    expect(JSON.stringify(workflow.env || {})).not.toMatch(/\$\{\{\s*runner\./)
+    for (const job of Object.values(workflow.jobs)) {
+      expect(JSON.stringify(job.env || {})).not.toMatch(/\$\{\{\s*runner\./)
+    }
+    const windows = workflow.jobs['build-windows-x64']
+    expect(windows.env).not.toHaveProperty('WINDOWS_LEGACY_BUNDLE')
+    const initialize = windows.steps.findIndex((step) => step.name === '初始化 Windows legacy 临时目录')
+    expect(initialize).toBeGreaterThanOrEqual(0)
+    expect(windows.steps[initialize]).toMatchObject({ if: '${{ inputs.legacy }}', shell: 'pwsh' })
+    expect(windows.steps[initialize].run).toContain('$env:RUNNER_TEMP')
+    expect(windows.steps[initialize].run).toContain('"WINDOWS_LEGACY_BUNDLE=$bundle" >> $env:GITHUB_ENV')
+    for (const name of [
+      '构建固定 Windows legacy 引擎与运行库',
+      '准备并校验 Windows x64 引擎',
+      '上传 Windows legacy 构建及宿主检查证据',
+    ]) {
+      expect(windows.steps.findIndex((step) => step.name === name)).toBeGreaterThan(initialize)
+    }
+  })
+
   it('专用回归和构建只挂载 Windows legacy 条件', () => {
     const workflow = parseYaml(fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8'))
     const windows = workflow.jobs['build-windows-x64']
