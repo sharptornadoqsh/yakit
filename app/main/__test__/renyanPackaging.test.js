@@ -7,7 +7,7 @@ import path from 'path'
 import { execFileSync } from 'child_process'
 import AdmZip from 'adm-zip'
 import asar from '@electron/asar'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import electronBuilderConfig from '../../../packageScript/electron-builder.config'
 import beforePack from '../../../packageScript/buildHook/before-pack'
@@ -29,6 +29,10 @@ import { verifyPackage } from '../../../packageScript/script/verify-renyan-packa
 import packageJson from '../../../package.json'
 
 const originalEnvironment = { ...process.env }
+
+beforeEach(() => {
+  delete process.env.RENYAN_PACKAGE_ARCHITECTURE
+})
 
 afterEach(() => {
   Object.keys(process.env).forEach((key) => {
@@ -460,6 +464,53 @@ describe('Windows legacy 确定性构建与归档', () => {
     }
   })
 
+  it('runs legacy regressions with separate project runtimes and reports', () => {
+    const workflow = parseYaml(fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8'))
+    const windows = workflow.jobs['build-windows-x64']
+    const main = windows.steps.find((step) => step.name === 'Windows legacy 主进程与打包回归')
+    const renderer = windows.steps.find((step) => step.name === 'Windows legacy 启动渲染回归')
+    for (const step of [main, renderer]) {
+      expect(step).toMatchObject({ if: '${{ inputs.legacy }}', shell: 'bash', 'timeout-minutes': 10 })
+      expect(step['continue-on-error']).toBeUndefined()
+      expect(step.env.THE_LEGACY).toBe('false')
+      expect(step.run).toContain('set -euo pipefail')
+      expect(step.run).toContain('--run')
+      expect(step.run).toContain('--reporter=default --reporter=junit')
+      expect(step.run).toContain('require.resolve')
+      expect(step.run).not.toMatch(/--passWithNoTests|--pass-with-no-tests|--no-isolate/)
+    }
+    expect(main['working-directory']).toBeUndefined()
+    expect(main.run).toContain('yarn test:vitest --run --threads=false')
+    expect(main.run).toContain('--outputFile=reports/windows-legacy-main.junit.xml')
+    expect(main.run).toContain('tee reports/windows-legacy-main.log')
+    expect(main.run.match(/\S+\.test\.[jt]sx?/g)).toEqual([
+      'app/main/__test__/renyanPackaging.test.js',
+      'app/main/__test__/packageStartupVerification.test.js',
+      'app/main/__test__/engineLifecycle.test.js',
+      'app/main/handlers/__test__/newEngineStatus.test.js',
+      'app/main/__test__/passwordTransport.test.js',
+      'app/main/__test__/ipcRegistration.test.js',
+    ])
+    expect(renderer['working-directory']).toBe('app/renderer/engine-link-startup')
+    expect(renderer.run).toContain('yarn test --run --config vitest.config.ts --no-file-parallelism')
+    expect(renderer.run).not.toContain('--threads')
+    expect(renderer.run).toContain('--outputFile=../../../reports/windows-legacy-renderer.junit.xml')
+    expect(renderer.run).toContain('tee ../../../reports/windows-legacy-renderer.log')
+    expect(renderer.run.match(/\S+\.test\.[jt]sx?/g)).toEqual([
+      'src/pages/StartupPage/components/LocalEngine/__test__/index.test.tsx',
+      'src/pages/StartupPage/components/EngineLifecyclePanel/__test__/index.test.tsx',
+      'src/pages/StartupPage/__test__/engineLifecycle.test.ts',
+      'src/pages/StartupPage/__test__/startup-port.test.tsx',
+    ])
+    const build = windows.steps.findIndex((step) => step.name === '构建固定 Windows legacy 引擎与运行库')
+    expect(windows.steps.indexOf(main)).toBeLessThan(windows.steps.indexOf(renderer))
+    expect(windows.steps.indexOf(renderer)).toBeLessThan(build)
+    const evidence = windows.steps.find((step) => step.name === '上传 Windows legacy 构建及宿主检查证据')
+    expect(evidence.if).toBe('${{ always() && inputs.legacy }}')
+    expect(evidence.with.path).toContain('reports/windows-legacy-*.junit.xml')
+    expect(evidence.with.path).toContain('reports/windows-legacy-*.log')
+  })
+
   it.each(['success', 'missing', 'hash', 'version', 'source'])('专用归档状态：%s', async (mode) => {
     const root = createEngineRoot()
     try {
@@ -653,11 +704,19 @@ describe('Cross-platform package regression', () => {
     const workflow = parseYaml(fs.readFileSync('.github/workflows/multi-platform-build.yml', 'utf8'))
     expect(workflow.on.workflow_dispatch.inputs.include_engine.default).toBe(true)
     for (const [name, job] of Object.entries(workflow.jobs).filter(([name]) => name.startsWith('build-'))) {
-      const verifyIndex = job.steps.findIndex((step) => step.run?.includes('verify-renyan-package.js'))
+      const verificationSteps = job.steps.filter((step) => step.name === '验证成品引擎、签名与应用启动')
+      expect(verificationSteps, name).toHaveLength(1)
+      const [verification] = verificationSteps
+      const verifyIndex = job.steps.indexOf(verification)
       const metadataIndex = job.steps.findIndex((step) => step.id === 'metadata')
+      const uploadIndex = job.steps.findIndex((step) => step.uses === 'actions/upload-artifact@v7')
       expect(verifyIndex, name).toBeGreaterThan(0)
       expect(verifyIndex, name).toBeLessThan(metadataIndex)
-      expect(job.steps[verifyIndex].env.PACKAGE_TARGET).toBe(name.replace('build-', ''))
+      expect(metadataIndex, name).toBeLessThan(uploadIndex)
+      expect(verification.run).toMatch(
+        /(?:^|\n)\s*(?:xvfb-run -a )?node packageScript\/script\/verify-renyan-package\.js(?:\s|$)/,
+      )
+      expect(verification.env?.PACKAGE_TARGET).toBe(name.replace('build-', ''))
     }
   })
 
@@ -750,11 +809,26 @@ describe('Cross-platform package regression', () => {
 })
 
 describe('睿眼预置引擎准备', () => {
-  it('优先使用固定任务声明的目标架构', () => {
+  it('uses the builder architecture when the environment has no override', () => {
     expect(beforePack.resolveBuildArchitecture(1)).toBe('x64')
     expect(beforePack.resolveBuildArchitecture(3)).toBe('arm64')
+    expect(() => beforePack.resolveBuildArchitecture(0)).toThrow('不支持的构建架构编号')
+  })
+
+  it.each([
+    ['x64', 3],
+    ['arm64', 1],
+  ])('prefers the %s job environment over builder architecture %s', (architecture, contextArchitecture) => {
+    process.env.RENYAN_PACKAGE_ARCHITECTURE = architecture
+    expect(beforePack.resolveBuildArchitecture(contextArchitecture)).toBe(architecture)
+  })
+
+  it('prefers an explicit architecture and rejects unsupported overrides', () => {
+    process.env.RENYAN_PACKAGE_ARCHITECTURE = 'x64'
     expect(beforePack.resolveBuildArchitecture(1, 'arm64')).toBe('arm64')
     expect(() => beforePack.resolveBuildArchitecture(1, 'ia32')).toThrow('不支持的显式构建架构')
+    process.env.RENYAN_PACKAGE_ARCHITECTURE = 'ia32'
+    expect(() => beforePack.resolveBuildArchitecture(1)).toThrow('不支持的显式构建架构')
   })
 
   it('从兼容清单读取推荐版本并拒绝不安全版本', () => {

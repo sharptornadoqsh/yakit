@@ -121,7 +121,7 @@ describe('引擎启动决策', () => {
 
   it('启动缺失与预置恢复失败时不自动进入网络下载', () => {
     const startupSource = fs.readFileSync(
-      path.resolve('app/renderer/engine-link-startup/src/pages/StartupPage/index.tsx'),
+      path.resolve(__dirname, '../index.tsx'),
       'utf8',
     )
     const localDecisionStart = startupSource.indexOf("if (decision.action === 'extract-bundled')")

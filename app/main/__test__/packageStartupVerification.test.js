@@ -99,7 +99,7 @@ describe('Windows legacy 验包数据隔离', () => {
     ['win32', '27.0.0', 'true', false],
     ['linux', '22.3.27', 'true', false],
   ])('平台 %s、Electron %s、Actions=%s 的目录契约', (platform, electron, actions, isolated) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-identity-'))
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-package-startup-identity-'))
     directories.push(root)
     const profile = path.join(root, 'verification-profile')
     const identity = loadModule(path.resolve('app/main/product.js'), {}, {

@@ -464,23 +464,56 @@ jobs:
         shell: bash
         run: yarn add --dev --exact electron@22.3.27
 
-      - name: Windows legacy 启动与平台隔离回归
+      - name: Windows legacy 主进程与打包回归
         if: ${{ inputs.legacy }}
+        timeout-minutes: 10
         shell: bash
         env:
           THE_LEGACY: 'false'
         run: |
+          set -euo pipefail
+          mkdir -p reports
+          node --input-type=commonjs <<'NODE' 2>&1 | tee reports/windows-legacy-main-runtime.log
+          for (const name of ['vitest', '@testing-library/jest-dom']) {
+            const manifest = require.resolve(`${name}/package.json`)
+            console.log(JSON.stringify({ name, version: require(manifest).version, manifest: manifest.replace(/\\/g, '/') }))
+          }
+          NODE
           yarn test:vitest --run --threads=false \
+            --reporter=default --reporter=junit --outputFile=reports/windows-legacy-main.junit.xml \
             app/main/__test__/renyanPackaging.test.js \
             app/main/__test__/packageStartupVerification.test.js \
             app/main/__test__/engineLifecycle.test.js \
             app/main/handlers/__test__/newEngineStatus.test.js \
             app/main/__test__/passwordTransport.test.js \
-            app/main/__test__/ipcRegistration.test.js \
-            app/renderer/engine-link-startup/src/pages/StartupPage/components/LocalEngine/__test__/index.test.tsx \
-            app/renderer/engine-link-startup/src/pages/StartupPage/components/EngineLifecyclePanel/__test__/index.test.tsx \
-            app/renderer/engine-link-startup/src/pages/StartupPage/__test__/engineLifecycle.test.ts \
-            app/renderer/engine-link-startup/src/pages/StartupPage/__test__/startup-port.test.tsx
+            app/main/__test__/ipcRegistration.test.js 2>&1 | tee reports/windows-legacy-main.log
+
+      - name: Windows legacy 启动渲染回归
+        if: ${{ inputs.legacy }}
+        timeout-minutes: 10
+        shell: bash
+        working-directory: app/renderer/engine-link-startup
+        env:
+          THE_LEGACY: 'false'
+        run: |
+          set -euo pipefail
+          mkdir -p ../../../reports
+          node --input-type=commonjs <<'NODE' 2>&1 | tee ../../../reports/windows-legacy-renderer-runtime.log
+          const { createRequire } = require('module')
+          for (const name of ['vitest', '@testing-library/jest-dom']) {
+            const manifest = require.resolve(`${name}/package.json`)
+            console.log(JSON.stringify({ name, version: require(manifest).version, manifest: manifest.replace(/\\/g, '/') }))
+          }
+          const matcher = require.resolve('@testing-library/jest-dom/vitest')
+          const matcherVitest = createRequire(matcher).resolve('vitest/package.json')
+          console.log(JSON.stringify({ matcher: matcher.replace(/\\/g, '/'), vitest: matcherVitest.replace(/\\/g, '/') }))
+          NODE
+          yarn test --run --config vitest.config.ts --no-file-parallelism \
+            --reporter=default --reporter=junit --outputFile=../../../reports/windows-legacy-renderer.junit.xml \
+            src/pages/StartupPage/components/LocalEngine/__test__/index.test.tsx \
+            src/pages/StartupPage/components/EngineLifecyclePanel/__test__/index.test.tsx \
+            src/pages/StartupPage/__test__/engineLifecycle.test.ts \
+            src/pages/StartupPage/__test__/startup-port.test.tsx 2>&1 | tee ../../../reports/windows-legacy-renderer.log
 
       - name: Windows legacy 源码语法与启动页类型检查
         if: ${{ inputs.legacy }}
@@ -649,6 +682,8 @@ jobs:
           name: RuiYan-windows-legacy-evidence
           path: |
             reports/junit.xml
+            reports/windows-legacy-*.junit.xml
+            reports/windows-legacy-*.log
             reports/windows-legacy-host.json
             release/build-manifest.json
             release/SHA256SUMS.txt
