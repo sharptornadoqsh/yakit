@@ -35,6 +35,27 @@ function Download-Locked($Definition, $Name) {
   }
   return $File
 }
+$PatchDirectory = Join-Path $Work 'upstream-patches'
+New-Item -ItemType Directory -Path $PatchDirectory | Out-Null
+$PatchEvidence = @()
+foreach ($Patch in $Lock.upstreamPatches) {
+  $Original = "$Source/.github/patch_go122/$Patch"
+  $File = "$PatchDirectory/$Patch"
+  node "$PSScriptRoot/patch-windows-legacy-go.js" --normalize-patch $Original $File
+  $Evidence = @{
+    name = $Patch
+    sha256 = (Get-FileHash -LiteralPath $Original -Algorithm SHA256).Hash.ToLower()
+    normalizedSha256 = (Get-FileHash -LiteralPath $File -Algorithm SHA256).Hash.ToLower()
+    parsed = $false
+    applied = $false
+  }
+  $PatchEvidence += $Evidence
+  Write-Json "$Output/upstream-patches.json" @{ sourceCommit = $Lock.sourceCommit; patches = $PatchEvidence }
+  git -C $Work apply --numstat -- $File
+  $Evidence.parsed = $true
+  Write-Json "$Output/upstream-patches.json" @{ sourceCommit = $Lock.sourceCommit; patches = $PatchEvidence }
+  Write-Output "上游补丁格式检查通过：$Patch"
+}
 $GoZip = Download-Locked $Lock.go 'go.zip'
 $CcZip = Download-Locked $Lock.compiler 'compiler.zip'
 $SdkZip = Download-Locked $Lock.ucrt 'sdk.zip'
@@ -57,12 +78,12 @@ $GoVersion = (& $Go version) -join "`n"
 $CcVersion = (& $env:CC -dumpfullversion) -join "`n"
 if ($CcVersion.Trim() -ne $Lock.compiler.version) { throw 'C 编译器版本不匹配' }
 if ($GoVersion -notmatch 'go1\.22\.12 windows/amd64') { throw 'Go 版本不匹配' }
-$PatchEvidence = @()
-foreach ($Patch in $Lock.upstreamPatches) {
-  $File = "$Source/.github/patch_go122/$Patch"
+foreach ($Patch in $PatchEvidence) {
+  $File = "$PatchDirectory/$($Patch.name)"
   git -C $env:GOROOT apply --check --reverse --ignore-space-change $File
   git -C $env:GOROOT apply --reverse --ignore-space-change $File
-  $PatchEvidence += @{ name = $Patch; sha256 = (Get-FileHash -LiteralPath $File).Hash.ToLower() }
+  $Patch.applied = $true
+  Write-Json "$Output/upstream-patches.json" @{ sourceCommit = $Lock.sourceCommit; patches = $PatchEvidence }
 }
 node "$PSScriptRoot/patch-windows-legacy-go.js" $env:GOROOT
 $RuntimeSource = "$env:GOROOT/src/runtime/os_windows.go"

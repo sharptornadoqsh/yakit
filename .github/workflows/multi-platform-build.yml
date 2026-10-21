@@ -689,6 +689,7 @@ jobs:
             release/SHA256SUMS.txt
             bins/yak_windows_amd64.zip.verified.json
             ${{ env.WINDOWS_LEGACY_BUNDLE }}/build.json
+            ${{ env.WINDOWS_LEGACY_BUNDLE }}/upstream-patches.json
             ${{ env.WINDOWS_LEGACY_BUNDLE }}/go-build-info.txt
             ${{ env.WINDOWS_LEGACY_BUNDLE }}/loader-probe.txt
             ${{ env.WINDOWS_LEGACY_BUNDLE }}/imports.json

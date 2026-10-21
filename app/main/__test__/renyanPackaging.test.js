@@ -22,7 +22,13 @@ import {
   prepareWindowsLegacyArchive,
 } from '../../../packageScript/script/prepare-renyan-engine'
 import windowsLegacyLock from '../../../product/windows-legacy-engine.json'
-import { patchRuntime, patchSyscall, patchDll, replaceOnce } from '../../../packageScript/script/patch-windows-legacy-go'
+import {
+  normalizePatch,
+  patchRuntime,
+  patchSyscall,
+  patchDll,
+  replaceOnce,
+} from '../../../packageScript/script/patch-windows-legacy-go'
 import { extractAndVerifyEngineArchive, normalizeSha256 } from '../engineLifecycle'
 import compatibilityManifest from '../../../product/engine-compatibility.json'
 import { verifyPackage } from '../../../packageScript/script/verify-renyan-package'
@@ -552,6 +558,89 @@ describe('Windows legacy 确定性构建与归档', () => {
       expect(unchanged).toEqual(baseline)
       expect(windowsLegacy.artifact.files).toHaveLength(43)
       expect(new AdmZip(result.archivePath).getEntries()).toHaveLength(43)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('checks normalized upstream patches before downloads and records their application', () => {
+    const build = fs.readFileSync(path.resolve('packageScript/script/build-windows-legacy-engine.ps1'), 'utf8')
+    const normalize = build.indexOf('--normalize-patch $Original $File')
+    const preflight = build.indexOf('git -C $Work apply --numstat -- $File')
+    expect(normalize).toBeGreaterThan(0)
+    expect(preflight).toBeGreaterThan(normalize)
+    expect(preflight).toBeLessThan(build.indexOf('$GoZip = Download-Locked'))
+    expect(build).toContain('foreach ($Patch in $Lock.upstreamPatches)')
+    expect(build).toContain('foreach ($Patch in $PatchEvidence)')
+    expect(build).toContain('$File = "$PatchDirectory/$($Patch.name)"')
+    expect(build).toContain('git -C $env:GOROOT apply --check --reverse --ignore-space-change $File')
+    expect(build).toContain('git -C $env:GOROOT apply --reverse --ignore-space-change $File')
+    expect(build.indexOf('$Patch.applied = $true')).toBeGreaterThan(
+      build.indexOf('git -C $env:GOROOT apply --reverse'),
+    )
+    expect(build).toContain('sha256 = (Get-FileHash -LiteralPath $Original -Algorithm SHA256)')
+    expect(build).toContain('normalizedSha256 = (Get-FileHash -LiteralPath $File -Algorithm SHA256)')
+    expect(build).not.toMatch(/--reject|--recount|--allow-empty/)
+    const workflow = parseYaml(fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8'))
+    const evidence = workflow.jobs['build-windows-x64'].steps.find(
+      (step) => step.name === '上传 Windows legacy 构建及宿主检查证据',
+    )
+    expect(evidence.if).toBe('${{ always() && inputs.legacy }}')
+    expect(evidence.with.path).toContain('${{ env.WINDOWS_LEGACY_BUNDLE }}/upstream-patches.json')
+  })
+
+  const upstreamPatchFixture = [
+    'diff --git a/sample.txt b/sample.txt',
+    '--- a/sample.txt',
+    '+++ b/sample.txt',
+    '@@ -1,3 +1,3 @@',
+    ' first  ',
+    '-old',
+    '+new',
+    ' last',
+  ].join('\n')
+
+  it.each(['lf', 'crlf', 'bom-crlf'])('normalizes %s patch framing without trimming hunk content', (format) => {
+    for (const terminated of [false, true]) {
+      let source = upstreamPatchFixture + (terminated ? '\n' : '')
+      if (format !== 'lf') source = source.replace(/\n/g, '\r\n')
+      if (format === 'bom-crlf') source = `\uFEFF${source}`
+      const normalized = normalizePatch(source)
+      expect(normalized).toBe(`${upstreamPatchFixture}\n`)
+      expect(normalizePatch(normalized)).toBe(normalized)
+    }
+    expect(normalizePatch(`${upstreamPatchFixture}\n\n`)).toBe(`${upstreamPatchFixture}\n\n`)
+    expect(() => normalizePatch('')).toThrow()
+    expect(() => normalizePatch('\uFEFF')).toThrow()
+  })
+
+  it('applies a normalized patch while preserving its source and rejecting malformed or mismatched input', () => {
+    const root = createEngineRoot()
+    const runGit = (args) =>
+      execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' })
+    try {
+      const original = path.join(root, 'original.diff')
+      const normalized = path.join(root, 'normalized.diff')
+      const target = path.join(root, 'sample.txt')
+      fs.writeFileSync(original, upstreamPatchFixture, 'utf8')
+      expect(() => runGit(['apply', '--numstat', '--', original])).toThrow()
+      execFileSync(
+        process.execPath,
+        [path.resolve('packageScript/script/patch-windows-legacy-go.js'), '--normalize-patch', original, normalized],
+        { timeout: 10000, stdio: 'pipe' },
+      )
+      expect(fs.readFileSync(original)).toEqual(Buffer.from(upstreamPatchFixture))
+      expect(fs.readFileSync(normalized, 'utf8')).toBe(`${upstreamPatchFixture}\n`)
+      expect(runGit(['apply', '--numstat', '--', normalized])).toContain('1\t1\tsample.txt')
+      fs.writeFileSync(target, 'first  \nnew\nlast\n', 'utf8')
+      runGit(['apply', '--check', '--reverse', '--ignore-space-change', normalized])
+      runGit(['apply', '--reverse', '--ignore-space-change', normalized])
+      expect(fs.readFileSync(target, 'utf8')).toBe('first  \nold\nlast\n')
+      expect(() => runGit(['apply', '--check', '--reverse', '--ignore-space-change', normalized])).toThrow()
+      expect(fs.readFileSync(target, 'utf8')).toBe('first  \nold\nlast\n')
+      const malformed = normalizePatch(upstreamPatchFixture.replace('@@ -1,3 +1,3 @@', '@@ -1,9 +1,9 @@'))
+      fs.writeFileSync(normalized, malformed, 'utf8')
+      expect(() => runGit(['apply', '--numstat', '--', normalized])).toThrow()
     } finally {
       fs.rmSync(root, { recursive: true, force: true })
     }

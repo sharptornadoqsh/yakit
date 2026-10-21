@@ -1,6 +1,12 @@
 const fs = require('fs')
 const path = require('path')
 
+const normalizePatch = (source) => {
+  const normalized = source.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n')
+  if (!normalized) throw new Error('上游补丁内容为空')
+  return normalized.endsWith('\n') ? normalized : `${normalized}\n`
+}
+
 const replaceOnce = (source, before, after) => {
   if (!source.includes(before) || source.indexOf(before) !== source.lastIndexOf(before)) {
     throw new Error('固定 Go 源码与 Windows legacy 补丁上下文不一致')
@@ -131,18 +137,23 @@ func legacySystemDLLPath(name string) (*uint16, error) {
 }
 
 if (require.main === module) {
-  const root = process.argv[2]
-  for (const [name, transform] of [
-    ['runtime/os_windows.go', patchRuntime],
-    ['runtime/syscall_windows.go', patchSyscall],
-    ['syscall/dll_windows.go', patchDll],
-  ]) {
-    const file = path.join(root, 'src', name)
-    const original = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
-    fs.writeFileSync(`${file}.legacy-original`, original, 'utf8')
-    fs.writeFileSync(file, transform(original), 'utf8')
+  if (process.argv[2] === '--normalize-patch') {
+    const original = fs.readFileSync(process.argv[3], 'utf8')
+    fs.writeFileSync(process.argv[4], normalizePatch(original), 'utf8')
+  } else {
+    const root = process.argv[2]
+    for (const [name, transform] of [
+      ['runtime/os_windows.go', patchRuntime],
+      ['runtime/syscall_windows.go', patchSyscall],
+      ['syscall/dll_windows.go', patchDll],
+    ]) {
+      const file = path.join(root, 'src', name)
+      const original = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
+      fs.writeFileSync(`${file}.legacy-original`, original, 'utf8')
+      fs.writeFileSync(file, transform(original), 'utf8')
+    }
+    console.log('Windows legacy Go 加载兼容补丁已应用')
   }
-  console.log('Windows legacy Go 加载兼容补丁已应用')
 }
 
-module.exports = { patchRuntime, patchSyscall, patchDll, replaceOnce }
+module.exports = { normalizePatch, patchRuntime, patchSyscall, patchDll, replaceOnce }
