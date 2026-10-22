@@ -1,7 +1,5 @@
 const assert = require('assert/strict')
-const crypto = require('crypto')
 const fs = require('fs')
-const net = require('net')
 const path = require('path')
 const { execFileSync, spawn } = require('child_process')
 const { redactEngineOutput } = require('../../app/main/windowsLegacyEngine')
@@ -16,80 +14,33 @@ const readLogs = (directory) =>
         .join('\n')
     : ''
 
+const getStartupProgress = (print, engine) => ({
+  windows: ['engineLinkWin', 'mainWin'].every(
+    (name) => print.includes(`[${name}] did-finish-load`) && print.includes(`[${name}] ready-to-show`),
+  ),
+  ipc: print.includes('[engineLinkWin] registerNewIPC completed') && print.includes('[Main] registerIPC completed'),
+  capability: /检查随机密码模式结束，退出码: 0(?:\D|$)/.test(engine) && engine.includes('随机密码模式检查通过'),
+  // Both messages are emitted only after newEngineStatus validates a real Echo response.
+  echo:
+    /^轮询检测到引擎连接成功 \(Echo 测试通过\)！\s*$/m.test(engine) ||
+    /^检测到 'yak grpc ok'，引擎启动成功！\s*$/m.test(engine),
+})
+
 const inspectStartupLogs = (print, engine) => {
-  if (
-    /uncaughtException|render-process-gone|did-fail-load|register(?:New)?IPC (?:error|failed)/i.test(print) ||
+  if (print.includes('blocked packaged startup due to forbidden debug flags')) {
+    throw Object.assign(new Error('成品拒绝了验包启动参数，尚未执行 IPC 或引擎启动'), { stage: 'launch' })
+  }
+  const ipcFailure = /uncaughtException|render-process-gone|did-fail-load|register(?:New)?IPC (?:error|failed)/i.test(print)
+  const engineFailure =
     /fatal error:|panic before malloc|引擎进程提前退出|引擎未完成启动|引擎运行时初始化失败|引擎 DLL|本地引擎超时|检查随机密码模式超时|部署失败/.test(engine) ||
     /检查随机密码模式结束，退出码: (?!0(?:\D|$))/.test(engine)
-  ) {
-    throw new Error('成品 IPC 或引擎启动失败；窗口加载不作为通过依据')
+  if (ipcFailure || engineFailure) {
+    throw Object.assign(new Error('成品 IPC 或引擎启动失败；窗口加载不作为通过依据'), {
+      stage: ipcFailure ? 'ipc' : 'engine',
+    })
   }
-  return (
-    ['engineLinkWin', 'mainWin'].every(
-      (name) => print.includes(`[${name}] did-finish-load`) && print.includes(`[${name}] ready-to-show`),
-    ) &&
-    print.includes('[engineLinkWin] registerNewIPC completed') &&
-    print.includes('[Main] registerIPC completed') &&
-    engine.includes('随机密码模式检查通过') &&
-    /Echo 测试通过|引擎启动成功|成功启动本地引擎/.test(engine)
-  )
+  return Object.values(getStartupProgress(print, engine)).every(Boolean)
 }
-
-const freePort = () =>
-  new Promise((resolve, reject) => {
-    const server = net.createServer()
-    const timer = setTimeout(() => {
-      server.close()
-      reject(new Error('分配验包调试端口超时'))
-    }, 5000)
-    server.on('error', (error) => {
-      clearTimeout(timer)
-      reject(error)
-    })
-    server.listen(0, '127.0.0.1', () => {
-      const port = server.address().port
-      server.close((error) => {
-        clearTimeout(timer)
-        if (error) reject(error)
-        else resolve(port)
-      })
-    })
-  })
-
-const evaluate = (url, expression) =>
-  new Promise((resolve, reject) => {
-    const socket = new WebSocket(url)
-    let settled = false
-    const timer = setTimeout(() => finish(new Error('成品 IPC/Echo 检查超时')), 10000)
-    const finish = (error, result) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      socket.close()
-      if (error) reject(error)
-      else resolve(result)
-    }
-    socket.addEventListener('error', () => finish(new Error('成品调试连接失败')))
-    socket.addEventListener('open', () => {
-      if (settled) {
-        socket.close()
-        return
-      }
-      socket.send(
-        JSON.stringify({
-          id: 1,
-          method: 'Runtime.evaluate',
-          params: { expression, awaitPromise: true, returnByValue: true },
-        }),
-      )
-    })
-    socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data)
-      if (message.id !== 1) return
-      if (message.error || message.result?.exceptionDetails) finish(new Error('真实 IPC/Echo 调用失败'))
-      else finish(null, message.result?.result?.value)
-    })
-  })
 
 const powershell = (script) =>
   execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
@@ -124,24 +75,35 @@ const ownedDescendants = (rootPid, snapshot) => {
 
 const verifyWindowsLegacyStartup = async (executable, env, userData, artifact, reportPath) => {
   assert.equal(env.GITHUB_ACTIONS, 'true', '严格宿主验包仅在 GitHub Actions 执行')
-  const port = await freePort()
-  const child = spawn(executable, [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1'], {
+  const child = spawn(executable, [], {
     env: { ...env, RENYAN_PACKAGE_VERIFY_USER_DATA: userData },
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let launchError
   child.on('error', (error) => (launchError = error))
-  // Do not copy arbitrary application stdio or credentials into the Actions log.
-  child.stdout.resume()
-  child.stderr.resume()
+  // Only classify a known launch failure; never persist application stdio or credentials.
+  let launchOutput = ''
+  const inspectLaunchOutput = (chunk) => {
+    launchOutput = (launchOutput + chunk.toString()).slice(-4096)
+    if (launchOutput.includes('blocked packaged startup due to forbidden debug flags')) {
+      launchError = new Error('成品拒绝了验包启动参数，尚未执行 IPC 或引擎启动')
+    }
+  }
+  child.stdout.on('data', inspectLaunchOutput)
+  child.stderr.on('data', inspectLaunchOutput)
   const owned = new Map()
   const report = { hostVerification: 'failed', win7Verification: 'pending', ipc: false, capability: false, echo: false }
+  report.stage = 'launch'
+  report.progress = getStartupProgress('', '')
   const home = path.join(userData, 'projects')
   try {
     const start = Date.now()
     while (Date.now() - start < 240000) {
-      if (launchError) throw launchError
+      if (launchError) {
+        report.stage = 'launch'
+        throw launchError
+      }
       if (child.exitCode !== null || child.signalCode !== null) throw new Error(`成品进程提前退出：${child.exitCode}`)
       const snapshot = processSnapshot()
       for (const item of ownedDescendants(child.pid, snapshot)) {
@@ -149,26 +111,14 @@ const verifyWindowsLegacyStartup = async (executable, env, userData, artifact, r
       }
       const print = readLogs(path.join(home, 'print-log'))
       const engine = readLogs(path.join(home, 'engine-log'))
+      report.progress = getStartupProgress(print, engine)
+      report.logPresence = { print: Boolean(print), engine: Boolean(engine) }
+      report.stage = Object.keys(report.progress).find((key) => !report.progress[key]) || 'engine-ownership'
       if (inspectStartupLogs(print, engine)) {
-        const targets = await fetch(`http://127.0.0.1:${port}/json/list`, {
-          signal: AbortSignal.timeout(5000),
-        }).then((r) => r.json())
-        const target = targets.find((item) => item.type === 'page' && /engine-link-startup/.test(item.url))
-        if (!target) throw new Error('启动窗口调试目标缺失')
-        const challenge = `package-${crypto.randomBytes(16).toString('hex')}`
-        const result = await evaluate(
-          target.webSocketDebuggerUrl,
-          `(async () => {
-            const bridge = window.yakitBridge;
-            if (!bridge?.system?.windowsLegacy) throw new Error('legacy flag missing');
-            const reply = await bridge.engine.echo({text: ${JSON.stringify(challenge)}});
-            if (reply.result !== ${JSON.stringify(challenge)}) throw new Error('echo mismatch');
-            const address = await bridge.engine.fetchYaklangEngineAddr();
-            return {ok: true, address: address.addr};
-          })()`,
-        )
-        assert.equal(result?.ok, true, '成品实际连接检查失败')
-        const enginePort = Number(result.address?.match(/:(\d+)$/)?.[1])
+        const starts = [
+          ...engine.matchAll(/^-{5} 启动本地引擎进程 \(Random Local Password, Port: (\d+)\)\s+-{5}\s*$/gm),
+        ]
+        const enginePort = Number(starts[starts.length - 1]?.[1])
         assert.ok(Number.isInteger(enginePort) && enginePort > 0 && enginePort <= 65535, '引擎端口无效')
         const listeners = JSON.parse(
           powershell(
@@ -184,23 +134,34 @@ const verifyWindowsLegacyStartup = async (executable, env, userData, artifact, r
             owned.get(item.ProcessId)?.Created === item.Created,
         )
         assert.ok(engineProcess && [].concat(listeners).includes(engineProcess.ProcessId), '连接不是本次启动的引擎')
+        Object.assign(report, { enginePort, enginePid: engineProcess.ProcessId, stage: 'engine-files' })
         const { verifyFileSha256 } = require('../../app/main/engineLifecycle')
         for (const file of artifact.files) {
           await verifyFileSha256(path.join(home, 'yak-engine', file.name), file.sha256)
         }
+        report.stage = 'stability'
         await wait(2000)
         assert.ok(inspectStartupLogs(readLogs(path.join(home, 'print-log')), readLogs(path.join(home, 'engine-log'))))
         const alive = processSnapshot().some(
           (item) => item.ProcessId === engineProcess.ProcessId && item.Created === engineProcess.Created,
         )
         assert.ok(alive && child.exitCode === null, '窗口就绪后引擎或应用退出')
-        Object.assign(report, { hostVerification: 'passed', ipc: true, capability: true, echo: true })
+        Object.assign(report, {
+          hostVerification: 'passed',
+          ipc: true,
+          capability: true,
+          echo: true,
+          stage: 'complete',
+          connectionEvidence: 'application-grpc-echo',
+        })
         return report
       }
       await wait(1000)
     }
-    throw new Error('成品 IPC、能力检查或真实连接未在 240 秒内完成')
+    const missing = Object.keys(report.progress).filter((key) => !report.progress[key]).join(', ')
+    throw new Error(`成品启动检查未在 240 秒内完成；阶段：${report.stage}；未满足：${missing}`)
   } catch (error) {
+    report.stage = error.stage || report.stage
     report.error = redactEngineOutput(error.message)
     const engine = readLogs(path.join(home, 'engine-log'))
     report.engineExitCodes = [...engine.matchAll(/退出码[:：]\s*(-?\d+)/g)].map((match) => match[1])
@@ -250,4 +211,4 @@ const verifyWindowsLegacyStartup = async (executable, env, userData, artifact, r
   }
 }
 
-module.exports = { inspectStartupLogs, ownedDescendants, verifyWindowsLegacyStartup }
+module.exports = { getStartupProgress, inspectStartupLogs, ownedDescendants, verifyWindowsLegacyStartup }

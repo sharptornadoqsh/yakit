@@ -10,7 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { configureApplicationIdentity, productConfig } from '../product'
 import { supportedAssets } from '../../../packageScript/script/prepare-renyan-engine'
 import packageJson from '../../../package.json'
-import { inspectStartupLogs, ownedDescendants } from '../../../packageScript/script/verify-windows-legacy-startup'
+import {
+  getStartupProgress,
+  inspectStartupLogs,
+  ownedDescendants,
+} from '../../../packageScript/script/verify-windows-legacy-startup'
 import { createEngineLogWriter } from '../windowsLegacyEngine'
 
 const directories = []
@@ -24,16 +28,19 @@ const targets = [
   ['macos-arm64', 'darwin', 'arm64'],
 ]
 
-describe('Windows legacy 严格验包判据', () => {
-  const ready = [
-    '[engineLinkWin] did-finish-load',
-    '[engineLinkWin] ready-to-show',
-    '[mainWin] did-finish-load',
-    '[mainWin] ready-to-show',
-  ].join('\n')
-  const registered = `${ready}\n[engineLinkWin] registerNewIPC completed\n[Main] registerIPC completed`
-  const connected = '检查随机密码模式结束，退出码: 0\n随机密码模式检查通过\nEcho 测试通过'
+const ready = [
+  '[engineLinkWin] did-finish-load',
+  '[engineLinkWin] ready-to-show',
+  '[mainWin] did-finish-load',
+  '[mainWin] ready-to-show',
+].join('\n')
+const registered = `${ready}\n[engineLinkWin] registerNewIPC completed\n[Main] registerIPC completed`
+const capable = '检查随机密码模式结束，退出码: 0\n随机密码模式检查通过'
+const started = '----- 启动本地引擎进程 (Random Local Password, Port: 9012)  -----'
+const echoMessages = ['轮询检测到引擎连接成功 (Echo 测试通过)！', "检测到 'yak grpc ok'，引擎启动成功！"]
+const connected = `${capable}\n${started}\n${echoMessages[0]}`
 
+describe('Windows legacy 严格验包判据', () => {
   it('窗口加载不是引擎成功', () => {
     expect(inspectStartupLogs(ready, '')).toBe(false)
     expect(inspectStartupLogs(registered, '')).toBe(false)
@@ -53,6 +60,25 @@ describe('Windows legacy 严格验包判据', () => {
 
   it('IPC 注册失败不能被窗口日志覆盖', () => {
     expect(() => inspectStartupLogs(`${registered}\n[Main] registerIPC error`, connected)).toThrow()
+  })
+
+  it.each(echoMessages)('accepts only application-confirmed Echo success: %s', (message) => {
+    expect(inspectStartupLogs(registered, `${capable}\n${started}\n${message}`)).toBe(true)
+  })
+
+  it.each(['yak grpc ok', 'Echo 测试通过', '引擎启动成功', '成功启动本地引擎'])(
+    'does not treat an unconfirmed success message as a real connection: %s',
+    (message) => expect(inspectStartupLogs(registered, `${capable}\n${message}`)).toBe(false),
+  )
+
+  it('reports readiness stages without copying logs or credentials', () => {
+    expect(getStartupProgress(ready, `${capable}\n--local-password fixture-password`)).toEqual({
+      windows: true,
+      ipc: false,
+      capability: true,
+      echo: false,
+    })
+    expect(() => inspectStartupLogs('blocked packaged startup due to forbidden debug flags', '')).toThrow('成品拒绝')
   })
 
   it('进程归属限定于本次根 PID，不选择其他同名引擎', () => {
@@ -91,6 +117,162 @@ const loadModule = (file, mocks, processMock) => {
   })
   return module.exports
 }
+
+const createLegacyHarness = (behavior = 'ready') => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ruiyan-package-startup-legacy-'))
+  directories.push(root)
+  const profile = path.join(root, 'profile')
+  const home = path.join(profile, 'projects')
+  const reportPath = path.join(root, 'report.json')
+  const executable = path.join(root, 'RuiYan.exe')
+  const engine = path.join(home, 'yak-engine/yak.exe')
+  const child = Object.assign(new EventEmitter(), {
+    pid: 11,
+    exitCode: null,
+    signalCode: null,
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+  })
+  const live = new Map([
+    [11, { ProcessId: 11, ParentProcessId: 1, ExecutablePath: executable, Created: 'app-created' }],
+    [12, { ProcessId: 12, ParentProcessId: 11, ExecutablePath: engine, Created: 'engine-created' }],
+    [99, { ProcessId: 99, ParentProcessId: 1, ExecutablePath: engine, Created: 'unrelated-created' }],
+  ])
+  if (behavior === 'foreign-engine') live.delete(12)
+  let print = registered
+  if (behavior === 'missing-window') print = print.replace('[mainWin] ready-to-show', '')
+  if (behavior === 'missing-ipc') print = ready
+  if (behavior === 'blocked') print = ''
+  let engineLog = connected
+  if (behavior === 'missing-capability') engineLog = `${started}\n${echoMessages[0]}`
+  if (behavior === 'missing-echo') engineLog = `${capable}\n${started}\nyak grpc ok`
+  if (behavior === 'blocked') engineLog = ''
+  if (behavior === 'engine-failure') engineLog += '\nfatal error: advapi32.dll not found'
+  if (behavior === 'invalid-port') engineLog = engineLog.replace('Port: 9012', 'Port: 0')
+  if (behavior === 'port-retry') engineLog = `${started.replace('9012', '9011')}\n${engineLog}`
+  for (const [folder, text] of [
+    ['print-log', print],
+    ['engine-log', engineLog],
+  ]) {
+    fs.mkdirSync(path.join(home, folder), { recursive: true })
+    fs.writeFileSync(path.join(home, folder, 'current.txt'), text)
+  }
+  const killed = []
+  const execFileSync = vi.fn((command, args) => {
+    const script = args[args.length - 1]
+    if (script.includes('Get-NetTCPConnection')) return JSON.stringify([behavior === 'foreign-listener' ? 99 : 12])
+    if (script.includes('$process.Kill()')) {
+      const pid = Number(script.match(/ProcessId = (\d+)/)[1])
+      killed.push(pid)
+      live.delete(pid)
+      return ''
+    }
+    return JSON.stringify([...live.values()])
+  })
+  const spawn = vi.fn(() => {
+    if (behavior === 'blocked') {
+      setTimeout(() => {
+        child.stderr.emit('data', Buffer.from('[Main] blocked packaged startup due to forbidden '))
+        child.stderr.emit('data', Buffer.from('debug flags: --inspect fixture-password'))
+      }, 1)
+    }
+    if (behavior === 'exit') {
+      child.exitCode = 3
+      live.delete(11)
+    }
+    if (behavior === 'engine-exit') setTimeout(() => live.delete(12), 1)
+    return child
+  })
+  const verifyFileSha256 = vi.fn(async () => {
+    if (behavior === 'hash') throw new Error('fixture hash mismatch')
+  })
+  const verifier = loadModule(
+    path.resolve('packageScript/script/verify-windows-legacy-startup.js'),
+    { child_process: { spawn, execFileSync }, '../../app/main/engineLifecycle': { verifyFileSha256 } },
+    { env: {} },
+  )
+  const files = [
+    'yak.exe',
+    'ucrtbase.dll',
+    ...Array.from({ length: 41 }, (_, index) => `api-ms-win-fixture-${index}.dll`),
+  ].map((name) => ({ name, sha256: 'a'.repeat(64) }))
+  return {
+    spawn,
+    execFileSync,
+    verifyFileSha256,
+    live,
+    killed,
+    profile,
+    reportPath,
+    run: () => verifier.verifyWindowsLegacyStartup(executable, { GITHUB_ACTIONS: 'true' }, profile, { files }, reportPath),
+  }
+}
+
+const runLegacyVerification = async (harness) => {
+  const pending = harness.run().then(
+    (value) => ({ value }),
+    (error) => ({ error }),
+  )
+  await vi.advanceTimersByTimeAsync(241000)
+  return { ...(await pending), report: JSON.parse(fs.readFileSync(harness.reportPath, 'utf8')) }
+}
+
+describe('Windows legacy packaged launch contract', () => {
+  it.each(['ready', 'port-retry'])('uses a normal launch and verifies the owned engine: %s', async (behavior) => {
+    const harness = createLegacyHarness(behavior)
+    const { value, error, report } = await runLegacyVerification(harness)
+    expect(error).toBeUndefined()
+    expect(value).toMatchObject({
+      hostVerification: 'passed', win7Verification: 'pending', ipc: true, capability: true, echo: true,
+    })
+    expect(harness.spawn.mock.calls[0][1]).toEqual([])
+    expect(harness.spawn.mock.calls[0][2].env.RENYAN_PACKAGE_VERIFY_USER_DATA).toBe(harness.profile)
+    expect(harness.execFileSync.mock.calls.some(([, args]) => args[3].includes('-LocalPort 9012'))).toBe(true)
+    expect(harness.verifyFileSha256).toHaveBeenCalledTimes(43)
+    expect(report).toMatchObject({ stage: 'complete', connectionEvidence: 'application-grpc-echo', cleanup: 'passed' })
+    expect(harness.killed).toEqual([12, 11])
+    expect(harness.live.has(99)).toBe(true)
+  })
+
+  it.each([
+    ['missing-window', 'windows'],
+    ['missing-ipc', 'ipc'],
+    ['missing-capability', 'capability'],
+    ['missing-echo', 'echo'],
+  ])('times out at the actual missing stage: %s', async (behavior, stage) => {
+    const { error, report } = await runLegacyVerification(createLegacyHarness(behavior))
+    expect(error.message).toContain('240 秒')
+    expect(report).toMatchObject({ hostVerification: 'failed', stage, cleanup: 'passed' })
+    expect(report.progress[stage]).toBe(false)
+  })
+
+  it('recognizes a blocked launch before log initialization without leaking stdio', async () => {
+    const { error, report } = await runLegacyVerification(createLegacyHarness('blocked'))
+    expect(error.message).toContain('成品拒绝了验包启动参数')
+    expect(error.message).not.toContain('240 秒')
+    expect(report).toMatchObject({ hostVerification: 'failed', stage: 'launch', cleanup: 'passed' })
+    expect(JSON.stringify(report)).not.toMatch(/fixture-password|--inspect/)
+  })
+
+  it.each([
+    ['exit', '成品进程提前退出'],
+    ['engine-exit', '窗口就绪后引擎或应用退出'],
+    ['engine-failure', '成品 IPC 或引擎启动失败'],
+    ['foreign-engine', '连接不是本次启动的引擎'],
+    ['foreign-listener', '连接不是本次启动的引擎'],
+    ['invalid-port', '引擎端口无效'],
+    ['hash', 'fixture hash mismatch'],
+  ])('keeps strict failure and cleanup behavior: %s', async (behavior, message) => {
+    const harness = createLegacyHarness(behavior)
+    const { error, report } = await runLegacyVerification(harness)
+    expect(error.message).toContain(message)
+    expect(report.hostVerification).toBe('failed')
+    if (behavior === 'engine-failure') expect(report.stage).toBe('engine')
+    expect(report.cleanup).toBe('passed')
+    expect(harness.killed).not.toContain(99)
+    expect(harness.live.has(99)).toBe(true)
+  })
+})
 
 describe('Windows legacy 验包数据隔离', () => {
   it.each([
