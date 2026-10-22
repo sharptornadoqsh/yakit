@@ -361,8 +361,10 @@ const createHandlers = (prepare, version = 'mitm') => {
     MITMV2: vi.fn(() => stream),
     DownloadMITMCert: vi.fn((params, callback) => callback(null, { CaCerts: 'remote' })),
   }
+  const handlerPath = path.resolve(`app/main/handlers/${version}.js`)
+  const handlerRequire = createRequire(handlerPath)
   const module = { exports: {} }
-  vm.runInNewContext(fs.readFileSync(path.resolve(`app/main/handlers/${version}.js`), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(handlerPath, 'utf8'), {
     module,
     Buffer,
     setTimeout,
@@ -371,7 +373,7 @@ const createHandlers = (prepare, version = 'mitm') => {
       if (name === '../filePath') return { getYakitHome: () => os.tmpdir() }
       if (name === '../logFile') return { engineLogOutputFile: vi.fn(), getFormattedDateTime: () => 'fixture' }
       if (name === '../mitmCertificateBranding') return { prepareMitmCertificates: prepare, trackCertificateUse: track }
-      return nativeRequire(name)
+      return handlerRequire(name)
     },
   })
   module.exports({ webContents: { send: vi.fn() } }, () => client)
