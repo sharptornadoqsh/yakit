@@ -617,7 +617,11 @@ describe('Windows legacy 确定性构建与归档', () => {
   it('applies a normalized patch while preserving its source and rejecting malformed or mismatched input', () => {
     const root = createEngineRoot()
     const runGit = (args) =>
-      execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' })
+      execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'core.eol=lf', '-C', root, ...args], {
+        encoding: 'utf8',
+        timeout: 10000,
+        stdio: 'pipe',
+      })
     try {
       const original = path.join(root, 'original.diff')
       const normalized = path.join(root, 'normalized.diff')
