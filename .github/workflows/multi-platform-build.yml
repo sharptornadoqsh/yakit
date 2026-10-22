@@ -536,16 +536,7 @@ jobs:
           )) { node --check $file }
           yarn --cwd app/renderer/engine-link-startup tsc --noEmit -p tsconfig.json
 
-      - name: 检出固定 Windows legacy 引擎源码
-        if: ${{ inputs.legacy && inputs.include_engine }}
-        uses: actions/checkout@v7
-        with:
-          repository: yaklang/yaklang
-          ref: 9b5f61cf4e69e74d2db157989de7e787b5cad4da
-          path: .Codex/windows-legacy-engine-source
-          persist-credentials: false
-
-      - name: 构建固定 Windows legacy 引擎与运行库
+      - name: 下载固定 Windows legacy 引擎与运行库
         if: ${{ inputs.legacy && inputs.include_engine }}
         timeout-minutes: 60
         shell: pwsh
@@ -553,7 +544,6 @@ jobs:
           REQUESTED_ENGINE_VERSION: ${{ inputs.engine_version }}
         run: |
           ./packageScript/script/build-windows-legacy-engine.ps1 `
-            -Source "${{ github.workspace }}/.Codex/windows-legacy-engine-source" `
             -Output "$env:WINDOWS_LEGACY_BUNDLE"
 
       - name: 校验仓库内置浏览器扩展
@@ -689,9 +679,6 @@ jobs:
             release/SHA256SUMS.txt
             bins/yak_windows_amd64.zip.verified.json
             ${{ env.WINDOWS_LEGACY_BUNDLE }}/build.json
-            ${{ env.WINDOWS_LEGACY_BUNDLE }}/upstream-patches.json
-            ${{ env.WINDOWS_LEGACY_BUNDLE }}/go-build-info.txt
-            ${{ env.WINDOWS_LEGACY_BUNDLE }}/loader-probe.txt
             ${{ env.WINDOWS_LEGACY_BUNDLE }}/imports.json
             ${{ env.WINDOWS_LEGACY_BUNDLE }}/yak.exe.sha256.txt
           if-no-files-found: warn

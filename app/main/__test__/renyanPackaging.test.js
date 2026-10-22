@@ -447,7 +447,7 @@ describe('Windows legacy 确定性构建与归档', () => {
     expect(windows.steps[initialize].run).toContain('$env:RUNNER_TEMP')
     expect(windows.steps[initialize].run).toContain('"WINDOWS_LEGACY_BUNDLE=$bundle" >> $env:GITHUB_ENV')
     for (const name of [
-      '构建固定 Windows legacy 引擎与运行库',
+      '下载固定 Windows legacy 引擎与运行库',
       '准备并校验 Windows x64 引擎',
       '上传 Windows legacy 构建及宿主检查证据',
     ]) {
@@ -458,10 +458,14 @@ describe('Windows legacy 确定性构建与归档', () => {
   it('专用回归和构建只挂载 Windows legacy 条件', () => {
     const workflow = parseYaml(fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8'))
     const windows = workflow.jobs['build-windows-x64']
-    const checkout = windows.steps.find((step) => step.name === '检出固定 Windows legacy 引擎源码')
-    expect(checkout.if).toBe('${{ inputs.legacy && inputs.include_engine }}')
-    expect(checkout.with.ref).toBe(windowsLegacyLock.sourceCommit)
-    expect(checkout.with.repository).toBe(windowsLegacyLock.sourceRepository)
+    const download = windows.steps.find((step) => step.name === '下载固定 Windows legacy 引擎与运行库')
+    expect(download.if).toBe('${{ inputs.legacy && inputs.include_engine }}')
+    expect(download.run).toContain('build-windows-legacy-engine.ps1')
+    expect(download.run).not.toContain('-Source')
+    expect(windows.steps.some((step) => step.with?.repository === 'yaklang/yaklang')).toBe(false)
+    expect(JSON.stringify(windows)).not.toMatch(
+      /setup-go|windows-legacy-engine-source|go-build-info|loader-probe|upstream-patches/,
+    )
     const prepare = windows.steps.find((step) => step.id === 'engine')
     expect(prepare.run).toContain('prepare-renyan-engine.js prepare-windows-legacy')
     expect(prepare.run).toContain('prepare-renyan-engine.js prepare\n')
@@ -508,7 +512,7 @@ describe('Windows legacy 确定性构建与归档', () => {
       'src/pages/StartupPage/__test__/engineLifecycle.test.ts',
       'src/pages/StartupPage/__test__/startup-port.test.tsx',
     ])
-    const build = windows.steps.findIndex((step) => step.name === '构建固定 Windows legacy 引擎与运行库')
+    const build = windows.steps.findIndex((step) => step.name === '下载固定 Windows legacy 引擎与运行库')
     expect(windows.steps.indexOf(main)).toBeLessThan(windows.steps.indexOf(renderer))
     expect(windows.steps.indexOf(renderer)).toBeLessThan(build)
     const evidence = windows.steps.find((step) => step.name === '上传 Windows legacy 构建及宿主检查证据')
@@ -517,76 +521,174 @@ describe('Windows legacy 确定性构建与归档', () => {
     expect(evidence.with.path).toContain('reports/windows-legacy-*.log')
   })
 
-  it.each(['success', 'missing', 'hash', 'version', 'source'])('专用归档状态：%s', async (mode) => {
+  it.each([
+    'success',
+    'default-version',
+    'missing',
+    'engine-missing',
+    'incomplete',
+    'hash',
+    'engine-hash',
+    'architecture',
+    'version',
+    'previous-version',
+    'source',
+    'repository',
+    'metadata-version',
+    'revision',
+    'distribution',
+    'asset',
+    'url',
+    'pinned-hash',
+    'inspection-source',
+    'runtime-source',
+  ])('专用归档状态：%s', async (mode) => {
     const root = createEngineRoot()
     try {
       const directory = path.join(root, 'bundle')
       fs.mkdirSync(directory)
       const bytes = engineFixture('win32', 'x64')
       const sha256 = crypto.createHash('sha256').update(bytes).digest('hex')
+      const lock = {
+        ...windowsLegacyLock,
+        engine: { ...windowsLegacyLock.engine, sha256 },
+      }
       const names = ['yak.exe', 'ucrtbase.dll', ...Array.from({ length: 41 }, (_, index) => `api-ms-win-fixture-${index}.dll`)]
       const metadata = {
+        distribution: lock.distribution,
+        sourceRepository: lock.sourceRepository,
         sourceCommit: windowsLegacyLock.sourceCommit,
         engineVersion: windowsLegacyLock.engineVersion,
         revision: windowsLegacyLock.revision,
-        go: windowsLegacyLock.go,
-        compiler: windowsLegacyLock.compiler,
-        ucrt: windowsLegacyLock.ucrt,
+        engine: { ...lock.engine },
+        inspectionTool: { ...lock.inspectionTool },
+        ucrt: { ...lock.ucrt },
         files: names.map((name) => ({ name, sha256 })),
       }
       for (const name of names) fs.writeFileSync(path.join(directory, name), bytes)
       if (mode === 'missing') fs.unlinkSync(path.join(directory, 'ucrtbase.dll'))
+      if (mode === 'engine-missing') fs.unlinkSync(path.join(directory, 'yak.exe'))
+      if (mode === 'incomplete') metadata.files.pop()
       if (mode === 'hash') fs.appendFileSync(path.join(directory, 'ucrtbase.dll'), 'changed')
+      if (mode === 'engine-hash') {
+        const altered = Buffer.concat([bytes, Buffer.from('changed')])
+        fs.writeFileSync(path.join(directory, 'yak.exe'), altered)
+        metadata.files[0].sha256 = crypto.createHash('sha256').update(altered).digest('hex')
+      }
+      if (mode === 'architecture') {
+        const wrongArchitecture = Buffer.from(bytes)
+        wrongArchitecture.writeUInt16LE(0xaa64, 132)
+        fs.writeFileSync(path.join(directory, 'ucrtbase.dll'), wrongArchitecture)
+        metadata.files[1].sha256 = crypto.createHash('sha256').update(wrongArchitecture).digest('hex')
+      }
       if (mode === 'source') metadata.sourceCommit = '0'.repeat(40)
+      if (mode === 'repository') metadata.sourceRepository = 'unexpected/source'
+      if (mode === 'metadata-version') metadata.engineVersion = `${lock.engineVersion}-unexpected`
+      if (mode === 'revision') metadata.revision = 'win7-loader-r1'
+      if (mode === 'distribution') metadata.distribution = 'source-build'
+      if (mode === 'asset') metadata.engine.asset = 'yak_windows_amd64.exe'
+      if (mode === 'url') metadata.engine.url = metadata.engine.url.replace(`/${lock.engineVersion}/`, '/latest/')
+      if (mode === 'pinned-hash') metadata.engine.sha256 = '0'.repeat(64)
+      if (mode === 'inspection-source') metadata.inspectionTool.sha256 = '0'.repeat(64)
+      if (mode === 'runtime-source') metadata.ucrt.sha512 = 'changed'
       fs.writeFileSync(path.join(directory, 'build.json'), JSON.stringify(metadata))
       const original = JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))
+      let requestedVersion = lock.engineVersion
+      if (mode === 'default-version') requestedVersion = ''
+      if (mode === 'version') requestedVersion = 'latest'
+      if (mode === 'previous-version') requestedVersion = '1.4.8-beta3'
       const promise = prepareWindowsLegacyArchive({
         root,
         directory,
-        requestedVersion: mode === 'version' ? 'latest' : windowsLegacyLock.engineVersion,
+        requestedVersion,
+        lock,
       })
-      if (mode !== 'success') {
+      if (!['success', 'default-version'].includes(mode)) {
         await expect(promise).rejects.toThrow()
         expect(JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))).toEqual(original)
+        expect(fs.existsSync(path.join(root, 'bins/yak_windows_amd64.zip'))).toBe(false)
         return
       }
       const result = await promise
-      expect(result.verification).toMatchObject({ legacy: true, win7Verification: 'pending', packagedEngineSha256: sha256 })
+      expect(result.engineVersion).toBe(lock.engineVersion)
+      expect(fs.readFileSync(path.join(root, 'bins/engine-version.txt'), 'utf8').trim()).toBe(lock.engineVersion)
+      expect(result.verification).toMatchObject({
+        legacy: true,
+        distribution: 'prebuilt',
+        win7Verification: 'pending',
+        packagedEngineSha256: sha256,
+        engine: lock.engine,
+      })
+      expect(result.verification).not.toHaveProperty('go')
+      expect(result.verification).not.toHaveProperty('compiler')
       const manifest = JSON.parse(fs.readFileSync(path.join(root, 'product/engine-compatibility.json'), 'utf8'))
       const { windowsLegacy, ...unchanged } = manifest.clientVersions[0]
       const { windowsLegacy: ignored, ...baseline } = original.clientVersions[0]
       expect(unchanged).toEqual(baseline)
       expect(windowsLegacy.artifact.files).toHaveLength(43)
+      expect(windowsLegacy.distribution).toBe('prebuilt')
+      expect(windowsLegacy.revision).toBe('win7-prebuilt-ucrt-r1')
+      expect(windowsLegacy.artifact.sourceUrl).toBe(lock.engine.url)
+      expect(windowsLegacy.artifact.engineSha256).toBe(lock.engine.sha256)
+      expect(windowsLegacy.artifact.replaceEngineSha256).toEqual(lock.replaceEngineSha256)
+      expect(windowsLegacy.artifact.status).toBe('downloaded-pending-win7-verification')
       expect(new AdmZip(result.archivePath).getEntries()).toHaveLength(43)
     } finally {
       fs.rmSync(root, { recursive: true, force: true })
     }
   })
 
-  it('checks normalized upstream patches before downloads and records their application', () => {
-    const build = fs.readFileSync(path.resolve('packageScript/script/build-windows-legacy-engine.ps1'), 'utf8')
-    const normalize = build.indexOf('--normalize-patch $Original $File')
-    const preflight = build.indexOf('git -C $Work apply --numstat -- $File')
-    expect(normalize).toBeGreaterThan(0)
-    expect(preflight).toBeGreaterThan(normalize)
-    expect(preflight).toBeLessThan(build.indexOf('$GoZip = Download-Locked'))
-    expect(build).toContain('foreach ($Patch in $Lock.upstreamPatches)')
-    expect(build).toContain('foreach ($Patch in $PatchEvidence)')
-    expect(build).toContain('$File = "$PatchDirectory/$($Patch.name)"')
-    expect(build).toContain('git -C $env:GOROOT apply --check --reverse --ignore-space-change $File')
-    expect(build).toContain('git -C $env:GOROOT apply --reverse --ignore-space-change $File')
-    expect(build.indexOf('$Patch.applied = $true')).toBeGreaterThan(
-      build.indexOf('git -C $env:GOROOT apply --reverse'),
+  it('downloads the pinned prebuilt legacy engine without invoking the Go toolchain', () => {
+    expect(windowsLegacyLock).toMatchObject({
+      engineVersion: '1.4.9-beta3',
+      distribution: 'prebuilt',
+      revision: 'win7-prebuilt-ucrt-r1',
+      sourceRepository: 'yaklang/yaklang',
+      sourceCommit: '95712c8462840fd2c2549edcf9078ff3a1d3e37c',
+      replaceEngineSha256: ['090ad62c2a1f1be9b426235bf7f627cd62c99d3affff5fbc7c5713295feffc6e'],
+      engine: {
+        asset: 'yak_windows_legacy_amd64.exe',
+        url: 'https://github.com/yaklang/yaklang/releases/download/1.4.9-beta3/yak_windows_legacy_amd64.exe',
+        sha256: '17488fa420cfaae267134a7439fed7373f4c54c080571631e32fbcef425bdf00',
+      },
+      ucrt: { package: 'Microsoft.Windows.SDK.CPP', version: '10.0.19041.5', fileCount: 42 },
+    })
+    expect(windowsLegacyLock).not.toHaveProperty('go')
+    expect(windowsLegacyLock).not.toHaveProperty('compiler')
+    expect(windowsLegacyLock).not.toHaveProperty('upstreamPatches')
+    const prepare = fs.readFileSync(path.resolve('packageScript/script/build-windows-legacy-engine.ps1'), 'utf8')
+    expect(prepare).toContain("$Engine = Download-Locked $Lock.engine 'yak.exe'")
+    expect(prepare).toContain('$env:REQUESTED_ENGINE_VERSION -ne $Lock.engineVersion')
+    expect(prepare).toContain('-Algorithm SHA256).Hash.ToLower() -ne $Definition.sha256')
+    expect(prepare).toContain('-Algorithm SHA512).Hash -ne $Expected')
+    expect(prepare).toContain('$Runtime.Count -ne $Lock.ucrt.fileCount')
+    expect(prepare).toContain('(& $Objdump -p $File.FullName)')
+    expect(prepare).toContain("distribution = 'prebuilt'")
+    expect(prepare).toContain("win7Verification = 'pending'")
+    expect(prepare).not.toMatch(
+      /GOROOT|GOPATH|GOTOOLCHAIN|CGO_|go\.exe|\bgo (?:mod|run|build)\b|patch-windows-legacy-go|git -C|gcc\.exe|g\+\+\.exe/,
     )
-    expect(build).toContain('sha256 = (Get-FileHash -LiteralPath $Original -Algorithm SHA256)')
-    expect(build).toContain('normalizedSha256 = (Get-FileHash -LiteralPath $File -Algorithm SHA256)')
-    expect(build).not.toMatch(/--reject|--recount|--allow-empty/)
     const workflow = parseYaml(fs.readFileSync(path.resolve('.github/workflows/multi-platform-build.yml'), 'utf8'))
     const evidence = workflow.jobs['build-windows-x64'].steps.find(
       (step) => step.name === '上传 Windows legacy 构建及宿主检查证据',
     )
     expect(evidence.if).toBe('${{ always() && inputs.legacy }}')
-    expect(evidence.with.path).toContain('${{ env.WINDOWS_LEGACY_BUNDLE }}/upstream-patches.json')
+    expect(evidence.with.path).toContain('${{ env.WINDOWS_LEGACY_BUNDLE }}/build.json')
+    expect(evidence.with.path).toContain('${{ env.WINDOWS_LEGACY_BUNDLE }}/imports.json')
+    expect(evidence.with.path).not.toMatch(/upstream-patches|loader-probe|go-build-info/)
+  })
+
+  it('keeps the Windows legacy recommendation separate from other platforms', () => {
+    const client = compatibilityManifest.clientVersions.find((item) => item.clientVersion === packageJson.version)
+    expect(client.windowsLegacy).toMatchObject({
+      recommendedEngineVersion: windowsLegacyLock.engineVersion,
+      sourceCommit: windowsLegacyLock.sourceCommit,
+      distribution: 'prebuilt',
+      win7Verification: 'pending',
+    })
+    expect(client.recommendedEngineVersion).toBe('1.4.8-beta3')
+    expect(client.highestVerifiedEngineVersion).toBe('1.4.8-beta3')
+    expect(resolveEngineVersion('')).toBe('1.4.8-beta3')
   })
 
   const upstreamPatchFixture = [

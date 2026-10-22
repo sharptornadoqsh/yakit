@@ -218,24 +218,37 @@ const prepareEngine = async ({
   }
 }
 
-const prepareWindowsLegacyArchive = async ({ directory, root = repositoryRoot, requestedVersion }) => {
-  if (requestedVersion && requestedVersion !== windowsLegacyLock.engineVersion) {
-    throw new Error(`Windows legacy 固定引擎版本为 ${windowsLegacyLock.engineVersion}`)
+const prepareWindowsLegacyArchive = async ({
+  directory,
+  root = repositoryRoot,
+  requestedVersion,
+  lock = windowsLegacyLock,
+}) => {
+  if (requestedVersion && requestedVersion !== lock.engineVersion) {
+    throw new Error(`Windows legacy 固定引擎版本为 ${lock.engineVersion}`)
   }
   const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'build.json'), 'utf8'))
   if (
-    metadata.sourceCommit !== windowsLegacyLock.sourceCommit ||
-    metadata.engineVersion !== windowsLegacyLock.engineVersion ||
-    metadata.revision !== windowsLegacyLock.revision ||
-    metadata.go?.sha256 !== windowsLegacyLock.go.sha256 ||
-    metadata.compiler?.sha256 !== windowsLegacyLock.compiler.sha256 ||
-    metadata.ucrt?.version !== windowsLegacyLock.ucrt.version ||
-    metadata.ucrt?.sha512 !== windowsLegacyLock.ucrt.sha512
+    metadata.distribution !== 'prebuilt' ||
+    metadata.sourceRepository !== lock.sourceRepository ||
+    metadata.sourceCommit !== lock.sourceCommit ||
+    metadata.engineVersion !== lock.engineVersion ||
+    metadata.revision !== lock.revision ||
+    metadata.engine?.asset !== lock.engine.asset ||
+    metadata.engine?.url !== lock.engine.url ||
+    metadata.engine?.sha256 !== lock.engine.sha256 ||
+    metadata.inspectionTool?.sha256 !== lock.inspectionTool.sha256 ||
+    metadata.ucrt?.package !== lock.ucrt.package ||
+    metadata.ucrt?.version !== lock.ucrt.version ||
+    metadata.ucrt?.sha512 !== lock.ucrt.sha512
   ) {
-    throw new Error('Windows legacy 构建来源与锁定清单不一致')
+    throw new Error('Windows legacy 预编译工件来源与锁定清单不一致')
   }
   const { validateFiles } = require('../../app/main/windowsLegacyEngine')
   const files = validateFiles(metadata)
+  if (files.find((file) => file.name === 'yak.exe').sha256 !== lock.engine.sha256) {
+    throw new Error('Windows legacy 引擎摘要与固定预编译工件不一致')
+  }
   const asset = 'yak_windows_amd64.exe'
   const paths = getEnginePaths(asset, root)
   const zip = new AdmZip()
@@ -269,6 +282,7 @@ const prepareWindowsLegacyArchive = async ({ directory, root = repositoryRoot, r
   client.windowsLegacy = {
     recommendedEngineVersion: metadata.engineVersion,
     revision: metadata.revision,
+    distribution: metadata.distribution,
     sourceCommit: metadata.sourceCommit,
     win7Verification: 'pending',
     artifact: {
@@ -280,9 +294,10 @@ const prepareWindowsLegacyArchive = async ({ directory, root = repositoryRoot, r
       archiveEntry: `bins/${asset}`,
       archiveSha256,
       engineSha256,
+      sourceUrl: metadata.engine.url,
       files,
-      replaceEngineSha256: windowsLegacyLock.replaceEngineSha256,
-      status: 'built-pending-win7-verification',
+      replaceEngineSha256: lock.replaceEngineSha256,
+      status: 'downloaded-pending-win7-verification',
     },
   }
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')

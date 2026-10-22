@@ -1,19 +1,21 @@
 {
   "schemaVersion": 1,
-  "engineVersion": "1.4.8-beta3",
-  "revision": "win7-loader-r1",
+  "engineVersion": "1.4.9-beta3",
+  "revision": "win7-prebuilt-ucrt-r1",
+  "distribution": "prebuilt",
   "sourceRepository": "yaklang/yaklang",
-  "sourceCommit": "9b5f61cf4e69e74d2db157989de7e787b5cad4da",
+  "sourceCommit": "95712c8462840fd2c2549edcf9078ff3a1d3e37c",
   "replaceEngineSha256": [
     "090ad62c2a1f1be9b426235bf7f627cd62c99d3affff5fbc7c5713295feffc6e"
   ],
-  "go": {
-    "version": "1.22.12",
-    "url": "https://go.dev/dl/go1.22.12.windows-amd64.zip",
-    "sha256": "2ceda04074eac51f4b0b85a9fcca38bcd49daee24bed9ea1f29958a8e22673a6"
+  "engine": {
+    "asset": "yak_windows_legacy_amd64.exe",
+    "url": "https://github.com/yaklang/yaklang/releases/download/1.4.9-beta3/yak_windows_legacy_amd64.exe",
+    "sha256": "17488fa420cfaae267134a7439fed7373f4c54c080571631e32fbcef425bdf00"
   },
-  "compiler": {
-    "version": "14.2.0",
+  "inspectionTool": {
+    "name": "winlibs-objdump",
+    "packageVersion": "14.2.0posix-12.0.0-ucrt-r3",
     "url": "https://github.com/brechtsanders/winlibs_mingw/releases/download/14.2.0posix-12.0.0-ucrt-r3/winlibs-x86_64-posix-seh-gcc-14.2.0-mingw-w64ucrt-12.0.0-r3.zip",
     "sha256": "88868d745b807f083a117ff69348d8bc021ad7389aa503379dbed1866efcaeb9"
   },
@@ -24,10 +26,5 @@
     "sha512": "6kRappwcPle+pBqSYbbKuTSSD/w5994cXUegff77U3mqyf5oEojwwGC4WliEsjn4E22aiVLC/vxpuCKNqgdxRg==",
     "directory": "c/Redist/10.0.19041.0/ucrt/DLLs/x64",
     "fileCount": 42
-  },
-  "upstreamPatches": [
-    "693def151adff1af707d82d28f55dba81ceb08e1.diff",
-    "7c1157f9544922e96945196b47b95664b1e39108.diff",
-    "48042aa09c2f878c4faa576948b07fe625c4707a.diff"
-  ]
+  }
 }

@@ -8,9 +8,10 @@
       "highestVerifiedEngineVersion": "1.4.8-beta3",
       "compatibilityGate": "check-secret-local-grpc",
       "windowsLegacy": {
-        "recommendedEngineVersion": "1.4.8-beta3",
-        "revision": "win7-loader-r1",
-        "sourceCommit": "9b5f61cf4e69e74d2db157989de7e787b5cad4da",
+        "recommendedEngineVersion": "1.4.9-beta3",
+        "revision": "win7-prebuilt-ucrt-r1",
+        "distribution": "prebuilt",
+        "sourceCommit": "95712c8462840fd2c2549edcf9078ff3a1d3e37c",
         "win7Verification": "pending"
       },
       "artifacts": [
