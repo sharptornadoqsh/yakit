@@ -1,16 +1,13 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import styles from './MITMServerStartForm.module.scss'
 import { RuiYanButton, RuiYanModal } from '@/components/renyanUI'
-import { YakitTag } from '@/components/yakitUI/YakitTag/YakitTag'
 import { YakEditor } from '@/utils/editors'
 import { CaCertData } from '../MITMServerHijacking/MITMServerHijacking'
 import { useMemoizedFn } from 'ahooks'
-import { saveABSFileToOpen, openExternalWebsite } from '@/utils/openWebsite'
+import { saveABSFileToOpen } from '@/utils/openWebsite'
 import { YakitCard } from '@/components/yakitUI/YakitCard/YakitCard'
 import { YakitRadioButtons } from '@/components/yakitUI/YakitRadioButtons/YakitRadioButtons'
-import { YakitButton } from '@/components/yakitUI/YakitButton/YakitButton'
 import { useI18nNamespaces } from '@/i18n/useI18nNamespaces'
-import { OutlineQuestionmarkcircleIcon } from '@/assets/icon/outline'
 
 const { ipcRenderer } = window.require('electron')
 
@@ -51,8 +48,6 @@ export const MITMCertificateDownloadModal: React.FC<MITMCertificateDownloadModal
       footer={
         <>
           <div className={styles['certificate-download-modal-footer']}>
-            {t('MITMCertificateDownloadModal.after_proxy_visit')}
-            <YakitTag enableCopy copyText="http://mitm" iconColor="var(--Colors-Use-Main-Primary)" />
             {t('MITMCertificateDownloadModal.auto_download_cert')}
           </div>
           <RuiYanButton variant="secondary" onClick={() => setVisible(false)}>
@@ -86,20 +81,6 @@ export const MITMCertificateDownloadModal: React.FC<MITMCertificateDownloadModal
         style={{ borderRadius: 4 }}
         headStyle={{ height: 36 }}
         bodyStyle={{ padding: 0 }}
-        extra={
-          isGMState ? (
-            <YakitButton
-              type="text"
-              onClick={() => {
-                openExternalWebsite('https://mp.weixin.qq.com/s/smGfZar2H0arbkZx_4b-Iw')
-              }}
-              className={styles['certificate-download-modal-btn']}
-            >
-              {t('YakitButton.ImportTutorial')}
-              <OutlineQuestionmarkcircleIcon className={styles['certificate-download-modal-icon']} />
-            </YakitButton>
-          ) : null
-        }
       >
         <div className={styles['certificate-download-modal-body']}>
           <YakEditor bytes={true} valueBytes={caCerts.CaCerts} />
