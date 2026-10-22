@@ -1,10 +1,16 @@
 const { ipcMain } = require('electron')
 const DNS = require('dns')
+const { getYakitHome } = require('../filePath')
+const { prepareMitmCertificates, trackCertificateUse } = require('../mitmCertificateBranding')
 
 /**@deprecated */
 // module.exports = (win, originGetClient) => {
 module.exports = (win, getClient) => {
   let stream
+  let startRequestId = 0
+  let preparation
+  const prepareCertificates = (client, directory = getYakitHome()) =>
+    prepareMitmCertificates({ client, directory, isBusy: () => Boolean(stream) })
   let currentPort
   let currentHost
   let currentDownstreamProxy
@@ -236,7 +242,7 @@ module.exports = (win, getClient) => {
 
   // 开始调用 MITM，设置 stream
   let isFirstData = true
-  ipcMain.handle('mitm-start-call', (e, params) => {
+  ipcMain.handle('mitm-start-call', async (e, params) => {
     const {
       host,
       port,
@@ -254,8 +260,25 @@ module.exports = (win, getClient) => {
       return
     }
 
+    if (preparation) {
+      await preparation
+      return
+    }
+    const requestId = ++startRequestId
+    const client = getClient()
+    const directory = getYakitHome()
+    const currentPreparation = prepareCertificates(client, directory)
+    preparation = currentPreparation
+    try {
+      await currentPreparation
+    } finally {
+      if (preparation === currentPreparation) preparation = undefined
+    }
+    if (requestId !== startRequestId) return
+    if (client !== getClient()) throw new Error('引擎连接已变化，请重新启动代理')
     isFirstData = true
-    stream = getClient().MITM()
+    stream = client.MITM()
+    trackCertificateUse(stream, client, directory)
     // 设置服务器发回的消息的回调函数
     stream.on('data', (data) => {
       // 处理第一个消息
@@ -346,6 +369,8 @@ module.exports = (win, getClient) => {
     }
   })
   ipcMain.handle('mitm-stop-call', () => {
+    startRequestId += 1
+    preparation = undefined
     if (stream) {
       stream.cancel()
       stream = null
@@ -398,6 +423,8 @@ module.exports = (win, getClient) => {
     })
   }
   ipcMain.handle('DownloadMITMCert', async (e, params) => {
+    const certificates = await prepareCertificates(getClient())
+    if (certificates) return certificates.regular
     return await asyncDownloadMITMCert(params)
   })
 
@@ -414,6 +441,8 @@ module.exports = (win, getClient) => {
     })
   }
   ipcMain.handle('DownloadMITMGMCert', async (e, params) => {
+    const certificates = await prepareCertificates(getClient())
+    if (certificates) return certificates.gm
     return await asyncDownloadMITMGMCert(params)
   })
 

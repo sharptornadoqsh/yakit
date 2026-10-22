@@ -129,6 +129,13 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
+      - name: 证书名称重签回归
+        shell: bash
+        timeout-minutes: 5
+        env:
+          THE_LEGACY: 'false'
+        run: yarn test:vitest --run --threads=false app/main/__test__/mitmCertificateBranding.test.js
+
       - name: 校验仓库内置浏览器扩展
         shell: bash
         run: |
@@ -289,6 +296,13 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 证书名称重签回归
+        shell: bash
+        timeout-minutes: 5
+        env:
+          THE_LEGACY: 'false'
+        run: yarn test:vitest --run --threads=false app/main/__test__/mitmCertificateBranding.test.js
 
       - name: 校验仓库内置浏览器扩展
         shell: bash
@@ -458,6 +472,13 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 证书名称重签回归
+        shell: bash
+        timeout-minutes: 5
+        env:
+          THE_LEGACY: 'false'
+        run: yarn test:vitest --run --threads=false app/main/__test__/mitmCertificateBranding.test.js
 
       - name: 配置旧系统兼容运行时
         if: ${{ inputs.legacy }}
@@ -730,6 +751,13 @@ jobs:
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
 
+      - name: 证书名称重签回归
+        shell: bash
+        timeout-minutes: 5
+        env:
+          THE_LEGACY: 'false'
+        run: yarn test:vitest --run --threads=false app/main/__test__/mitmCertificateBranding.test.js
+
       - name: 配置旧系统兼容运行时
         if: ${{ inputs.legacy }}
         shell: bash
@@ -884,6 +912,13 @@ jobs:
           yarn install --frozen-lockfile
           yarn install-render --frozen-lockfile
           yarn install-link-render --frozen-lockfile
+
+      - name: 证书名称重签回归
+        shell: bash
+        timeout-minutes: 5
+        env:
+          THE_LEGACY: 'false'
+        run: yarn test:vitest --run --threads=false app/main/__test__/mitmCertificateBranding.test.js
 
       - name: 配置旧系统兼容运行时
         if: ${{ inputs.legacy }}

@@ -1,6 +1,8 @@
 const { ipcMain } = require('electron')
 const DNS = require('dns')
 const { engineLogOutputFile, getFormattedDateTime } = require('../logFile')
+const { getYakitHome } = require('../filePath')
+const { prepareMitmCertificates, trackCertificateUse } = require('../mitmCertificateBranding')
 
 // 创建消息发送器的工厂函数
 const createMessageSender = (stream, options) => {
@@ -81,6 +83,8 @@ const createMessageSender = (stream, options) => {
 // module.exports = (win, originGetClient) => {
 module.exports = (win, getClient) => {
   let stream
+  let startRequestId = 0
+  let preparation
   let currentPort
   let currentHost
   let currentDownstreamProxy
@@ -232,7 +236,7 @@ module.exports = (win, getClient) => {
 
   // 开始调用 MITM，设置 stream
   let isFirstData = true
-  ipcMain.handle('mitmV2-start-call', (e, params) => {
+  ipcMain.handle('mitmV2-start-call', async (e, params) => {
     const { Host, Port, DownstreamProxy, DownstreamProxyRuleId, extra } = params
     if (stream) {
       if (win) {
@@ -241,8 +245,25 @@ module.exports = (win, getClient) => {
       return
     }
 
+    if (preparation) {
+      await preparation
+      return
+    }
+    const requestId = ++startRequestId
+    const client = getClient()
+    const directory = getYakitHome()
+    const currentPreparation = prepareMitmCertificates({ client, directory, isBusy: () => Boolean(stream) })
+    preparation = currentPreparation
+    try {
+      await currentPreparation
+    } finally {
+      if (preparation === currentPreparation) preparation = undefined
+    }
+    if (requestId !== startRequestId) return
+    if (client !== getClient()) throw new Error('引擎连接已变化，请重新启动代理')
     isFirstData = true
-    stream = getClient().MITMV2()
+    stream = client.MITMV2()
+    trackCertificateUse(stream, client, directory)
     // 设置服务器发回的消息的回调函数
     stream.on('data', (data) => {
       // 处理第一个消息
@@ -339,6 +360,8 @@ module.exports = (win, getClient) => {
     }
   })
   ipcMain.handle('mitmV2-stop-call', () => {
+    startRequestId += 1
+    preparation = undefined
     if (stream) {
       stream.cancel()
       stream = null
